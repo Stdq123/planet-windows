@@ -1,6 +1,6 @@
 # Contributing
 
-Contributions are welcome. Please discuss substantial changes in a [GitHub issue](https://github.com/puremixai/planet-windows/issues) before investing in a large implementation. Small fixes can be submitted directly as pull requests.
+Contributions are welcome. Please discuss substantial changes in a [GitHub issue](https://github.com/Stdq123/planet-windows/issues) before investing in a large implementation. Small fixes can be submitted directly as pull requests.
 
 1. Fork and clone the repository, then create a branch.
 2. Follow the build and test instructions in [README.md](README.md) and the detailed [Windows guide](windows/README.md).

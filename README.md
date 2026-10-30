@@ -30,7 +30,7 @@ The build downloads Kubo 0.38.2 from its official release and verifies its SHA-5
 
 ## Contributing and support
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). For bugs and feature requests, use the [GitHub issue tracker](https://github.com/puremixai/planet-windows/issues). For security concerns, see [SECURITY.md](SECURITY.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). For bugs and feature requests, use the [GitHub issue tracker](https://github.com/Stdq123/planet-windows/issues). For security concerns, see [SECURITY.md](SECURITY.md).
 
 The source snapshot is also available on [Gitea](https://gitea.com/puremixai/planet-windows) and [Codeberg](https://codeberg.org/puremixai/planet-windows). GitHub is the preferred place for collaboration. These are independent repositories; synchronization is manual.
 
