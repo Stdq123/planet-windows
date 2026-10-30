@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Planet</title>
+  <link rel="stylesheet" href="./src/style.css" />
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="planet-mark">◒</span><span>Planet<small>WINDOWS</small></span></div>
+      <div class="section-label">我的站点 <button id="new-site" class="icon-button" title="新建站点" aria-label="新建站点">＋</button></div>
+      <nav id="sites" class="sites" aria-label="我的站点"></nav>
+      <button id="import-planet" class="sidebar-action">导入 .planet 备份</button>
+      <div class="section-label following-label">关注 <button id="new-feed" class="icon-button" title="添加订阅" aria-label="添加订阅">＋</button></div>
+      <nav id="subscriptions" class="sites" aria-label="关注的订阅"></nav>
+      <div class="sidebar-footer"><span class="status-dot"></span>本地工作区<span class="version">开发中</span></div>
+    </aside>
+    <section class="posts-panel">
+      <header class="posts-header"><div><span class="eyebrow">WORKSPACE</span><h1 id="site-title">我的站点</h1></div><button id="new-article" class="icon-button" title="新建文章" aria-label="新建文章" disabled>＋</button></header>
+      <div class="posts-caption"><span>文章</span><span id="post-count">0</span></div>
+      <div id="articles" class="articles"></div>
+      <div class="panel-note">你的内容保存在这台电脑上</div>
+    </section>
+    <main class="workspace">
+      <header class="workspace-header"><div class="workspace-heading"><span class="eyebrow">YOUR SPACE TO WRITE</span><div id="workspace-title" class="workspace-title">欢迎来到 Planet</div><div id="site-address" class="site-address" hidden></div></div><div class="header-actions"><span id="save-state" role="status"></span><button id="delete-article" class="secondary" hidden>删除文章</button><button id="select-template" class="secondary" disabled>选择模板</button><button id="export-site" class="secondary" disabled>导出网页</button><button id="export-planet" class="secondary" disabled>备份</button><button id="publish-site" class="secondary" disabled>发布到 IPFS</button><button id="refresh-feed" class="secondary" hidden>刷新订阅</button><button id="save" class="primary" title="保存后自动公开发布整个站点及其已保存附件" disabled>保存并发布</button></div></header>
+      <div id="published-address" class="published-address" hidden><label for="published-url">站点访问地址</label><input id="published-url" readonly /><button id="copy-published-url" class="secondary">复制地址</button><span id="copy-status" role="status"></span></div>
+      <div id="empty" class="empty"><div class="empty-orbit"><span>◒</span></div><h2>让想法有一个地方安放。</h2><p>创建站点，开始撰写你的第一篇文章。</p><button id="empty-action" class="primary">创建站点</button><p class="notice">原版备份兼容仍在验证中；简单 Plain 站点可尝试重建后发布。</p></div>
+      <div id="editor" class="editor" hidden>
+        <div id="imported-warning" class="imported-warning" hidden></div>
+        <div class="document-head"><label class="sr-only" for="title">文章标题</label><input id="title" class="title-input" placeholder="文章标题" maxlength="250" /><div class="document-meta">MARKDOWN <span>·</span> 保存后自动公开发布整个站点和已保存附件</div></div>
+        <div class="attachment-bar"><button id="add-attachment" class="secondary" disabled>添加附件</button><span id="attachment-list"></span><span id="attachment-help">先保存文章，再添加附件</span></div>
+        <div class="writing-grid"><section class="writing-pane"><div class="pane-label">编辑 <span>MARKDOWN</span></div><label class="sr-only" for="content">文章内容</label><textarea id="content" placeholder="从这里开始写作…" spellcheck="false"></textarea></section><section class="preview-pane"><div class="pane-label">预览 <span>LIVE PREVIEW</span></div><iframe id="preview" sandbox="" title="文章预览"></iframe></section></div>
+      </div>
+      <div id="reader" class="reader" hidden><div class="document-head"><h2 id="reader-title"></h2><div class="document-meta" id="reader-date"></div></div><iframe id="reader-preview" sandbox="" title="订阅文章"></iframe></div>
+      <div id="error" class="error" role="alert" hidden></div>
+    </main>
+  </div>
+  <dialog id="site-dialog"><form id="site-form"><h2>创建站点</h2><p>为你的新空间起个名字。</p><label>站点名称<input name="name" required maxlength="120" autofocus /></label><label>简介 <span>选填</span><textarea name="about" rows="3"></textarea></label><div class="dialog-actions"><button type="button" id="cancel-site" class="secondary">取消</button><button class="primary" type="submit">创建站点</button></div></form></dialog>
+  <dialog id="feed-dialog"><form id="feed-form"><h2>添加订阅</h2><p>输入 RSS、Atom 或 JSON Feed 地址。</p><label>订阅地址<input name="url" type="url" required placeholder="https://example.com/feed.xml" /></label><div class="dialog-actions"><button type="button" id="cancel-feed" class="secondary">取消</button><button class="primary" type="submit">添加</button></div></form></dialog>
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>
