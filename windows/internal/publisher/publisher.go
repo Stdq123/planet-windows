@@ -39,10 +39,19 @@ func PublishWithAssets(node Node, tempParent string, site store.Site, articles [
 		return Result{}, err
 	}
 	defer os.RemoveAll(dir)
+	if err = StagePublicSite(dir, site, articles, templateDir, attachmentRoot); err != nil {
+		return Result{}, err
+	}
+	return PublishDirectory(node, dir, site)
+}
+
+// StagePublicSite prepares the same public snapshot for every publishing target.
+func StagePublicSite(dir string, site store.Site, articles []store.Article, templateDir, attachmentRoot string) error {
+	var err error
 	if attachmentRoot != "" {
 		articles, err = attachments.EnrichMedia(attachmentRoot, site, articles)
 		if err != nil {
-			return Result{}, fmt.Errorf("读取媒体附件失败：%w", err)
+			return fmt.Errorf("读取媒体附件失败：%w", err)
 		}
 	}
 	if templateDir != "" {
@@ -51,25 +60,28 @@ func PublishWithAssets(node Node, tempParent string, site store.Site, articles [
 		err = sitegen.Render(dir, site, articles)
 	}
 	if err != nil {
-		return Result{}, fmt.Errorf("生成网站失败：%w", err)
+		return fmt.Errorf("生成网站失败：%w", err)
 	}
 	if attachmentRoot != "" {
 		if err := attachments.CopyToSite(attachmentRoot, dir, articles); err != nil {
-			return Result{}, fmt.Errorf("复制附件失败：%w", err)
+			return fmt.Errorf("复制附件失败：%w", err)
 		}
 		for _, article := range articles {
 			if err := attachments.GenerateVideoThumbnail(attachmentRoot, site, article, dir); err != nil {
-				return Result{}, fmt.Errorf("生成视频缩略图失败：%w", err)
+				return fmt.Errorf("生成视频缩略图失败：%w", err)
 			}
 		}
 	} else {
 		for _, article := range articles {
 			if len(article.Attachments) > 0 {
-				return Result{}, fmt.Errorf("附件存储位置未设置")
+				return fmt.Errorf("附件存储位置未设置")
 			}
 		}
 	}
-	return PublishDirectory(node, dir, site)
+	if err := sitegen.WriteAliases(dir, articles); err != nil {
+		return fmt.Errorf("生成文章自定义路径失败：%w", err)
+	}
+	return nil
 }
 
 // PublishDirectory publishes an already prepared public website after verifying its identity.

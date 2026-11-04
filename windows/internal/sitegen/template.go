@@ -21,6 +21,48 @@ import (
 	"windows/internal/templates"
 )
 
+// Original templates apply a JavaScript escape filter inside HTML attributes.
+// Correct only the known social hrefs after rendering; the values are validated.
+func renderSiteTemplate(dir, name string, ctx map[string]any, site store.Site) (string, error) {
+	page, err := templates.Render(dir, name, ctx)
+	if err != nil {
+		return "", err
+	}
+	escapeJS := func(value string) string {
+		var b strings.Builder
+		for _, r := range value {
+			if r < 32 || strings.ContainsRune(`\\'\"<>&=-;`, r) || r == '\u2028' || r == '\u2029' {
+				fmt.Fprintf(&b, `\u%04X`, r)
+			} else {
+				b.WriteRune(r)
+			}
+		}
+		return b.String()
+	}
+	for _, entry := range []struct{ prefix, value string }{{"https://twitter.com/", site.TwitterUsername}, {"https://github.com/", site.GithubUsername}, {"https://t.me/", site.TelegramUsername}, {"", site.DiscordLink}} {
+		if entry.value == "" {
+			continue
+		}
+		old := `href="` + entry.prefix + escapeJS(entry.value) + `"`
+		fresh := `href="` + html.EscapeString(entry.prefix+entry.value) + `"`
+		page = strings.ReplaceAll(page, old, fresh)
+	}
+	var missing strings.Builder
+	for _, link := range socialLinks(site) {
+		href := html.EscapeString(link.Href)
+		if !strings.Contains(page, `href="`+href+`"`) {
+			missing.WriteString(`<a href="` + href + `" target="_blank" rel="noopener noreferrer">` + html.EscapeString(link.Title) + `</a> `)
+		}
+	}
+	if missing.Len() > 0 {
+		if pos := strings.LastIndex(strings.ToLower(page), "</body>"); pos >= 0 {
+			extra := `<nav class="planet-social-extra" aria-label="Social links">` + missing.String() + `</nav>`
+			page = page[:pos] + extra + page[pos:]
+		}
+	}
+	return page, nil
+}
+
 // RenderWithTemplate implements the index, article and archive subset of Planet templates.
 func RenderWithTemplate(dir string, site store.Site, articles []store.Article, templateDir string) error {
 	return RenderWithTemplateSettings(dir, site, articles, templateDir, site.TemplateSettings)
@@ -39,6 +81,12 @@ func RenderWithTemplateSettingsForOwnership(dir string, site store.Site, article
 func renderWithTemplateSettings(dir string, site store.Site, articles []store.Article, templateDir string, settings map[string]string, buildTimestamp string) error {
 	site = store.ApplyPlausibleOverride(site)
 	var err error
+	if !site.Imported {
+		site, err = normalizedSiteProfile(site)
+		if err != nil {
+			return err
+		}
+	}
 	site, err = prepareTags(site, articles)
 	if err != nil {
 		return err
@@ -109,7 +157,7 @@ func renderWithTemplateSettings(dir string, site store.Site, articles []store.Ar
 		// This pinned template explicitly escapes tag labels itself.
 		planetTags = site.Tags
 	}
-	planet := map[string]any{"id": site.ID, "name": site.Name, "about": site.About, "ipns": site.IPNS, "created": site.Created, "tags": planetTags, "plausibleEnabled": site.PlausibleEnabled, "plausibleDomain": site.PlausibleDomain, "plausibleAPIServer": site.PlausibleAPIServer}
+	planet := map[string]any{"id": site.ID, "name": site.Name, "about": site.About, "slug": site.Slug, "authorName": site.AuthorName, "domain": site.Domain, "twitterUsername": site.TwitterUsername, "githubUsername": site.GithubUsername, "telegramUsername": site.TelegramUsername, "mastodonUsername": site.MastodonUsername, "discordLink": site.DiscordLink, "podcastLanguage": site.PodcastLanguage, "podcastExplicit": site.PodcastExplicit, "podcastCategories": podcastCategoryMap(site.PodcastCategories), "ipns": site.IPNS, "created": site.Created, "tags": planetTags, "plausibleEnabled": site.PlausibleEnabled, "plausibleDomain": site.PlausibleDomain, "plausibleAPIServer": site.PlausibleAPIServer}
 	if site.PlausibleScriptID != "" {
 		planet["plausibleEnabled"] = false
 	}
@@ -125,7 +173,7 @@ func renderWithTemplateSettings(dir string, site store.Site, articles []store.Ar
 		if err != nil {
 			return err
 		}
-		row := map[string]any{"id": a.ID, "link": articleLink(a), "title": a.Title, "content": a.Content, "contentRendered": html, "created": a.Created, "createdTimestamp": a.Created.Unix(), "modified": a.Modified, "attachments": a.Attachments, "articleReference": a.ArticleReference, "externalLink": "", "slug": a.Slug, "hasVideo": a.VideoFilename != "", "hasAudio": a.AudioFilename != "", "videoFilename": url.PathEscape(a.VideoFilename), "audioFilename": url.PathEscape(a.AudioFilename), "audioDuration": a.AudioDuration, "audioByteLength": a.AudioByteLength, "heroImage": nil, "tags": escapedTags(a.Tags)}
+		row := map[string]any{"id": a.ID, "link": articleLink(a), "title": a.Title, "content": a.Content, "contentRendered": html, "created": a.Created, "createdTimestamp": a.Created.Unix(), "modified": a.Modified, "attachments": a.Attachments, "articleReference": a.ArticleReference, "externalLink": a.ExternalLink, "articleType": a.ArticleType, "slug": a.Slug, "hasVideo": a.VideoFilename != "", "hasAudio": a.AudioFilename != "", "videoFilename": url.PathEscape(a.VideoFilename), "audioFilename": url.PathEscape(a.AudioFilename), "audioDuration": a.AudioDuration, "audioByteLength": a.AudioByteLength, "heroImage": nil, "tags": escapedTags(a.Tags)}
 		if metadata.Name == "Platinum" || metadata.Name == "Sepia" {
 			// These pinned templates escape article tag labels explicitly.
 			row["tags"] = a.Tags
@@ -139,11 +187,14 @@ func renderWithTemplateSettings(dir string, site store.Site, articles []store.Ar
 			}
 			row["attachments"] = names
 		}
+		byID[a.ID] = row
+		if a.ArticleType == 1 {
+			continue
+		}
 		rows = append(rows, row)
 		for key := range a.Tags {
 			tagArticles[key] = append(tagArticles[key], row)
 		}
-		byID[a.ID] = row
 		month := a.Created.In(time.Local).Format("January 2006")
 		if _, ok := archive[month]; !ok {
 			sections = append(sections, month)
@@ -157,10 +208,21 @@ func renderWithTemplateSettings(dir string, site store.Site, articles []store.Ar
 	avatar, avatarErr := os.Lstat(filepath.Join(dir, "avatar.png"))
 	hasAvatar := avatarErr == nil && avatar.Mode().IsRegular()
 	ogImage := ""
-	if site.IPNS != "" {
+	if site.Domain != "" {
+		ogImage = store.CanonicalSiteBase(site.Domain, site.IPNS) + "avatar.png"
+	} else if site.IPNS != "" {
 		ogImage = "https://" + site.IPNS + ".eth.sucks/avatar.png"
 	}
-	context := map[string]any{"planet": planet, "articles": rows, "assets_prefix": "./", "page_title": site.Name, "page_description": site.About, "page_description_html": aboutHTML, "article_summary": "", "current_item_type": "index", "site_navigation": []any{}, "template_settings": map[string]any{}, "user_settings": userSettings, "og_image_url": ogImage, "style_css_sha256": cssHash, "custom_code_head": "", "custom_code_body_start": "", "custom_code_body_end": "", "total_pages": 1, "current_page": 1, "has_avatar": hasAvatar, "has_podcast": false}
+	navigation := []map[string]any{}
+	for _, n := range navigationItems(items, "") {
+		title := n.Title
+		if metadata.Name == "Grid" || metadata.Name == "8-bit" {
+			title = html.EscapeString(title)
+		}
+		navigation = append(navigation, map[string]any{"id": n.ID, "title": title, "slug": n.Slug, "externalLink": n.ExternalLink, "weight": n.Weight})
+	}
+	_, podcastErr := os.Stat(filepath.Join(dir, "podcast.xml"))
+	context := map[string]any{"planet": planet, "articles": rows, "assets_prefix": "./", "page_title": site.Name, "page_description": site.About, "page_description_html": aboutHTML, "article_summary": "", "current_item_type": "index", "site_navigation": navigation, "template_settings": map[string]any{}, "user_settings": userSettings, "og_image_url": ogImage, "style_css_sha256": cssHash, "custom_code_head": "", "custom_code_body_start": "", "custom_code_body_end": "", "total_pages": 1, "current_page": 1, "has_avatar": hasAvatar, "has_podcast": podcastErr == nil}
 	if buildTimestamp != "" {
 		context["build_timestamp"] = buildTimestamp
 	}
@@ -195,7 +257,7 @@ func renderWithTemplateSettings(dir string, site store.Site, articles []store.Ar
 		if page < totalPages {
 			ctx["next_page"] = fmt.Sprintf("page%d.html", page+1)
 		}
-		index, err := templates.Render(templatesDir, "index.html", ctx)
+		index, err := renderSiteTemplate(templatesDir, "index.html", ctx, site)
 		if err != nil {
 			return fmt.Errorf("模板首页渲染失败：%w", err)
 		}
@@ -228,23 +290,39 @@ func renderWithTemplateSettings(dir string, site store.Site, articles []store.Ar
 		}
 		ctx["article"] = byID[a.ID]
 		ctx["article_id"] = a.ID
-		ctx["article_type"] = 0
+		ctx["article_type"] = a.ArticleType
 		ctx["content_html"] = byID[a.ID]["contentRendered"]
 		ctx["social_image_url"] = ogImage
-		if site.IPNS != "" {
+		if site.IPNS != "" || site.Domain != "" {
 			for _, name := range a.Attachments {
 				switch strings.ToLower(filepath.Ext(name)) {
 				case ".avif", ".jpeg", ".jpg", ".png", ".webp", ".gif", ".tiff", ".heic":
-					ctx["social_image_url"] = "https://" + site.IPNS + ".eth.sucks/" + url.PathEscape(a.ID) + "/" + url.PathEscape(name)
+					base := "https://" + site.IPNS + ".eth.sucks/"
+					if site.Domain != "" {
+						base = store.CanonicalSiteBase(site.Domain, site.IPNS)
+					}
+					ctx["social_image_url"] = base + url.PathEscape(a.ID) + "/" + url.PathEscape(name)
 				}
 				if ctx["social_image_url"] != ogImage {
 					break
 				}
 			}
 		}
-		page, err := templates.Render(templatesDir, "blog.html", ctx)
+		page, err := renderSiteTemplate(templatesDir, "blog.html", ctx, site)
 		if err != nil {
 			return fmt.Errorf("模板文章渲染失败：%w", err)
+		}
+		if a.ExternalLink != "" && metadata.Name != "Plain" && metadata.Name != "Platinum" {
+			target, marshalErr := json.Marshal(a.ExternalLink)
+			if marshalErr != nil {
+				return marshalErr
+			}
+			redirect := `<script>if(!/Planet\/\S*/.test(navigator.userAgent)){window.location.href=` + string(target) + `;}</script>`
+			if pos := strings.Index(strings.ToLower(page), "</head>"); pos >= 0 {
+				page = page[:pos] + redirect + page[pos:]
+			} else {
+				page = redirect + page
+			}
 		}
 		if metadata.Name == "Sepia" {
 			page = sepiaIconFilters(page, userSettings)
@@ -265,7 +343,7 @@ func renderWithTemplateSettings(dir string, site store.Site, articles []store.Ar
 			}
 			ctx["articles"], ctx["tag_key"], ctx["tag_value"] = tagged, key, planetTags[key]
 			ctx["current_item_type"], ctx["page_title"] = "tags", site.Name+" - "+site.Tags[key]
-			page, err := templates.Render(templatesDir, "index.html", ctx)
+			page, err := renderSiteTemplate(templatesDir, "index.html", ctx, site)
 			if err != nil {
 				return fmt.Errorf("模板标签页面渲染失败：%w", err)
 			}
@@ -289,7 +367,7 @@ func renderWithTemplateSettings(dir string, site store.Site, articles []store.Ar
 				ctx[k] = v
 			}
 			ctx["tags"], ctx["tag_articles"], ctx["current_item_type"] = planetTags, tagArticles, "tags"
-			page, err := templates.Render(templatesDir, "tags.html", ctx)
+			page, err := renderSiteTemplate(templatesDir, "tags.html", ctx, site)
 			if err != nil {
 				return fmt.Errorf("模板标签索引渲染失败：%w", err)
 			}
@@ -316,7 +394,7 @@ func renderWithTemplateSettings(dir string, site store.Site, articles []store.Ar
 		ctx["current_item_type"] = "archive"
 		ctx["archive"] = archive
 		ctx["archive_sections"] = sections
-		page, err := templates.Render(templatesDir, "archive.html", ctx)
+		page, err := renderSiteTemplate(templatesDir, "archive.html", ctx, site)
 		if err != nil {
 			return fmt.Errorf("模板归档渲染失败：%w", err)
 		}

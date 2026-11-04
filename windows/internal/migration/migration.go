@@ -339,6 +339,9 @@ func (m *Manager) Export(siteID, parent string) (string, error) {
 				return "", err
 			}
 		}
+		if err := sitegen.WriteAliases(stage, articles); err != nil {
+			return "", err
+		}
 	}
 	var metadata []byte
 	if len(raw) > 0 && !rebuild {

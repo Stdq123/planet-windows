@@ -1,0 +1,14 @@
+Bundled Planet templates and pinned upstream sources
+
+Plain build 132: https://github.com/Planetable/SiteTemplatePlain/tree/b29140fd906877206a76edb5e9510f816d16e336
+8-bit build 50: https://github.com/Planetable/SiteTemplate8bit/tree/88ac27ae3d9a34787690f45efa6e7516b910f562
+Grid build 99: https://github.com/Planetable/SiteTemplateGrid/tree/10b5bccda25a1028a22b62b88ea6ccfbbfcfcd52
+Platinum build 20: https://github.com/Planetable/SiteTemplatePlatinum/tree/afb62c3ea708337f7ef59f7e045e7a0d0da08fc5
+Sepia build 90: https://github.com/Planetable/SiteTemplateSepia/tree/b7e3651aaed05924cadbb349c677f3082ae7eff2
+
+The pinned Plain, 8-bit, Grid and Platinum repositories did not include a root
+license file when checked. Their redistribution terms, and the terms of their
+bundled fonts, images, and video, require separate review before distribution.
+The 8-bit upstream README contains icon attribution; it is reproduced below.
+
+Sepia provides the following MIT license:

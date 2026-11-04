@@ -1,7 +1,9 @@
-import { Library, type Article, type Draft, type Site, type Subscription, type Item } from "./mygo";
+import { Library, type Article, type Draft, type Site, type Subscription, type Item, type KuboStatus, type SearchResult, type Builtin } from "./mygo";
 import { initUpdates } from "./updates";
 import release from "../release.json";
 import { refreshDue } from "./auto-refresh";
+import { gatewayKey, planetShareURL, selectedGateway, sitePublicURL } from "./gateway";
+import { localGatewayResource } from "./local-gateway";
 
 const $ = <T extends HTMLElement>(selector: string): T => {
   const element = document.querySelector<T>(selector);
@@ -17,6 +19,7 @@ const newArticle = $<HTMLButtonElement>("#new-article"), dialog = $<HTMLDialogEl
 const form = $<HTMLFormElement>("#site-form"), emptyAction = $<HTMLButtonElement>("#empty-action");
 const subscriptionsEl = $("#subscriptions"), feedDialog = $<HTMLDialogElement>("#feed-dialog"), feedForm = $<HTMLFormElement>("#feed-form");
 const reader = $("#reader"), readerTitle = $("#reader-title"), readerDate = $("#reader-date"), readerPreview = $<HTMLIFrameElement>("#reader-preview");
+const ownReader = $("#own-reader"), ownReaderPreview=$<HTMLIFrameElement>("#own-reader-preview");
 const refreshFeed = $<HTMLButtonElement>("#refresh-feed"), pinSubscription = $<HTMLButtonElement>("#pin-subscription");
 const unfollow = $<HTMLButtonElement>("#unfollow");
 const starItem = $<HTMLButtonElement>("#star-item"), shareItem = $<HTMLButtonElement>("#share-item"), shareURL = $<HTMLInputElement>("#share-url"), shareStatus = $("#share-status");
@@ -35,6 +38,116 @@ const showDrafts = $<HTMLButtonElement>("#show-drafts"), saveDraft = $<HTMLButto
 const siteAddress = $("#site-address");
 const publishedAddress = $("#published-address"), publishedURL = $<HTMLInputElement>("#published-url");
 const copyStatus = $("#copy-status");
+const publicGateway = $<HTMLSelectElement>("#public-gateway"), copyPublishedURL = $<HTMLButtonElement>("#copy-published-url");
+const workspaceMenu = $<HTMLDetailsElement>("#workspace-menu");
+workspaceMenu.addEventListener("click", event => {
+  if (event.target instanceof window.HTMLButtonElement && !event.target.disabled) workspaceMenu.open = false;
+});
+document.addEventListener("click", event => {
+  if (!workspaceMenu.contains(event.target as Node)) workspaceMenu.open = false;
+});
+
+const ipfsDialog = $<HTMLDialogElement>("#ipfs-status-dialog"), ipfsRefresh = $<HTMLButtonElement>("#refresh-ipfs-status");
+const ipfsToggle = $<HTMLButtonElement>("#toggle-ipfs"), ipfsOpenSite = $<HTMLAnchorElement>("#ipfs-open-site");
+const ipfsGC = $<HTMLButtonElement>("#ipfs-gc");
+const ipfsResource = $<HTMLInputElement>("#ipfs-resource"), ipfsOpenResource = $<HTMLAnchorElement>("#ipfs-open-resource");
+let ipfsStatusRevision = 0;
+let ipfsStatus: KuboStatus | null = null, ipfsTimer: ReturnType<typeof setTimeout> | undefined;
+let ipfsSamples: {time:number, input:number, output:number}[] = [];
+function updateIPFSResource() {
+  const href = ipfsStatus?.running ? localGatewayResource(ipfsStatus.gateway || "", ipfsResource.value) : null;
+  ipfsOpenResource.setAttribute("aria-disabled",String(!href));
+  if (href) ipfsOpenResource.href=href; else ipfsOpenResource.removeAttribute("href");
+}
+ipfsResource.addEventListener("input", updateIPFSResource);
+function drawIPFSTraffic() {
+  const now=Date.now(); ipfsSamples=ipfsSamples.filter(sample=>now-sample.time<=300000).slice(-60);
+  $("#ipfs-chart-empty").hidden=ipfsSamples.length>0;
+  for (const [selector,key] of [["#ipfs-chart-in","input"],["#ipfs-chart-out","output"]] as const) {
+    const group=$(selector); group.replaceChildren();
+    if (!ipfsSamples.length) continue;
+    const max=Math.max(1,...ipfsSamples.map(sample=>sample[key]));
+    const points=ipfsSamples.map(sample=>({x:Math.max(0,300-(now-sample.time)/1000), y:(key==="input" ? 49 : 101)-Math.min(1,sample[key]/max)*45}));
+    const line=document.createElementNS("http://www.w3.org/2000/svg","polyline");
+    line.setAttribute("points",points.map(point=>`${point.x},${point.y}`).join(" "));group.append(line);
+    for(const point of points){const dot=document.createElementNS("http://www.w3.org/2000/svg","circle");dot.setAttribute("cx",String(point.x));dot.setAttribute("cy",String(point.y));dot.setAttribute("r","1.4");group.append(dot);}
+  }
+}
+function formatIPFSBytes(value: number): string {
+  if (!Number.isFinite(value) || value < 0) return "—";
+  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit++; }
+  return `${unit ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
+}
+async function refreshIPFSStatus(includeRepo = false) {
+  if (ipfsRefresh.disabled) return;
+  clearTimeout(ipfsTimer);
+  const revision = ++ipfsStatusRevision;
+  ipfsRefresh.disabled = true; ipfsToggle.disabled = true; ipfsGC.disabled=true;
+  $("#ipfs-status-message").textContent = "正在读取节点状态…";
+  for (const id of ["#ipfs-version", "#ipfs-peer-count", "#ipfs-rate", "#ipfs-total"]) $(id).textContent = "—";
+  try {
+    const status = await Library.ipfsStatus();
+    if (revision !== ipfsStatusRevision || !ipfsDialog.open) return;
+    ipfsStatus = status;
+    updateIPFSResource();
+    $("#ipfs-status-message").textContent = status.disabled ? "节点已关闭，自动发布和续期已暂停。" : !status.running ? "节点尚未启动。发布站点或读取 IPFS 内容时会启动节点。" : status.online ? "节点在线" : "节点正在离线模式运行";
+    ipfsToggle.textContent = status.disabled || !status.running ? "启动节点" : "关闭节点";
+    $("#ipfs-version").textContent = status.version || "—";
+    if (!status.running) $("#ipfs-repo-size").textContent="—";
+    const gateway=localGatewayResource(status.gateway || "", "/ipfs/bafy") ? status.gateway : "";
+    $("#ipfs-gateway").textContent = status.running && gateway ? gateway : "—";
+    const siteURL=site?.ipns ? localGatewayResource(gateway, `/ipns/${site.ipns}/`) : null;
+    ipfsOpenSite.hidden = !status.running || !siteURL;
+    if (!ipfsOpenSite.hidden && siteURL) ipfsOpenSite.href = siteURL;
+    else ipfsOpenSite.removeAttribute("href");
+    if (status.running && status.online) {
+      $("#ipfs-peer-count").textContent = String(status.peers);
+      $("#ipfs-rate").textContent = `${formatIPFSBytes(status.rateIn)}/s / ${formatIPFSBytes(status.rateOut)}/s`;
+      $("#ipfs-total").textContent = `${formatIPFSBytes(status.totalIn)} / ${formatIPFSBytes(status.totalOut)}`;
+      if (Number.isFinite(status.rateIn) && status.rateIn >= 0 && Number.isFinite(status.rateOut) && status.rateOut >= 0) ipfsSamples.push({time:Date.now(),input:status.rateIn,output:status.rateOut});
+    }
+    drawIPFSTraffic();
+    if (includeRepo && status.running) {
+      $("#ipfs-repo-size").textContent="正在计算…";
+      try { const size=await Library.ipfsRepoSize(); if(revision===ipfsStatusRevision && ipfsDialog.open) $("#ipfs-repo-size").textContent=formatIPFSBytes(size); }
+      catch { if(revision===ipfsStatusRevision && ipfsDialog.open) $("#ipfs-repo-size").textContent="暂不可用"; }
+    }
+  } catch (error) {
+    if (revision === ipfsStatusRevision && ipfsDialog.open) { ipfsStatus=null; updateIPFSResource(); $("#ipfs-gateway").textContent="—"; ipfsOpenSite.hidden=true; ipfsOpenSite.removeAttribute("href"); $("#ipfs-status-message").textContent = `读取失败：${error instanceof Error ? error.message : String(error)}`; }
+  } finally { if (revision === ipfsStatusRevision) { ipfsRefresh.disabled = false; ipfsToggle.disabled = !ipfsStatus; ipfsGC.disabled=!ipfsStatus?.running; if(ipfsDialog.open) ipfsTimer=setTimeout(()=>void refreshIPFSStatus(),5000); } }
+}
+$("#show-ipfs-status").addEventListener("click", () => { ipfsDialog.showModal(); void refreshIPFSStatus(true); });
+ipfsRefresh.addEventListener("click", () => void refreshIPFSStatus(true));
+ipfsGC.addEventListener("click",async()=>{
+  if(ipfsGC.disabled || !ipfsStatus?.running)return;
+  if(!window.confirm("清理会删除本机 Kubo 中未固定的数据，包括可能用于离线访问的内容；已固定内容会保留。继续吗？"))return;
+  clearTimeout(ipfsTimer);ipfsRefresh.disabled=true;ipfsToggle.disabled=true;ipfsGC.disabled=true;$("#ipfs-status-message").textContent="正在清理未固定数据…";
+  let failure="";
+  try {await Library.ipfsGarbageCollect();} catch(error){failure=`清理失败：${error instanceof Error ? error.message : String(error)}`;}
+  finally {ipfsRefresh.disabled=false;if(ipfsDialog.open){await refreshIPFSStatus(true);if(failure)$("#ipfs-status-message").textContent=failure;else $("#ipfs-status-message").textContent="未固定数据清理完成。";}}
+});
+ipfsToggle.addEventListener("click", async () => {
+  if (!ipfsStatus || ipfsToggle.disabled) return;
+  const enable = ipfsStatus.disabled || !ipfsStatus.running;
+  if (!enable && !window.confirm("关闭节点会暂停站点发布、IPNS 续期及 IPFS 订阅更新，直到重新开启。继续吗？")) return;
+  clearTimeout(ipfsTimer); ipfsToggle.disabled=true; ipfsRefresh.disabled=true; ipfsGC.disabled=true;
+  $("#ipfs-status-message").textContent=enable ? "正在启动节点…" : "正在关闭节点…";
+  let operationError = "";
+  let pendingSites: Site[] = [];
+  try {
+    await Library.setIPFSEnabled(enable);
+    if (!enable) { ipfsSamples=[]; drawIPFSTraffic(); }
+    if (enable) { try { pendingSites=await Library.sites(); } catch(error) { showError(`节点已启动，但无法检查待发布站点：${error instanceof Error ? error.message : String(error)}`); } }
+  } catch(error) { operationError=`操作失败：${error instanceof Error ? error.message : String(error)}`; }
+  finally { ipfsRefresh.disabled=false; if(ipfsDialog.open) { await refreshIPFSStatus(true); if(operationError) $("#ipfs-status-message").textContent=operationError; } }
+  for (const entry of pendingSites) if (entry.publishPending) void queuePublication(entry.id);
+});
+$("#close-ipfs-status").addEventListener("click", () => ipfsDialog.close());
+ipfsDialog.addEventListener("close", () => { ipfsStatusRevision++; clearTimeout(ipfsTimer); ipfsRefresh.disabled = false; ipfsStatus=null; updateIPFSResource(); ipfsOpenSite.hidden=true; ipfsOpenSite.removeAttribute("href"); });
+try { publicGateway.value = selectedGateway(window.localStorage.getItem(gatewayKey)); }
+catch { publicGateway.value = "ipfs.io"; }
 const addAttachment = $<HTMLButtonElement>("#add-attachment"), attachmentList = $("#attachment-list"), attachmentHelp = $("#attachment-help");
 const tagInput=$<HTMLInputElement>("#tag-input"), addTag=$<HTMLButtonElement>("#add-tag"), tagList=$("#tag-list");
 const importedWarning = $("#imported-warning");
@@ -72,6 +185,10 @@ function pendingTagBlocksSave(): boolean {
   showError("请先添加标签，或清空标签输入框后再保存。");tagInput.focus();return true;
 }
 let navigationRevision = 0, favoritesView = false, readerRevision = 0;
+let smartView: "today" | "unread" | null = null;
+const pendingRead = new Set<string>();
+const bulkReading = new Set<string>();
+function isToday(value:string): boolean { const date=new Date(value); return Number.isFinite(date.getTime()) && date.toDateString()===new Date().toDateString(); }
 const refreshingSubscriptions = new Set<string>();
 let autoRefreshing = false;
 let busyMessage = "";
@@ -127,37 +244,61 @@ function canLeave() { return !saving && (!dirty || window.confirm("当前文章�
 function label(tag: string, value: string, className: string) {
   const el = document.createElement(tag); el.className = className; el.textContent = value; return el;
 }
+function articleRow(title: string, date: string, content: string, selected = false): HTMLButtonElement {
+  const button=document.createElement("button"); button.className=`article-item${selected ? " active" : ""}`;
+  button.setAttribute("aria-pressed", String(selected));
+  const heading=document.createElement("span"); heading.className="article-row-heading";
+  heading.append(label("span",title || "无标题","article-title"),label("span",date,"article-date"));
+  const excerpt=content.slice(0,2000).replace(/<[^>]*>/g," ").replace(/!?\[([^\]]*)\]\([^)]*\)/g,"$1").replace(/(^|\s)[#>*_`~-]+/g,"$1").replace(/\s+/g," ").trim();
+  button.append(heading);
+  if (excerpt) button.append(label("span",excerpt.slice(0,280),"article-excerpt"));
+  return button;
+}
 function renderSites() {
   sitesEl.replaceChildren();
   for (const item of sites) {
     const button = document.createElement("button"); button.className = `site-item${item.id === site?.id ? " active" : ""}`;
-    button.append(label("span", "◉", "site-icon"), label("span", item.name, "site-name"));
+    if(item.avatarPng){const avatar=document.createElement("img");avatar.className="site-icon site-avatar";avatar.alt="";avatar.src=`data:image/png;base64,${item.avatarPng}`;button.append(avatar);}else button.append(label("span", "◉", "site-icon"));
+    button.append(label("span", item.name, "site-name"));
     button.addEventListener("click", () => void selectSite(item)); sitesEl.append(button);
   }
 }
 function renderSubscriptions() {
   subscriptionsEl.replaceChildren();
   for (const entry of subscriptions) {
-    const button = document.createElement("button"); button.className = `site-item${entry.url === subscription?.url ? " active" : ""}`;
+    const button = document.createElement("button"); button.className = `site-item${!favoritesView && !smartView && entry.url === subscription?.url ? " active" : ""}`;
     button.append(label("span", entry.lastError ? "⚠" : "◌", "site-icon"), label("span", entry.feed.title || entry.url, "site-name"));
     button.title = entry.lastError ? `更新失败：${entry.lastError}` : entry.pinnedCid ? "已固定到本机" : entry.url;
     button.addEventListener("click", () => selectSubscription(entry)); subscriptionsEl.append(button);
   }
 }
 function renderArticles() {
+  if (smartView) {
+    articlesEl.replaceChildren();
+    const entries=subscriptions.flatMap(source=>source.feed.items.filter(entry=>smartView==="unread" ? !entry.read : isToday(entry.published)).map(entry=>({source,entry})));
+    entries.sort((a,b)=>(Date.parse(b.entry.published)||0)-(Date.parse(a.entry.published)||0));
+    count.textContent=String(entries.length);
+    if(!entries.length) articlesEl.append(label("p",smartView==="unread" ? "没有未读文章" : "今天没有文章","list-empty"));
+    for(const {source,entry} of entries) {
+      const button=articleRow(entry.title,source.feed.title || source.url,entry.description || entry.content || "",source.url===subscription?.url && (entry.key || entry.id || entry.link)===(item?.key || item?.id || item?.link));
+      button.classList.toggle("unread",!entry.read);
+      button.addEventListener("click",()=>{subscription=source;site=null;selectFeedItem(entry);});articlesEl.append(button);
+    }
+    return;
+  }
   if (favoritesView) {
     articlesEl.replaceChildren(); const favorites = subscriptions.flatMap(source => source.feed.items.filter(entry => entry.starred).map(entry => ({source,entry})));
     count.textContent = String(favorites.length);
     if (!favorites.length) articlesEl.append(label("p", "还没有收藏的文章", "list-empty"));
-    for (const favorite of favorites) { const button=document.createElement("button"); button.className="article-item"; button.append(label("span",favorite.entry.title || "无标题","article-title"),label("span",favorite.source.feed.title || favorite.source.url,"article-date")); button.addEventListener("click",()=>{subscription=favorite.source; site=null; selectFeedItem(favorite.entry);}); articlesEl.append(button); }
+    for (const favorite of favorites) { const button=articleRow(favorite.entry.title, favorite.source.feed.title || favorite.source.url, favorite.entry.description || favorite.entry.content || ""); button.addEventListener("click",()=>{subscription=favorite.source; site=null; selectFeedItem(favorite.entry);}); articlesEl.append(button); }
     return;
   }
   if (subscription) {
     articlesEl.replaceChildren(); count.textContent = String(subscription.feed.items.length);
     if (!subscription.feed.items.length) articlesEl.append(label("p", "订阅暂时没有文章", "list-empty"));
     for (const entry of subscription.feed.items) {
-      const button = document.createElement("button"); button.className = `article-item${entry === item ? " active" : ""}`;
-      button.append(label("span", entry.title || "无标题", "article-title"), label("span", entry.published || "", "article-date"));
+      const button = articleRow(entry.title, entry.published || "", entry.description || entry.content || "", entry === item);
+      button.classList.toggle("unread",!entry.read);
       button.addEventListener("click", () => selectFeedItem(entry)); articlesEl.append(button);
     }
     return;
@@ -166,8 +307,7 @@ function renderArticles() {
     articlesEl.replaceChildren(); count.textContent=String(drafts.length);
     if (!drafts.length) articlesEl.append(label("p","还没有草稿","list-empty"));
     for (const entry of drafts) {
-      const button=document.createElement("button"); button.className=`article-item${entry.id===draft?.id ? " active" : ""}`;
-      button.append(label("span",entry.title || "未命名草稿","article-title"),label("span",new Date(entry.modified).toLocaleDateString("zh-CN"),"article-date"));
+      const button=articleRow(entry.title || "未命名草稿",new Date(entry.modified).toLocaleDateString("zh-CN"),entry.content,entry.id===draft?.id);
       button.addEventListener("click",()=>selectDraft(entry)); articlesEl.append(button);
     }
     return;
@@ -175,35 +315,48 @@ function renderArticles() {
   articlesEl.replaceChildren(); count.textContent = String(articles.length);
   if (!articles.length) { articlesEl.append(label("p", site ? "还没有文章" : "选择一个站点开始", "list-empty")); return; }
   for (const item of [...articles].sort((a, b) => b.modified.localeCompare(a.modified))) {
-    const button = document.createElement("button"); button.className = `article-item${item.id === article?.id ? " active" : ""}`;
-    button.append(label("span", item.title, "article-title"), label("span", new Date(item.modified).toLocaleDateString("zh-CN"), "article-date"));
+    const button = articleRow(item.title, `${item.articleType===1 ? "页面 · " : ""}${new Date(item.modified).toLocaleDateString("zh-CN")}`, item.content, item.id === article?.id);
     button.addEventListener("click", () => selectArticle(item)); articlesEl.append(button);
   }
 }
 function updateView() {
   const publication = site ? publicationStates.get(site.id) : undefined;
-  renderSites(); renderSubscriptions(); renderArticles(); siteTitle.textContent = subscription?.feed.title || site?.name || "我的站点";
+  renderSites(); renderSubscriptions(); renderArticles(); siteTitle.textContent = smartView === "today" ? "今天" : smartView === "unread" ? "未读文章" : favoritesView ? "收藏的文章" : subscription?.feed.title || site?.name || "我的站点";
+  $("#show-favorites").classList.toggle("active",favoritesView);
+  $("#show-favorites").setAttribute("aria-pressed",String(favoritesView));
+  for(const [id,view] of [["#show-today","today"],["#show-unread","unread"]] as const){$(id).classList.toggle("active",smartView===view);$(id).setAttribute("aria-pressed",String(smartView===view));}
+  const allItems=subscriptions.flatMap(sub=>sub.feed.items);
+  $("#today-count").textContent=String(allItems.filter(entry=>isToday(entry.published)).length);
+  $("#unread-count").textContent=String(allItems.filter(entry=>!entry.read).length);
+  workspaceMenu.hidden = !site && !subscription;
   newArticle.disabled = !site || !!subscription || saving; saveButton.disabled = !site || !editing || !!subscription || saving;
-  showDrafts.hidden=!!subscription; showDrafts.disabled=!site || saving; showDrafts.textContent=draftsView ? "返回文章" : "草稿";
+  showDrafts.hidden=!!subscription || favoritesView || !!smartView; showDrafts.disabled=!site || saving; showDrafts.textContent=draftsView ? "返回文章" : "草稿";
+  $("#posts-kind").textContent = smartView === "unread" ? "未读" : smartView === "today" ? "今天" : favoritesView ? "收藏" : draftsView ? "草稿" : "文章";
   saveDraft.hidden=!editing || !!subscription; saveDraft.disabled=!site || !editing || saving;
-  saveButton.hidden = !!subscription; refreshFeed.hidden = !subscription;
+  saveButton.hidden = !!subscription || !editing; refreshFeed.hidden = !subscription;
   unfollow.hidden = !subscription; unfollow.disabled = !subscription || saving;
   refreshFeed.disabled = !!subscription && refreshingSubscriptions.has(subscription.url); refreshFeed.textContent = refreshFeed.disabled ? "正在刷新…" : "刷新订阅";
   exportSite.hidden = !!subscription; exportSite.disabled = !site || saving;
-  publishSite.hidden = !!subscription; publishSite.disabled = !site || saving || !!publication?.running;
+  publishSite.hidden = !!subscription || !site; publishSite.disabled = !site || saving || !!publication?.running;
   exportPlanet.hidden = !!subscription; exportPlanet.disabled = !site || saving; importPlanet.disabled = saving;
   selectTemplate.hidden = !!subscription; selectTemplate.disabled = !site || saving;
   templateSettingsButton.hidden = !!subscription; templateSettingsButton.disabled = !site || site.templateName !== "Sepia" || saving;
   pinnableButton.hidden=!!subscription; pinnableButton.disabled=!site || saving;
   serviceButton.hidden=!!subscription; serviceButton.disabled=!site || saving;
   editSite.hidden = !!subscription; editSite.disabled = !site || saving;
+  const profileButton=$<HTMLButtonElement>("#site-profile");profileButton.hidden=!!subscription;profileButton.disabled=!site || !!site.imported || saving;profileButton.title=site?.imported ? "导入站点暂不支持修改公开资料" : "";
+  const podcastButton=$<HTMLButtonElement>("#podcast-settings");podcastButton.hidden=!!subscription;podcastButton.disabled=!site || !!site.imported || saving;
+  const deploymentButton=$<HTMLButtonElement>("#deployment-settings");deploymentButton.hidden=!!subscription;deploymentButton.disabled=!site || !!site.imported || saving;
   removeSite.hidden = !!subscription; removeSite.disabled = !site || saving || !!publication?.running;
   const fixed = !!subscription && (subscription.cid ? subscription.pinnedCid === subscription.cid : !!subscription.offlinePinned);
   pinSubscription.hidden = !subscription; pinSubscription.disabled = saving || !!subscription && ((fixed && !!subscription.cid) || refreshingSubscriptions.has(subscription.url));
   pinSubscription.textContent = fixed ? (subscription?.cid ? "已固定离线" : "重新固定离线") : "固定离线";
   $("#subscription-status").textContent = subscription && refreshingSubscriptions.has(subscription.url) ? "正在刷新订阅…" : subscription?.lastError ? `更新失败，正在显示已缓存内容：${subscription.lastError}` : subscription?.offlinePinned ? "已固定订阅媒体到本机" : subscription?.pinnedCid ? (subscription.pinnedCid === subscription.cid ? "已固定当前版本到本机" : "仅旧版本已固定") : "";
   starItem.textContent = item?.starred ? "取消收藏" : "收藏"; starItem.disabled = !item || !subscription; shareItem.disabled = !item?.link;
-  deleteArticle.hidden = !editing || (!article && !draft) || !!subscription; deleteArticle.textContent=draft ? "删除草稿" : "删除文章";
+  const readButton=$<HTMLButtonElement>("#toggle-read"), readKey=subscription && item ? `${subscription.url}\u0000${item.key || item.id || item.link}` : "";
+  readButton.textContent=item?.read ? "标为未读" : "标为已读";readButton.disabled=!item || !subscription || pendingRead.has(readKey) || bulkReading.has(subscription.url);
+  const markFeed=$<HTMLButtonElement>("#mark-feed-read");markFeed.hidden=!subscription;markFeed.disabled=!subscription || bulkReading.has(subscription.url) || [...pendingRead].some(key=>key.startsWith(`${subscription!.url}\u0000`)) || !subscription.feed.items.some(entry=>!entry.read);
+  deleteArticle.hidden = (!article && !draft) || !!subscription; deleteArticle.textContent=draft ? "删除草稿" : "删除文章";
   addAttachment.disabled = (!article && !draft) || !site || saving;
 	 tagInput.disabled = !editing || saving || !!site?.tagsUnsupported; addTag.disabled = tagInput.disabled;
 	 tagList.replaceChildren();
@@ -213,6 +366,13 @@ function updateView() {
 	   remove.addEventListener("click",()=>{if(saving || site?.tagsUnsupported)return;editorTags.delete(key);dirty=true;navigationRevision++;updateView();});item.append(remove);tagList.append(item);
 	 }
   playArticleAudio.hidden = !article?.audioFilename || !site; playArticleAudio.disabled = saving;
+  const ownAudio=$<HTMLButtonElement>("#play-own-audio");ownAudio.hidden=!article?.audioFilename || !site;ownAudio.disabled=saving;
+  const articleSettings=$<HTMLButtonElement>("#article-settings");articleSettings.disabled=!article || !site || !!site.imported || saving;articleSettings.title=site?.imported ? "导入站点的文章设置暂不可修改" : "文章路径、类型与导航设置";
+  $<HTMLButtonElement>("#share-own-article").disabled=!site?.ipns || !site.lastPublishedCID || !article;
+  const ownShareInput=$<HTMLInputElement>("#own-share-url");
+  let currentOwnShare="";
+  if(site?.ipns && site.lastPublishedCID && article){try{currentOwnShare=sitePublicURL(selectedGateway(publicGateway.value),site.ipns,site.domain,`/${encodeURIComponent(article.slug || article.id)}/`);}catch{ /* The copy action reports unsupported gateway names. */ }}
+  if(ownShareInput.value && ownShareInput.value!==currentOwnShare){ownShareInput.value="";ownShareInput.hidden=true;$("#own-share-status").textContent="";}
   attachmentList.replaceChildren();
   for (const name of [...(article?.attachments ?? []), ...(draft?.attachments ?? [])]) {
     const marked = !!draft?.removedAttachments?.includes(name);
@@ -225,16 +385,24 @@ function updateView() {
   importedWarning.hidden = !site?.imported;
   importedWarning.textContent = site?.templateId ? "这是导入的原版站点。通过检查的导入站点可重新生成网页并发布，保留原 IPNS 和已登记附件。" : "这是导入的原版站点。请先选择已验证的模板，才能尝试重建或发布兼容的站点。";
 	 if(site?.tagsUnsupported) importedWarning.textContent += " 原备份标签格式不受支持，已保留原始数据；当前不能编辑标签或重建该站点。";
-  empty.hidden = editing || !!item; editor.hidden = !editing; reader.hidden = !item;
-  workspaceTitle.textContent = subscription ? "阅读订阅" : editing ? "撰写文章" : site?.name ?? "欢迎来到 Planet";
+  const ownReading=!!site && !!article && !editing && !subscription && !draftsView;
+  empty.hidden = editing || !!item || ownReading; editor.hidden = !editing; reader.hidden = !item; ownReader.hidden=!ownReading;
+  if(ownReading && article){$("#own-reader-title").textContent=article.title || "无标题";$("#own-reader-date").textContent=new Date(article.modified).toLocaleDateString("zh-CN");}
+  workspaceTitle.textContent = subscription ? "阅读订阅" : smartView === "today" ? "今天" : smartView === "unread" ? "未读文章" : favoritesView ? "收藏的文章" : editing ? "撰写文章" : ownReading ? "阅读文章" : site?.name ?? "欢迎来到 Planet";
   siteAddress.hidden = !site?.ipns || !!subscription; siteAddress.textContent = site?.ipns ? `IPNS: ${site.ipns}` : ""; siteAddress.title = site?.ipns ?? "";
   publishedAddress.hidden = !site?.ipns || !site?.lastPublishedCID || !!subscription;
-  const address = !publishedAddress.hidden ? `https://ipfs.io/ipns/${site!.ipns}/` : "";
+  let address = "", gatewayError = "";
+  if (!publishedAddress.hidden) {
+    try { address = sitePublicURL(selectedGateway(publicGateway.value), site!.ipns!,site!.domain); }
+    catch (error) { gatewayError = error instanceof Error ? error.message : String(error); }
+  }
   if (publishedURL.value !== address) { publishedURL.value = address; copyStatus.textContent = ""; }
+  copyPublishedURL.disabled = !address;
+  if (gatewayError) copyStatus.textContent = gatewayError;
   emptyAction.textContent = site ? "撰写文章" : "创建站点";
-  emptyAction.hidden = !!subscription;
-  empty.querySelector("h2")!.textContent = subscription ? "选择一篇文章阅读。" : site ? "开始记录你的故事。" : "让想法有一个地方安放。";
-  empty.querySelector("p")!.textContent = subscription ? "订阅内容已保存在本地。" : site ? "新建文章，在这里写作与预览。" : "创建站点，开始撰写你的第一篇文章。";
+  emptyAction.hidden = !!subscription || favoritesView || !!smartView;
+  empty.querySelector("h2")!.textContent = smartView ? "选择一篇文章阅读" : favoritesView ? "选择一篇收藏文章" : subscription ? "选择一篇文章阅读" : site && articles.length ? "选择一篇文章" : site ? "开始记录你的故事" : "让想法有一个地方安放";
+  empty.querySelector("p")!.textContent = smartView || favoritesView || subscription ? "从左侧列表选择文章。" : site && articles.length ? "从左侧列表选择文章，或新建一篇。" : site ? "新建文章，在这里写作与预览。" : "创建站点，开始撰写你的第一篇文章。";
   const current = dirty ? "有未保存更改" : draft ? "草稿已保存（未发布）" : editing ? "已保存" : "";
   const unpublished = !!site && ((site.contentRevision ?? 0) > (site.publishedRevision ?? 0) || !!site.publishPending || !!publication && publication.changes > publication.publishedChanges);
   saveState.textContent = saving ? busyMessage || "正在处理…" : publication?.running ? `${current}${current ? " · " : ""}正在发布已保存内容…` : publication?.status === "failed" ? `${current}${current ? " · " : ""}发布未确认` : unpublished ? `${current}${current ? " · " : ""}站点更改尚未发布` : publication?.status === "published" ? `${current}${current ? " · " : ""}${dirty ? "已发布上次保存的内容" : "已发布"}` : current;
@@ -247,7 +415,7 @@ async function selectSite(item: Site) {
   try {
     const loaded = await Library.articles(item.id);
     if (revision !== navigationRevision) return;
-    articleLoadFailures.delete(item.id); site = sites.find(entry => entry.id === item.id) ?? item; favoritesView = false; subscription = null; windowItemReset(); articles = loaded; article = null; draft=null; drafts=[]; draftsView=false; editing = false; dirty = false; clearError(); updateView();
+    articleLoadFailures.delete(item.id); site = sites.find(entry => entry.id === item.id) ?? item; favoritesView = false; smartView=null; subscription = null; windowItemReset(); articles = loaded; article = null; draft=null; drafts=[]; draftsView=false; editing = false; dirty = false; clearError(); updateView();
     const failure = publicationStates.get(item.id)?.error; if (failure) showError(failure);
   } catch (e) { if (revision===navigationRevision) { articleLoadFailures.add(item.id); showError(e); } }
 }
@@ -255,7 +423,7 @@ function windowItemReset() { item = null; }
 function selectSubscription(entry: Subscription) {
   if (!canLeave()) return;
   navigationRevision++;
-  site = null; favoritesView = false; subscription = entry; item = null; article = null; draft=null; draftsView=false; editing = false; dirty = false; clearError(); updateView();
+  site = null; favoritesView = false; smartView=null; subscription = entry; item = null; article = null; draft=null; draftsView=false; editing = false; dirty = false; clearError(); updateView();
 }
 function readerHTML(html: string, localImages: boolean) {
   const images = localImages ? "img-src data:; " : "";
@@ -273,13 +441,67 @@ function selectFeedItem(entry: Item) {
     }).catch(()=>{});
   }
   updateView();
+  if (!entry.read && address && key) void setSubscriptionRead(address,key,true);
+}
+async function setSubscriptionRead(address:string,key:string,value:boolean) {
+  const operation=`${address}\u0000${key}`;
+  if (!key || pendingRead.has(operation) || bulkReading.has(address)) return;
+  pendingRead.add(operation);updateView();
+  try {
+    await Library.setSubscriptionRead(address,key,value);
+    subscriptionsRevision++;
+    const current=subscriptions.find(entry=>entry.url===address)?.feed.items.find(entry=>(entry.key || entry.id || entry.link)===key);
+    if(current) current.read=value;
+    if(subscription?.url===address && item && (item.key || item.id || item.link)===key) item.read=value;
+  } catch(error) { showError(`保存阅读状态失败：${error instanceof Error ? error.message : String(error)}`); }
+  finally {pendingRead.delete(operation);updateView();}
 }
 function selectArticle(item: Article) {
-  if (item.id === article?.id && editing) return;
+  if (item.id === article?.id && !editing) return;
   if (!canLeave()) return;
   navigationRevision++;
-  article = item; draft=null; draftsView=false; editing = true; dirty = false; title.value = item.title; content.value = item.content; setEditorTags(item.tags); clearError(); updateView(); void renderPreview();
+  article = item; draft=null; draftsView=false; editing = false; dirty = false; title.value = item.title; content.value = item.content; setEditorTags(item.tags); clearError(); updateView(); void renderOwnArticle();
 }
+$("#edit-article").addEventListener("click",()=>{if(!site || !article || saving)return;navigationRevision++;editing=true;dirty=false;title.value=article.title;content.value=article.content;setEditorTags(article.tags);clearError();updateView();void renderPreview();});
+const articleSettingsDialog=$<HTMLDialogElement>("#article-settings-dialog"),articleSettingsForm=$<HTMLFormElement>("#article-settings-form");
+$("#article-settings").addEventListener("click",()=>{
+  if(!site || site.imported || !article || saving)return;
+  articleSettingsForm.querySelector<HTMLInputElement>('[name="slug"]')!.value=article.slug || "";
+  articleSettingsForm.querySelector<HTMLSelectElement>('[name="articleType"]')!.value=String(article.articleType || 0);
+  articleSettingsForm.querySelector<HTMLInputElement>('[name="externalLink"]')!.value=article.externalLink || "";
+  articleSettingsForm.querySelector<HTMLInputElement>('[name="inNavigation"]')!.checked=!!article.isIncludedInNavigation;
+  articleSettingsForm.querySelector<HTMLInputElement>('[name="weight"]')!.value=String(article.navigationWeight ?? 1);
+  $("#article-settings-result").textContent="";articleSettingsDialog.showModal();
+});
+$("#close-article-settings").addEventListener("click",()=>{if(!saving)articleSettingsDialog.close();});
+articleSettingsDialog.addEventListener("cancel",event=>{if(saving)event.preventDefault();});
+articleSettingsForm.addEventListener("submit",async event=>{
+  event.preventDefault();if(!site || site.imported || !article || saving)return;
+  const siteID=site.id,articleID=article.id,slug=articleSettingsForm.querySelector<HTMLInputElement>('[name="slug"]')!.value.trim();
+  const type=Number(articleSettingsForm.querySelector<HTMLSelectElement>('[name="articleType"]')!.value),external=articleSettingsForm.querySelector<HTMLInputElement>('[name="externalLink"]')!.value.trim();
+  const included=articleSettingsForm.querySelector<HTMLInputElement>('[name="inNavigation"]')!.checked,weight=Number(articleSettingsForm.querySelector<HTMLInputElement>('[name="weight"]')!.value);
+  if(!Number.isSafeInteger(weight) || weight < -2147483648 || weight > 2147483647){$("#article-settings-result").textContent="请输入有效的整数权重。";return;}
+  const controls=Array.from(articleSettingsForm.querySelectorAll<HTMLInputElement|HTMLSelectElement|HTMLButtonElement>("input,select,button"));controls.forEach(control=>control.disabled=true);saving=true;updateView();
+  try {
+    const saved=await Library.updateArticleSettings(siteID,articleID,slug,type,external,included,weight);
+    articles=articles.map(entry=>entry.id===articleID ? saved : entry);if(site?.id===siteID && article?.id===articleID)article=saved;
+    markLocalChange(siteID);articleSettingsDialog.close();clearError();void queuePublication(siteID);
+  } catch(error){$("#article-settings-result").textContent=`保存失败：${error instanceof Error ? error.message : String(error)}`;}
+  finally{controls.forEach(control=>control.disabled=false);saving=false;updateView();}
+});
+$("#share-own-article").addEventListener("click",async()=>{
+  if(!site?.ipns || !site.lastPublishedCID || !article)return;
+  const shareInput=$<HTMLInputElement>("#own-share-url"), status=$("#own-share-status");
+  try {
+    shareInput.value=sitePublicURL(selectedGateway(publicGateway.value),site.ipns,site.domain,`/${encodeURIComponent(article.slug || article.id)}/`);
+    const publication=publicationStates.get(site.id);
+    const unpublished=(site.contentRevision ?? 0)>(site.publishedRevision ?? 0) || site.publishPending || !!publication && (publication.running || publication.changes>publication.publishedChanges);
+    const warning=unpublished ? "；站点尚有更改未发布，新文章发布后才可访问" : "";
+    try {await window.navigator.clipboard.writeText(shareInput.value);shareInput.hidden=true;status.textContent=`链接已复制${warning}`;}
+    catch {shareInput.hidden=false;shareInput.focus();shareInput.select();status.textContent=`请按 Ctrl+C 复制${warning}`;}
+  } catch(error){showError(error);}
+});
+$("#play-own-audio").addEventListener("click",()=>playArticleAudio.click());
 function selectDraft(item: Draft) {
   if (!canLeave()) return;
   navigationRevision++; draft=item; article=articles.find(entry=>entry.id===item.articleId) ?? null;
@@ -297,6 +519,15 @@ async function renderPreview() {
     if (revision !== previewRevision) return;
     preview.srcdoc = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><style>body{font:16px/1.8 'Segoe UI',sans-serif;color:#303239;margin:28px;overflow-wrap:anywhere}h1,h2,h3{line-height:1.3;color:#20252d}a{color:#4e5cbb}pre{background:#f1f2f5;padding:16px;overflow:auto;border-radius:8px}code{font-family:Consolas,monospace}blockquote{border-left:3px solid #a9b1ca;margin-left:0;padding-left:16px;color:#69707c}img{max-width:100%}</style></head><body>${html}</body></html>`;
   } catch (e) { showError(e); }
+}
+async function renderOwnArticle() {
+  if(!site || !article)return;
+  const revision=++previewRevision,siteID=site.id,articleID=article.id;
+  try {
+    const html=await Library.previewArticle(siteID,articleID,article.content);
+    if(revision!==previewRevision || site?.id!==siteID || article?.id!==articleID || editing)return;
+    ownReaderPreview.srcdoc=`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><style>body{max-width:760px;font:16px/1.8 'Segoe UI',sans-serif;color:#303239;margin:28px auto;padding:0 28px;overflow-wrap:anywhere}h1,h2,h3{line-height:1.3}a{color:#4e5cbb}pre{background:#f1f2f5;padding:16px;overflow:auto;border-radius:8px}img{max-width:100%}</style></head><body>${html}</body></html>`;
+  } catch(error){if(revision===previewRevision)showError(error);}
 }
 async function save() {
   if (!site || !editing || saveButton.disabled) return;
@@ -359,15 +590,119 @@ async function queuePublication(siteID: string, manual = false) {
     } while (state.pending);
   } finally { state.running = false; updateView(); }
 }
-$("#new-site").addEventListener("click", () => { if (canLeave()) { navigationRevision++; editingSiteID=""; form.reset(); form.querySelector("h2")!.textContent="创建站点"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="创建站点"; dialog.showModal(); } });
+$("#new-site").addEventListener("click", () => { if (canLeave()) { navigationRevision++; editingSiteID=""; form.reset(); $("#site-index-setting").hidden=true;$("#site-avatar-setting").hidden=true;$("#site-identity-settings").hidden=true;$("#site-avatar-result").textContent="";$("#site-settings-result").textContent=""; form.querySelector("h2")!.textContent="创建站点";form.querySelector("h2 + p")!.textContent="为你的新空间起个名字。"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="创建站点"; dialog.showModal(); } });
+function updateSiteAvatarPreview(value?:string) {
+  const image=$<HTMLImageElement>("#site-avatar-preview");image.hidden=!value;$("#site-avatar-placeholder").hidden=!!value;
+  if(value)image.src=`data:image/png;base64,${value}`;else image.removeAttribute("src");
+  $<HTMLButtonElement>("#remove-site-avatar").disabled=!value || saving;
+}
 editSite.addEventListener("click", () => {
   if (!site || saving) return;
-  editingSiteID=site.id; form.reset();
+  editingSiteID=site.id; form.reset();$("#site-settings-result").textContent="";
   form.querySelector<HTMLInputElement>('input[name="name"]')!.value=site.name;
   form.querySelector<HTMLTextAreaElement>('textarea[name="about"]')!.value=site.about;
-  form.querySelector("h2")!.textContent="站点设置"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="保存设置";
+  form.querySelector<HTMLInputElement>('input[name="doNotIndex"]')!.checked=!!site.doNotIndex;
+  form.querySelector<HTMLInputElement>('input[name="siteSlug"]')!.value=site.slug || "";
+  form.querySelector<HTMLInputElement>('input[name="authorName"]')!.value=site.authorName || "";
+  $("#site-index-setting").hidden=!!site.imported;
+  $("#site-identity-settings").hidden=!!site.imported;
+  $("#site-avatar-setting").hidden=!!site.imported;$("#site-avatar-result").textContent="";updateSiteAvatarPreview(site.avatarPng);
+  form.querySelector("h2")!.textContent="站点设置";form.querySelector("h2 + p")!.textContent="站点信息保存后需重新发布；头像选择后会自动发布。"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="保存设置";
   dialog.showModal();
 });
+async function changeSiteAvatar(remove:boolean) {
+  if(!editingSiteID || !site || site.id!==editingSiteID || site.imported || saving)return;
+  const siteID=editingSiteID,generation=publicationState(siteID).generation;
+  const controls=Array.from(form.querySelectorAll<HTMLInputElement|HTMLTextAreaElement|HTMLButtonElement>("input,textarea,button"));
+  const disabled=controls.map(control=>control.disabled);controls.forEach(control=>control.disabled=true);saving=true;updateView();$("#site-avatar-result").textContent="";
+  try {
+    const updated=remove ? await Library.removeSiteAvatar(siteID) : await Library.selectSiteAvatar(siteID);
+    if(!updated.id)return;
+    const selected=mergeSitePublication(sites.find(entry=>entry.id===siteID),updated,generation);
+    sitesRevision++;sites=sites.map(entry=>entry.id===siteID ? selected : entry);if(site?.id===siteID)site=selected;
+    updateSiteAvatarPreview(selected.avatarPng);markLocalChange(siteID);void queuePublication(siteID);
+    $("#site-avatar-result").textContent="头像已保存，正在发布站点。";
+  } catch(error){$("#site-avatar-result").textContent=`头像保存失败：${error instanceof Error ? error.message : String(error)}`;}
+  finally{controls.forEach((control,i)=>control.disabled=disabled[i]!);saving=false;updateSiteAvatarPreview(site?.id===siteID ? site.avatarPng : undefined);updateView();}
+}
+$("#choose-site-avatar").addEventListener("click",()=>void changeSiteAvatar(false));
+$("#remove-site-avatar").addEventListener("click",()=>void changeSiteAvatar(true));
+const siteProfileDialog=$<HTMLDialogElement>("#site-profile-dialog"),siteProfileForm=$<HTMLFormElement>("#site-profile-form");
+const profileFields=["domain","twitterUsername","githubUsername","telegramUsername","mastodonUsername","discordLink"] as const;
+$("#site-profile").addEventListener("click",()=>{
+  if(!site || site.imported || saving)return;
+  for(const name of profileFields)siteProfileForm.querySelector<HTMLInputElement>(`[name="${name}"]`)!.value=site[name] || "";
+  $("#site-profile-result").textContent="";siteProfileDialog.showModal();
+});
+$("#close-site-profile").addEventListener("click",()=>{if(!saving)siteProfileDialog.close();});
+siteProfileDialog.addEventListener("cancel",event=>{if(saving)event.preventDefault();});
+siteProfileForm.addEventListener("submit",async event=>{
+  event.preventDefault();if(!site || site.imported || saving)return;
+  const siteID=site.id,generation=publicationState(siteID).generation,profile=Object.fromEntries(profileFields.map(name=>[name,siteProfileForm.querySelector<HTMLInputElement>(`[name="${name}"]`)!.value.trim()]));
+  const controls=Array.from(siteProfileForm.querySelectorAll<HTMLInputElement|HTMLButtonElement>("input,button"));controls.forEach(control=>control.disabled=true);saving=true;updateView();
+  try {const updated=await Library.updateSiteProfile(siteID,JSON.stringify(profile));const selected=mergeSitePublication(sites.find(entry=>entry.id===siteID),updated,generation);sitesRevision++;sites=sites.map(entry=>entry.id===siteID?selected:entry);if(site?.id===siteID)site=selected;siteProfileDialog.close();markLocalChange(siteID);void queuePublication(siteID);}
+  catch(error){$("#site-profile-result").textContent=`保存失败：${error instanceof Error ? error.message : String(error)}`;}
+  finally{controls.forEach(control=>control.disabled=false);saving=false;updateView();}
+});
+const podcastDialog=$<HTMLDialogElement>("#podcast-settings-dialog"),podcastForm=$<HTMLFormElement>("#podcast-settings-form");
+const podcastCategories=["Arts","Business","Comedy","Education","Fiction","Government","History","Health & Fitness","Kids & Family","Leisure","Music","News","Religion & Spirituality","Science","Society & Culture","Sports","Technology","True Crime","TV & Film"];
+for(const category of podcastCategories){const item=document.createElement("label"),input=document.createElement("input");input.type="checkbox";input.value=category;input.name="category";item.append(input,document.createTextNode(category));$("#podcast-categories").append(item);}
+function updatePodcastCover(value?:string){const preview=$<HTMLImageElement>("#podcast-cover-preview");preview.hidden=!value;$("#podcast-cover-placeholder").hidden=!!value;if(value)preview.src=`data:image/png;base64,${value}`;else preview.removeAttribute("src");$<HTMLButtonElement>("#remove-podcast-cover").disabled=!value || saving;}
+$("#podcast-settings").addEventListener("click",()=>{if(!site || site.imported || saving)return;podcastForm.querySelector<HTMLInputElement>('[name="language"]')!.value=site.podcastLanguage || "en";podcastForm.querySelector<HTMLInputElement>('[name="explicit"]')!.checked=!!site.podcastExplicit;for(const input of podcastForm.querySelectorAll<HTMLInputElement>('[name="category"]'))input.checked=!!site.podcastCategories?.includes(input.value);updatePodcastCover(site.podcastCoverPng);$("#podcast-settings-result").textContent="";$("#podcast-cover-result").textContent="";podcastDialog.showModal();});
+$("#close-podcast-settings").addEventListener("click",()=>{if(!saving)podcastDialog.close();});podcastDialog.addEventListener("cancel",event=>{if(saving)event.preventDefault();});
+podcastForm.addEventListener("submit",async event=>{
+  event.preventDefault();if(!site || site.imported || saving)return;const siteID=site.id,generation=publicationState(siteID).generation;
+  const language=podcastForm.querySelector<HTMLInputElement>('[name="language"]')!.value.trim(),explicit=podcastForm.querySelector<HTMLInputElement>('[name="explicit"]')!.checked,categories=Array.from(podcastForm.querySelectorAll<HTMLInputElement>('[name="category"]:checked')).map(input=>input.value);
+  const controls=Array.from(podcastForm.querySelectorAll<HTMLInputElement|HTMLButtonElement>("input,button"));controls.forEach(control=>control.disabled=true);saving=true;updateView();
+  try{const updated=await Library.updatePodcastSettings(siteID,language,explicit,JSON.stringify(categories));const selected=mergeSitePublication(sites.find(entry=>entry.id===siteID),updated,generation);sitesRevision++;sites=sites.map(entry=>entry.id===siteID?selected:entry);if(site?.id===siteID)site=selected;podcastDialog.close();markLocalChange(siteID);void queuePublication(siteID);}
+  catch(error){$("#podcast-settings-result").textContent=`保存失败：${error instanceof Error ? error.message : String(error)}`;}
+  finally{controls.forEach(control=>control.disabled=false);saving=false;updateView();}
+});
+async function changePodcastCover(remove:boolean){
+  if(!site || site.imported || saving)return;const siteID=site.id,generation=publicationState(siteID).generation;
+  const controls=Array.from(podcastForm.querySelectorAll<HTMLInputElement|HTMLButtonElement>("input,button")),disabled=controls.map(control=>control.disabled);controls.forEach(control=>control.disabled=true);saving=true;updateView();
+  try{const updated=remove?await Library.removePodcastCover(siteID):await Library.selectPodcastCover(siteID);if(!updated.id)return;const selected=mergeSitePublication(sites.find(entry=>entry.id===siteID),updated,generation);sitesRevision++;sites=sites.map(entry=>entry.id===siteID?selected:entry);if(site?.id===siteID)site=selected;updatePodcastCover(selected.podcastCoverPng);markLocalChange(siteID);void queuePublication(siteID);$("#podcast-cover-result").textContent="封面已保存，正在发布站点。";}
+  catch(error){$("#podcast-cover-result").textContent=`封面保存失败：${error instanceof Error ? error.message : String(error)}`;}
+  finally{controls.forEach((control,i)=>control.disabled=disabled[i]!);saving=false;updatePodcastCover(site?.id===siteID?site.podcastCoverPng:undefined);updateView();}
+}
+$("#choose-podcast-cover").addEventListener("click",()=>void changePodcastCover(false));$("#remove-podcast-cover").addEventListener("click",()=>void changePodcastCover(true));
+const deploymentDialog=$<HTMLDialogElement>("#deployment-dialog"),deploymentForm=$<HTMLFormElement>("#deployment-form"),deploymentKind=deploymentForm.querySelector<HTMLSelectElement>('[name="kind"]')!;
+let deploymentSiteID="",deploymentRevision=0,deploymentBusy=false,deploymentCurrent:{configured:boolean;name:string;server:string;autoDeploy:boolean;deleteRemote:boolean;pending:boolean;lastUrl:string}|null=null;
+function deploymentField(name:string){return deploymentForm.querySelector<HTMLInputElement>(`[name="${name}"]`)!;}
+function updateDeploymentControls(){
+  const cloud=deploymentKind.value==="cloudflare";$("#deployment-token-label").hidden=!cloud;$("#deployment-delete-label").hidden=cloud;$("#select-ssh-key").hidden=cloud;
+  $("#deployment-name-label").firstChild!.textContent=cloud ? "Pages 项目名称" : "目标地址";$("#deployment-server-label").firstChild!.textContent=cloud ? "Cloudflare 账号 ID" : "SSH 私钥路径（可留空使用 ssh-agent）";
+  deploymentField("name").placeholder=cloud ? "my-site" : "user@example.com:/var/www/site";
+  $("#deployment-note").textContent=cloud ? "需要 Cloudflare Pages Edit 令牌。项目不存在时会创建；单文件不得超过 25 MiB。" : "需要已安装的 Cygwin 兼容 rsync 与 Windows OpenSSH；请先在系统 known_hosts 中确认服务器主机密钥。";
+  for(const el of deploymentForm.querySelectorAll<HTMLInputElement|HTMLButtonElement|HTMLSelectElement>("input,button,select"))el.disabled=deploymentBusy;
+  $<HTMLButtonElement>("#deployment-run").disabled=deploymentBusy || !deploymentCurrent?.configured;$<HTMLButtonElement>("#deployment-disable").disabled=deploymentBusy || !deploymentCurrent?.configured;
+}
+async function loadDeployment(){
+  const id=deploymentSiteID,kind=deploymentKind.value,revision=++deploymentRevision;deploymentCurrent=null;deploymentBusy=true;updateDeploymentControls();$("#deployment-result").textContent="正在读取配置…";
+  try{const info=await Library.deploymentInfo(id,kind);if(revision!==deploymentRevision || !deploymentDialog.open)return;deploymentCurrent=info;deploymentField("name").value=info.name || "";deploymentField("server").value=info.server || "";deploymentField("token").value="";deploymentField("autoDeploy").checked=info.autoDeploy;deploymentField("deleteRemote").checked=info.deleteRemote;$("#deployment-result").textContent=info.pending ? "上次发布结果不确定，请检查目标后手动重试。" : info.lastUrl ? `最近部署：${info.lastUrl}` : info.configured ? "已保存配置。" : "尚未配置。";}
+  catch(error){if(revision===deploymentRevision)$("#deployment-result").textContent=`读取失败：${error instanceof Error ? error.message : String(error)}`;}
+  finally{if(revision===deploymentRevision){deploymentBusy=false;updateDeploymentControls();}}
+}
+$("#deployment-settings").addEventListener("click",()=>{if(!site || site.imported || saving)return;deploymentSiteID=site.id;deploymentKind.value="ssh";deploymentDialog.showModal();void loadDeployment();});
+deploymentKind.addEventListener("change",()=>void loadDeployment());
+$("#deployment-close").addEventListener("click",()=>{if(!deploymentBusy)deploymentDialog.close();});deploymentDialog.addEventListener("cancel",event=>{if(deploymentBusy)event.preventDefault();});deploymentDialog.addEventListener("close",()=>{deploymentRevision++;deploymentField("token").value="";});
+$("#select-ssh-key").addEventListener("click",async()=>{if(deploymentBusy)return;deploymentBusy=true;updateDeploymentControls();try{const path=await Library.selectSSHKey();if(path)deploymentField("server").value=path;}catch(error){$("#deployment-result").textContent=String(error);}finally{deploymentBusy=false;updateDeploymentControls();}});
+deploymentForm.addEventListener("submit",async event=>{
+  event.preventDefault();if(deploymentBusy || !deploymentCurrent)return;const kind=deploymentKind.value,id=deploymentSiteID;
+  const name=deploymentField("name").value.trim(),server=deploymentField("server").value.trim(),token=deploymentField("token").value,auto=deploymentField("autoDeploy").checked,remove=kind==="ssh" && deploymentField("deleteRemote").checked;
+  deploymentBusy=true;updateDeploymentControls();try{await Library.configureDeployment(id,kind,name,server,token,auto,remove);deploymentField("token").value="";await loadDeployment();}
+  catch(error){$("#deployment-result").textContent=`保存失败：${error instanceof Error ? error.message : String(error)}`;}finally{deploymentBusy=false;updateDeploymentControls();}
+});
+$("#deployment-run").addEventListener("click",async()=>{
+  if(deploymentBusy || !deploymentCurrent?.configured)return;const kind=deploymentKind.value,id=deploymentSiteID,info=deploymentCurrent;
+  if(deploymentField("name").value.trim()!==info.name || deploymentField("server").value.trim()!==info.server || deploymentField("token").value || deploymentField("autoDeploy").checked!==info.autoDeploy || (kind==="ssh" && deploymentField("deleteRemote").checked!==info.deleteRemote)){$("#deployment-result").textContent="请先保存当前配置。";return;}
+  const warning=kind==="ssh" && info.deleteRemote ? "\n远端多余文件将被删除。" : "";if(!window.confirm(`将已保存的站点公开发布到 ${info.name}？${warning}${dirty ? "\n当前编辑内容尚未保存，不会包含在此次发布中。" : ""}`))return;
+  deploymentBusy=true;updateDeploymentControls();$("#deployment-result").textContent="正在发布…";
+  try{const url=await Library.deploySite(id,kind);await loadDeployment();$("#deployment-result").textContent=url ? `发布完成：${url}` : "发布完成。";}
+  catch(error){$("#deployment-result").textContent=`发布未确认：${error instanceof Error ? error.message : String(error)}；请检查目标后重试。`;}
+  finally{deploymentBusy=false;updateDeploymentControls();}
+});
+$("#deployment-disable").addEventListener("click",async()=>{if(deploymentBusy || !deploymentCurrent?.configured)return;deploymentBusy=true;updateDeploymentControls();try{await Library.disableDeployment(deploymentSiteID,deploymentKind.value);await loadDeployment();}catch(error){$("#deployment-result").textContent=`停用失败：${String(error)}`;}finally{deploymentBusy=false;updateDeploymentControls();}});
 removeSite.addEventListener("click", async () => {
   if (!site || removeSite.disabled || !canLeave()) return;
   const siteID=site.id;
@@ -395,7 +730,7 @@ $("#show-removed-sites").addEventListener("click", async () => {
         try {
           const restored=await Library.restoreSite(entry.id);
           sitesRevision++; sites=[...sites.filter(item=>item.id!==restored.id),restored];
-          site=restored; subscription=null; item=null; favoritesView=false; article=null; draft=null; drafts=[]; draftsView=false; articles=[]; editing=false; dirty=false;
+          site=restored; subscription=null; item=null; favoritesView=false; smartView=null; article=null; draft=null; drafts=[]; draftsView=false; articles=[]; editing=false; dirty=false;
           removedSitesDialog.close();
           try { articles=await Library.articles(restored.id); articleLoadFailures.delete(restored.id); }
           catch(e) { articleLoadFailures.add(restored.id); showError(`站点已恢复，但文章加载失败；请点击站点重试：${String(e)}`); }
@@ -434,15 +769,20 @@ $("#cancel-site").addEventListener("click", () => dialog.close());
 dialog.addEventListener("cancel", event => { if (saving) event.preventDefault(); });
 dialog.addEventListener("close", () => { navigationRevision++; });
 form.addEventListener("submit", async (event) => {
-  event.preventDefault(); const button = form.querySelector<HTMLButtonElement>('button[type="submit"]')!; button.disabled = true;
+  event.preventDefault(); $("#site-settings-result").textContent="";const button = form.querySelector<HTMLButtonElement>('button[type="submit"]')!; button.disabled = true;
   const revision = ++navigationRevision;
   const isUpdate=!!editingSiteID, cancel=$<HTMLButtonElement>("#cancel-site");
   if(isUpdate) { saving=true; cancel.disabled=true; busyMessage="正在保存站点设置…"; updateView(); }
   try {
     const values = new window.FormData(form); const name=String(values.get("name") ?? ""), about=String(values.get("about") ?? "");
     if (editingSiteID) {
-      form.querySelector<HTMLInputElement>('input[name="name"]')!.disabled=true; form.querySelector<HTMLTextAreaElement>('textarea[name="about"]')!.disabled=true;
-      const id=editingSiteID, generation=publicationState(id).generation, updated=await Library.updateSite(id,name,about), selected=mergeSitePublication(sites.find(entry=>entry.id===id),updated,generation);
+      form.querySelector<HTMLInputElement>('input[name="name"]')!.disabled=true; form.querySelector<HTMLTextAreaElement>('textarea[name="about"]')!.disabled=true; form.querySelector<HTMLInputElement>('input[name="doNotIndex"]')!.disabled=true;
+      form.querySelector<HTMLInputElement>('input[name="siteSlug"]')!.disabled=true;form.querySelector<HTMLInputElement>('input[name="authorName"]')!.disabled=true;
+      const id=editingSiteID, generation=publicationState(id).generation, existing=sites.find(entry=>entry.id===id), noIndex=form.querySelector<HTMLInputElement>('input[name="doNotIndex"]')!.checked;
+      const slug=String(values.get("siteSlug") ?? "").trim(),author=String(values.get("authorName") ?? "").trim();
+      const identityChanged=existing && !existing.imported && (slug!==(existing.slug || "") || author!==(existing.authorName || ""));
+      const updated=identityChanged ? await Library.updateSiteDetails(id,name,about,noIndex,slug,author) : existing && !existing.imported && noIndex!==!!existing.doNotIndex ? await Library.updateSiteSettings(id,name,about,noIndex) : await Library.updateSite(id,name,about);
+      const selected=mergeSitePublication(sites.find(entry=>entry.id===id),updated,generation);
       sitesRevision++; sites=sites.map(entry=>entry.id===id ? selected : entry);
       if (site?.id===id) site=selected;
       dialog.close(); clearError(); updateView(); return;
@@ -452,9 +792,9 @@ form.addEventListener("submit", async (event) => {
     let refreshError: unknown;
     try { await reloadSites(); } catch(e) { refreshError=e; }
     if (revision !== navigationRevision) { if(refreshError) showError(`站点已创建，但站点列表刷新失败：${String(refreshError)}`); updateView(); return; }
-    site = created; favoritesView = false; subscription = null; item = null; articles = []; article = null; draft=null; drafts=[]; draftsView=false; editing = false; dirty = false; dialog.close();
+    site = created; favoritesView = false; smartView=null; subscription = null; item = null; articles = []; article = null; draft=null; drafts=[]; draftsView=false; editing = false; dirty = false; dialog.close();
     if (refreshError) showError(`站点已创建，但站点列表刷新失败：${String(refreshError)}`); else clearError(); updateView();
-  } catch (e) { showError(e); dialog.close(); } finally { button.disabled = false; if(isUpdate) {saving=false;cancel.disabled=false;form.querySelector<HTMLInputElement>('input[name="name"]')!.disabled=false;form.querySelector<HTMLTextAreaElement>('textarea[name="about"]')!.disabled=false;busyMessage="";updateView();} }
+  } catch (e) { if(isUpdate)$("#site-settings-result").textContent=`保存失败：${e instanceof Error ? e.message : String(e)}`;else {showError(e);dialog.close();} } finally { button.disabled = false; if(isUpdate) {saving=false;cancel.disabled=false;form.querySelector<HTMLInputElement>('input[name="name"]')!.disabled=false;form.querySelector<HTMLTextAreaElement>('textarea[name="about"]')!.disabled=false;form.querySelector<HTMLInputElement>('input[name="doNotIndex"]')!.disabled=false;form.querySelector<HTMLInputElement>('input[name="siteSlug"]')!.disabled=false;form.querySelector<HTMLInputElement>('input[name="authorName"]')!.disabled=false;busyMessage="";updateView();} }
 });
 $("#new-feed").addEventListener("click", () => { if (canLeave()) { navigationRevision++; feedForm.reset(); feedDialog.showModal(); } });
 $("#cancel-feed").addEventListener("click", () => feedDialog.close());
@@ -499,7 +839,61 @@ async function updateOfflineUsage() {const usage=await Library.offlineMediaUsage
 $("#offline-storage").addEventListener("click",async()=>{storageDialog.showModal();$("#offline-storage-result").textContent="";cleanupOffline.disabled=true;try{await updateOfflineUsage();}catch(e){$("#offline-storage-usage").textContent=`无法计算空间：${String(e)}`;}});
 $("#close-offline-storage").addEventListener("click",()=>storageDialog.close());
 cleanupOffline.addEventListener("click",async()=>{cleanupOffline.disabled=true;try{const result=await Library.cleanupOfflineMedia();await updateOfflineUsage();$("#offline-storage-result").textContent=`已清理 ${formatBytes(result.reclaimedBytes)}（${result.reclaimedFiles} 个文件）`;}catch(e){$("#offline-storage-result").textContent=`清理未完成，部分文件可能已清理：${String(e)}`;try{await updateOfflineUsage();}catch{}}});
-$("#show-favorites").addEventListener("click",()=>{ if(!canLeave()) return; navigationRevision++; site=null; subscription=null; item=null; article=null; draft=null; draftsView=false; editing=false; dirty=false; favoritesView=true; clearError();updateView(); });
+$("#show-favorites").addEventListener("click",()=>{ if(!canLeave()) return; navigationRevision++; site=null; subscription=null; item=null; article=null; draft=null; draftsView=false; editing=false; dirty=false; favoritesView=true; smartView=null; clearError();updateView(); });
+for(const [selector,view] of [["#show-today","today"],["#show-unread","unread"]] as const) $(selector).addEventListener("click",()=>{if(!canLeave())return;navigationRevision++;readerRevision++;site=null;subscription=null;item=null;article=null;draft=null;draftsView=false;editing=false;dirty=false;favoritesView=false;smartView=view;clearError();updateView();});
+$("#toggle-read").addEventListener("click",()=>{if(!subscription || !item)return;const key=item.key || item.id || item.link;if(key) void setSubscriptionRead(subscription.url,key,!item.read);});
+$("#mark-feed-read").addEventListener("click",async()=>{
+  if(!subscription)return;const address=subscription.url;
+  if(bulkReading.has(address) || [...pendingRead].some(key=>key.startsWith(`${address}\u0000`)))return;
+  bulkReading.add(address);updateView();
+  try {
+    await Library.markSubscriptionRead(address);subscriptionsRevision++;
+    const current=subscriptions.find(entry=>entry.url===address);current?.feed.items.forEach(entry=>{entry.read=true;});
+    if(subscription?.url===address && item)item.read=true;
+    try{await reloadSubscriptions();}catch(error){showError(`已标为已读，但刷新列表失败：${error instanceof Error ? error.message : String(error)}`);}
+  } catch(error){showError(`标记已读失败：${error instanceof Error ? error.message : String(error)}`);}
+  finally{bulkReading.delete(address);updateView();}
+});
+const searchDialog=$<HTMLDialogElement>("#search-dialog"),searchInput=$<HTMLInputElement>("#search-input"),searchResults=$("#search-results"),searchStatus=$("#search-status");
+let searchRevision=0,searchTimer:ReturnType<typeof setTimeout>|undefined;
+async function openSearchResult(result:SearchResult) {
+  if(!canLeave())return;
+  const revision=++navigationRevision;
+  try {
+    if(result.siteId && result.articleId){
+      const selected=sites.find(entry=>entry.id===result.siteId);
+      if(!selected)throw new Error("站点已不可用，请重新搜索");
+      const loaded=await Library.articles(result.siteId);
+      if(revision!==navigationRevision || !searchDialog.open)return;
+      const target=loaded.find(entry=>entry.id===result.articleId);
+      if(!target)throw new Error("文章已不可用，请重新搜索");
+      site=selected;subscription=null;item=null;favoritesView=false;smartView=null;articles=loaded;article=null;draft=null;draftsView=false;editing=false;dirty=false;
+      searchDialog.close();selectArticle(target);return;
+    }
+    if(result.subscriptionUrl && result.itemKey){
+      const selected=subscriptions.find(entry=>entry.url===result.subscriptionUrl);
+      const target=selected?.feed.items.find(entry=>(entry.key || entry.id || entry.link)===result.itemKey);
+      if(!selected || !target)throw new Error("订阅文章已不可用，请重新搜索");
+      dirty=false;selectSubscription(selected);searchDialog.close();selectFeedItem(target);return;
+    }
+    throw new Error("搜索结果缺少来源");
+  } catch(error){if(searchDialog.open)searchStatus.textContent=`无法打开：${error instanceof Error ? error.message : String(error)}`;}
+}
+async function performSearch() {
+  const revision=++searchRevision,query=searchInput.value.trim();searchResults.replaceChildren();
+  if(!query){searchStatus.textContent="输入关键词开始搜索。";return;}
+  searchStatus.textContent="正在搜索…";
+  try {
+    const results=await Library.searchArticles(query);
+    if(revision!==searchRevision || !searchDialog.open)return;
+    searchStatus.textContent=results.length ? `找到 ${results.length} 篇文章${results.length>=200 ? "（最多显示 200 篇）" : ""}` : "没有找到匹配的文章。";
+    for(const result of results){const button=articleRow(result.title,result.sourceName,result.snippet);button.addEventListener("click",()=>void openSearchResult(result));searchResults.append(button);}
+  } catch(error){if(revision===searchRevision && searchDialog.open)searchStatus.textContent=`搜索失败：${error instanceof Error ? error.message : String(error)}`;}
+}
+$("#show-search").addEventListener("click",()=>{searchDialog.showModal();searchInput.focus();if(searchInput.value.trim())void performSearch();});
+searchInput.addEventListener("input",()=>{searchRevision++;clearTimeout(searchTimer);searchResults.replaceChildren();searchStatus.textContent=searchInput.value.trim() ? "正在搜索…" : "输入关键词开始搜索。";searchTimer=setTimeout(()=>void performSearch(),180);});
+$("#close-search").addEventListener("click",()=>searchDialog.close());
+searchDialog.addEventListener("close",()=>{searchRevision++;clearTimeout(searchTimer);});
 starItem.addEventListener("click",async()=>{
   if(!subscription || !item) return; const address=subscription.url, key=item.key || item.id || item.link; if(!key) { showError("文章缺少可用标识"); return; } const starred=!item.starred;
   starItem.disabled=true; clearError();
@@ -507,7 +901,7 @@ starItem.addEventListener("click",async()=>{
   catch(e) { showError(e); } finally {updateView();}
 });
 shareItem.addEventListener("click",async()=>{
-  if(!item?.link) return; try { const u=new URL(item.link);if((u.protocol!=="http:" && u.protocol!=="https:") || u.username || u.password) throw new Error("文章没有可分享的网页链接"); shareURL.value=u.href; try {await window.navigator.clipboard.writeText(u.href);shareStatus.textContent="链接已复制";} catch {shareURL.hidden=false;shareURL.focus();shareURL.select();shareStatus.textContent="请按 Ctrl+C 复制";} } catch(e) {showError(e);}
+  if(!item?.link) return; try { const url=planetShareURL(selectedGateway(publicGateway.value),item.link,!!item.contentCid); shareURL.value=url; try {await window.navigator.clipboard.writeText(url);shareStatus.textContent="链接已复制";} catch {shareURL.hidden=false;shareURL.focus();shareURL.select();shareStatus.textContent="请按 Ctrl+C 复制";} } catch(e) {showError(e);}
 });
 
 exportSite.addEventListener("click", async () => {
@@ -530,7 +924,7 @@ importPlanet.addEventListener("click", async () => {
     const imported = await Library.importPlanet();
     if (imported.id) {
       sitesRevision++; sites=[...sites.filter(entry=>entry.id!==imported.id),imported];
-      site=imported; subscription=null; item=null; article=null; draft=null; drafts=[]; draftsView=false; articles=[]; editing=false; dirty=false; navigationRevision++;
+      site=imported; subscription=null; item=null; favoritesView=false; smartView=null; article=null; draft=null; drafts=[]; draftsView=false; articles=[]; editing=false; dirty=false; navigationRevision++;
       try { await reloadSites(); } catch(e) { showError(`站点已导入，但站点列表刷新失败：${String(e)}`); }
       try { articles=await Library.articles(imported.id); articleLoadFailures.delete(imported.id); }
       catch(e) { articleLoadFailures.add(imported.id); showError(`站点已导入，但文章加载失败；请点击站点重试：${String(e)}`); }
@@ -545,20 +939,43 @@ exportPlanet.addEventListener("click", async () => {
   try { const path = await Library.exportPlanet(site.id); if (path) window.alert(`备份已保存到：\n${path}`); }
   catch (e) { showError(e); } finally { saving = false; updateView(); }
 });
+const templateGallery=$<HTMLDialogElement>("#template-gallery"), templateList=$("#template-list"), templateFrame=$<HTMLIFrameElement>("#template-preview"), templateApply=$<HTMLButtonElement>("#template-apply"), templateImport=$<HTMLButtonElement>("#template-import"), templateClose=$<HTMLButtonElement>("#template-gallery-close");
+let gallerySiteID="", gallerySelected="", galleryRevision=0, galleryItems:Builtin[]=[];
+async function showTemplatePreview(item:Builtin) {
+  gallerySelected=item.id; const revision=++galleryRevision;
+  for(const button of templateList.querySelectorAll<HTMLButtonElement>(".template-choice")) button.setAttribute("aria-selected",String(button.dataset.templateId===item.id));
+  $("#template-preview-name").textContent=item.name; $("#template-preview-description").textContent=`${item.description} · build ${item.build}`;
+  $("#template-gallery-result").textContent="正在生成预览…";templateFrame.srcdoc="";templateApply.disabled=true;
+  try { const html=await Library.builtinTemplatePreview(item.id); if(revision!==galleryRevision || !templateGallery.open)return; templateFrame.srcdoc=html;$("#template-gallery-result").textContent="";templateApply.disabled=false; }
+  catch(e) { if(revision===galleryRevision && templateGallery.open) $("#template-gallery-result").textContent=`预览失败：${String(e)}`; }
+}
 selectTemplate.addEventListener("click", async () => {
-  if (!site || saving) return;
-  const siteID=site.id; navigationRevision++; saving=true; updateView(); clearError();
+  if (!site || saving) return; gallerySiteID=site.id; gallerySelected="";templateList.replaceChildren();templateFrame.srcdoc="";templateApply.disabled=true;$("#template-gallery-result").textContent="正在读取模板…";templateGallery.showModal();
+  const revision=++galleryRevision;
+  try { galleryItems=await Library.builtinTemplates();if(revision!==galleryRevision || !templateGallery.open)return;
+    for(const item of galleryItems) { const button=document.createElement("button");button.type="button";button.className="template-choice";button.dataset.templateId=item.id;button.setAttribute("aria-selected","false");const name=document.createElement("strong"),description=document.createElement("small");name.textContent=item.name;description.textContent=item.description;button.append(name,description);button.addEventListener("click",()=>void showTemplatePreview(item));templateList.append(button); }
+    const initial=galleryItems.find(item=>item.name===site?.templateName) ?? galleryItems[0];if(initial) void showTemplatePreview(initial);else $("#template-gallery-result").textContent="没有可用的内置模板。";
+  } catch(e) {if(revision===galleryRevision && templateGallery.open)$("#template-gallery-result").textContent=`读取失败：${String(e)}`;}
+});
+templateClose.addEventListener("click",()=>{if(!saving){galleryRevision++;templateGallery.close();}});
+templateGallery.addEventListener("cancel",event=>{if(saving)event.preventDefault();else galleryRevision++;});
+async function applyTemplate(manual:boolean) {
+  if (!site || site.id!==gallerySiteID || saving || (!manual && !gallerySelected)) return;
+  const siteID=gallerySiteID; navigationRevision++; saving=true;templateApply.disabled=true;templateImport.disabled=true;templateClose.disabled=true;updateView();clearError();
   try {
-    const generation=publicationState(siteID).generation, updated=await Library.selectTemplate(siteID);
+    const generation=publicationState(siteID).generation, updated=manual ? await Library.selectTemplate(siteID) : await Library.applyBuiltinTemplate(siteID,gallerySelected);
     if (updated.id) {
       const selected=mergeSitePublication(sites.find(entry=>entry.id===siteID),updated,generation);
       markLocalChange(siteID); sitesRevision++; sites=sites.map(entry=>entry.id===siteID ? selected : entry);
       if (site?.id===siteID) site=selected;
+      galleryRevision++;templateGallery.close();
       window.alert(selected.imported ? `已选择模板：${selected.templateName}\n可尝试导出备份；不支持的原站点设置会提示原因。` : `已选择模板：${selected.templateName}\n建议先导出网页检查效果。`);
       if (selected.publishPending) void queuePublication(siteID);
     }
-  } catch(e) { showError(e); } finally { saving=false; updateView(); }
-});
+  } catch(e) { $("#template-gallery-result").textContent=`选择失败：${String(e)}`; } finally { saving=false;templateApply.disabled=!gallerySelected;templateImport.disabled=false;templateClose.disabled=false;updateView(); }
+}
+templateApply.addEventListener("click",()=>void applyTemplate(false));
+templateImport.addEventListener("click",()=>void applyTemplate(true));
 templateSettingsButton.addEventListener("click", async () => {
   if (!site || site.templateName !== "Sepia" || saving) return;
   const siteID=site.id; navigationRevision++; saving=true; title.disabled=true; content.disabled=true; busyMessage="正在读取模板设置…"; updateView(); clearError();
@@ -688,7 +1105,7 @@ feedForm.addEventListener("submit", async (event) => {
     const address = String(new FormData(feedForm).get("url") ?? "");
     const entry = await Library.follow(address); await reloadSubscriptions();
     if (revision !== navigationRevision) { updateView(); return; }
-    site = null; favoritesView = false; subscription = entry; item = null; article = null; draft=null; draftsView=false; editing = false; dirty = false; feedDialog.close(); clearError(); updateView();
+    site = null; favoritesView = false; smartView=null; subscription = entry; item = null; article = null; draft=null; draftsView=false; editing = false; dirty = false; feedDialog.close(); clearError(); updateView();
   } catch (e) { feedDialog.close(); showError(e); } finally { button.disabled = false; }
 });
 newArticle.addEventListener("click", startArticle);
@@ -779,7 +1196,14 @@ addAttachment.addEventListener("click", async () => {
   } catch (e) { showError(e); }
   finally { saving = false; busyMessage = ""; updateView(); }
 });
-$("#copy-published-url").addEventListener("click", async () => {
+publicGateway.addEventListener("change", () => {
+  publicGateway.value = selectedGateway(publicGateway.value);
+  try { window.localStorage.setItem(gatewayKey, publicGateway.value); }
+  catch { showError("无法保存网关设置，本次选择将在关闭程序后失效。"); }
+  copyStatus.textContent = ""; shareStatus.textContent = ""; shareURL.hidden = true;
+  updateView();
+});
+copyPublishedURL.addEventListener("click", async () => {
   if (!publishedURL.value) return;
   try { await window.navigator.clipboard.writeText(publishedURL.value); copyStatus.textContent = "已复制"; }
   catch { publishedURL.focus(); publishedURL.select(); copyStatus.textContent = "请按 Ctrl+C 复制"; }
@@ -787,7 +1211,7 @@ $("#copy-published-url").addEventListener("click", async () => {
 emptyAction.addEventListener("click", () => site ? startArticle() : $("#new-site").click());
 saveButton.addEventListener("click", () => void save());
 for (const input of [title, content]) input.addEventListener("input", () => { navigationRevision++; dirty = true; updateView(); clearTimeout(previewTimer); previewTimer = setTimeout(() => void renderPreview(), 180); });
-window.addEventListener("keydown", (event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); void save(); } });
+window.addEventListener("keydown", (event) => { if (event.ctrlKey || event.metaKey) { if(event.key.toLowerCase() === "s") { event.preventDefault(); void save(); } else if(event.key.toLowerCase()==="f" && !document.querySelector("dialog[open]")){event.preventDefault();$("#show-search").click();} } });
 window.addEventListener("beforeunload", (event) => { if (dirty) event.preventDefault(); });
 async function init() {
   const initialNavigation=navigationRevision, initialSites=++sitesRevision, initialSubscriptions=++subscriptionsRevision;

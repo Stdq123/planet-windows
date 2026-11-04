@@ -4,7 +4,7 @@
 
 ## 构建和静态校验
 
-在 `windows/` 目录运行 `bun run build`，构建结束会打印唯一发行目录 `.mygo/releases/<GUID>/windows-amd64/`；该目录包含独立安装器和所需 payload。MyGo 默认生成的安装器因进程关闭和目录处理行为不能作为交付包，旧 `build/windows-amd64/` 安装包也不是新版交付物。`prepare-kubo.ps1` 验证固定 Kubo 包的 SHA-512；MyGo 的前端构建命令会调用 `prepare-notices.ps1`，从 Windows/amd64 构建依赖及 `mygo-runtime` 生成 `LICENSE-PLANET.txt`、`THIRD-PARTY-NOTICES.txt` 和 `KUBO-BUILDINFO.txt`，并校验及复制 `KUBO-DEPENDENCY-LICENSES.txt`。
+在 `windows/` 目录运行 `bun run build`，构建结束会打印唯一发行目录 `.mygo/releases/<GUID>/windows-amd64/`，检查通过后还会同步到固定的 `build/windows-amd64/`；两个目录均包含独立安装器和所需 payload。MyGo 默认生成的安装器因进程关闭和目录处理行为不能作为交付包。`prepare-kubo.ps1` 验证固定 Kubo 包的 SHA-512；MyGo 的前端构建命令会调用 `prepare-notices.ps1`，从 Windows/amd64 构建依赖及 `mygo-runtime` 生成 `LICENSE-PLANET.txt`、`THIRD-PARTY-NOTICES.txt` 和 `KUBO-BUILDINFO.txt`，并校验及复制 `KUBO-DEPENDENCY-LICENSES.txt`。
 
 ```powershell
 $releaseDir = Read-Host '粘贴构建结束时显示的发行目录'

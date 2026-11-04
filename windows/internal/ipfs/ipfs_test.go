@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -54,6 +55,41 @@ func TestInitPreservesExistingDNSAndUnknownConfig(t *testing.T) {
 	resolvers := config["DNS"].(map[string]any)["Resolvers"].(map[string]any)
 	if resolvers["eth."] != "https://example.test/dns-query" || resolvers["custom."] != "https://example.test/custom" {
 		t.Fatalf("resolvers changed: %+v", resolvers)
+	}
+}
+
+func TestInitEnablesIPv4AndIPv6TCPAndQUICListeners(t *testing.T) {
+	exe := os.Getenv("PLANET_TEST_KUBO")
+	if exe == "" {
+		t.Skip("Kubo required")
+	}
+	repo := filepath.Join(t.TempDir(), "repo")
+	client := New(exe, repo)
+	if err := client.Init(); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(repo, "config"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var config struct {
+		Addresses struct {
+			Swarm []string `json:"Swarm"`
+		} `json:"Addresses"`
+	}
+	if err := json.Unmarshal(raw, &config); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{"/ip4/0.0.0.0/tcp/0": false, "/ip6/::/tcp/0": false, "/ip4/0.0.0.0/udp/0/quic-v1": false, "/ip6/::/udp/0/quic-v1": false}
+	for _, addr := range config.Addresses.Swarm {
+		if _, ok := want[addr]; ok {
+			want[addr] = true
+		}
+	}
+	for addr, found := range want {
+		if !found {
+			t.Errorf("missing swarm listener %s", addr)
+		}
 	}
 }
 
@@ -378,6 +414,7 @@ func TestIsolatedDaemonStartsAndStops(t *testing.T) {
 	if err := client.Start(true); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { _ = client.Close() })
 	key, err := client.EnsureKey("daemon-test")
 	if err != nil || key == "" {
 		t.Fatalf("key=%q err=%v", key, err)
@@ -389,6 +426,9 @@ func TestIsolatedDaemonStartsAndStops(t *testing.T) {
 	cid, err := client.Add(dir)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if got, err := client.run("pin", "ls", "--type=recursive", cid); err != nil || got != cid+" recursive" {
+		t.Fatalf("site directory is not recursively pinned: %q: %v", got, err)
 	}
 	name, err := client.PublishOffline("daemon-test", cid)
 	if err != nil {
@@ -422,6 +462,10 @@ func TestPublicPublishFromIndependentRepository(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = first.Close() })
+	listeners, err := first.run("swarm", "addrs", "listen")
+	if err != nil || !strings.Contains(listeners, "/udp/") || !strings.Contains(listeners, "/quic-v1") {
+		t.Fatalf("QUIC listener not active: %q: %v", listeners, err)
+	}
 	second := New(executable, filepath.Join(t.TempDir(), "reader"))
 	if err := second.Init(); err != nil {
 		t.Fatal(err)

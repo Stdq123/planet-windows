@@ -1,0 +1,260 @@
+/* Platinum, the site template: every page is one window on the desktop
+   gray, drawn as the exe desk and its homepage draw theirs. The chrome —
+   the window, its striped bar, the sunken frame, the status strip and the
+   push button — is chrome.css beside this file, a copy of exe-stats'
+   shared block; this file is only what a site needs on top of it. Every
+   1px line is a border on a box of its own; 12px type; no hover states. */
+:root { --rule: #ddd; --quiet: #555; --cell: #999; --head: #ddd;
+  /* the reader's Serif (see .type): the exe Notes app's, then a Song or
+     Mincho face for the page's Chinese or Japanese, else the browser's
+     own fallback would draw those in a sans */
+  --serif: Charter, "Bitstream Charter", "Charis SIL", Georgia, "Iowan Old Style", Cambria, "Times New Roman", "Songti SC", STSong, "Noto Serif CJK SC", "Noto Serif SC", serif; }
+:root:lang(zh-Hant) { --serif: Charter, "Bitstream Charter", "Charis SIL", Georgia, "Iowan Old Style", Cambria, "Times New Roman", "Songti TC", "Noto Serif CJK TC", "Noto Serif TC", serif; }
+:root:lang(ja) { --serif: Charter, "Bitstream Charter", "Charis SIL", Georgia, "Iowan Old Style", Cambria, "Times New Roman", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", "Noto Serif JP", serif; }
+/* bold type on a Mac: the stack in chrome.css lands there on Geneva, which
+   has one weight, so a browser thickens it a little and a heading reads as
+   the text under it. Geneva's bold on these pages is Lucida Grande's, a
+   face every Mac carries; where neither face is installed both rules come
+   to nothing and the stack goes on to its next name, as it always did. */
+@font-face { font-family: "Geneva"; font-weight: normal; src: local("Geneva"); }
+@font-face { font-family: "Geneva"; font-weight: bold; src: local("Lucida Grande Bold"), local("LucidaGrande-Bold"); }
+.window { max-width: 720px; }
+
+/* the top strip: where this page sits, in one line, on the platinum the
+   desk's status bars are made of */
+.strip.tools { display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+  background: #ddd; color: #333; font-size: 11px; border-bottom: 1px solid #262626;
+  box-shadow: inset 1px 1px 0 rgba(255,255,255,.6), inset -1px -1px 0 #aaa; }
+.crumbs { display: flex; align-items: baseline; gap: 5px; min-width: 0; white-space: nowrap; overflow: hidden; }
+.crumbs .crumb { display: inline-flex; align-items: baseline; gap: 5px; flex: none; }
+.crumbs a { color: #333399; text-decoration: none; }
+.crumbs a:hover { text-decoration: underline; }
+/* the step between two names is a chevron on the pixel grid; between
+   ratios 1 and 2 a fractional scale would drop a row, so it is smoothed
+   there */
+.crumbs .sep { display: block; flex: none; align-self: center; margin: 0 1px; width: 4px; height: 7px; color: #777; shape-rendering: crispEdges; }
+.crumbs .sep .k { fill: currentColor; }
+@media (min-resolution: 1.01dppx) and (max-resolution: 1.99dppx) { .crumbs .sep { shape-rendering: geometricPrecision; } }
+.crumbs b { flex: 0 1 auto; min-width: 3em; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 480px) { .crumbs .crumb:not(:last-of-type) { display: none; } }
+/* a post's type, the reader's to choose at the strip's far end (the head
+   script is modules/type.html): − + step the text's size and Sans Serif |
+   Serif its face, joined push buttons as the exe Notes app has them, one
+   seam one line, the chosen face pressed in, and each face in Notes'
+   compact form: a sample "Aa" in itself, its name the button's label
+   and tooltip. The strip keeps its 28px: the buttons' 20px take 4px
+   above and below in place of the text's 6px. Without script the
+   controls keep their place, unseen. */
+.strip.tools.typed { padding-top: 4px; padding-bottom: 4px; }
+.type { display: flex; gap: 8px; flex: none; margin-left: auto; }
+html:not(.type-on) .type { visibility: hidden; }
+.type .seg { display: flex; }
+.type .btn { min-width: 0; margin: 0; font-family: inherit; cursor: default; }
+.type .seg .btn { border-radius: 0; border-right-width: 0; }
+.type .seg .btn:first-child { border-radius: 3px 0 0 3px; }
+.type .seg .btn:last-child { border-radius: 0 3px 3px 0; border-right-width: 1px; }
+.type .size .btn { padding: 2px 8px; min-width: 24px; }
+html:not(.serif) .type [data-type=sans], html.serif .type [data-type=serif] { background: #888; color: #fff;
+  box-shadow: inset 1px 1px 0 #666, inset -1px -1px 0 #aaa, inset 2px 2px 0 #777, inset -2px -2px 0 #999; }
+.type .btn:disabled, html.ts-min .type [data-type=smaller], html.ts-max .type [data-type=bigger] { color: #777; border-color: #888; background: var(--g300); box-shadow: none; }
+.type .s { font-weight: normal; font-size: 14px; line-height: 14px; }
+.type [data-type=serif] .s { font-family: var(--serif); }
+
+/* the page's body: the site's name and a line about it, then the posts */
+.body { padding: 16px 16px 12px; }
+.head { display: flex; align-items: center; gap: 12px; margin: 0 0 12px; }
+.head .avatar { display: block; width: 32px; height: 32px; flex: none; }
+.head h1 { margin: 0; font-size: 12px; line-height: 16px; }
+.head h1 small { display: block; font-size: 12px; font-weight: normal; color: var(--quiet); }
+.head h1 small p { margin: 0; }
+
+/* the list: each post a line with its date at the far end, a summary
+   under it, 1px rules between; the last line closes the list */
+.items { margin: 0; }
+.item { padding: 6px 0; border-top: 1px solid var(--rule); }
+.items .item:last-child { border-bottom: 1px solid var(--rule); }
+.item-head { display: flex; align-items: baseline; gap: 4px 12px; flex-wrap: wrap; }
+.item-title { font-weight: bold; text-decoration: none; color: #333399; }
+.item-title:hover { text-decoration: underline; }
+.item-date { margin-left: auto; font-size: 11px; color: var(--quiet); white-space: nowrap; }
+.item-summary { margin: 2px 0 0; color: #333; }
+.item-body { margin: 2px 0 0; }
+/* a post in more than one language is listed with its title in each,
+   the one it was written with marked data-o; until the page script has
+   chosen the reader's, and without script, only that one shows */
+html:not(.lang-on) [data-l]:not([data-o]) { display: none; }
+h2.section { margin: 16px 0 4px; font-size: 12px; line-height: 16px; }
+/* the feed, as rss.xsl shows it in a browser: a line saying what the
+   file is, with its address to copy */
+.feed-note { margin: 0 0 12px; }
+.feed-note code { font: 11px/1.45 Monaco, Menlo, Consolas, "DejaVu Sans Mono", monospace; user-select: all; }
+.items + h2.section { margin-top: 20px; }
+
+/* a post: its title, its date in the quiet ink, then the text at the
+   manual's size, with a terminal for code and a sunken field for a
+   picture on its own */
+.post-title { margin: 0 0 2px; font-size: var(--ts, 12px); line-height: calc(var(--ts, 12px) + 4px); }
+.date { margin: 0 0 12px; font-size: 11px; color: var(--quiet); }
+/* a post in more than one language: the languages it can be read in, at
+   the far end of the date's line, each by its own name; the one being
+   read is bold, the others are links */
+.meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; margin: 0 0 12px; }
+.meta .date { margin: 0; }
+.langs { display: flex; flex-wrap: wrap; gap: 2px 8px; margin-left: auto; font-size: 11px; }
+.langs a { color: #333399; text-decoration: none; }
+.langs a:hover { text-decoration: underline; }
+/* the text's size is the reader's (--ts, 12px unless chosen), and every
+   size in it follows; the face too, once Serif is chosen */
+.content { font-size: var(--ts, 12px); line-height: 1.45; }
+html.serif .post-title, html.serif .content { font-family: var(--serif); }
+.content > :first-child { margin-top: 0; }
+.content h1, .content h2 { font-size: 1em; font-weight: bold; line-height: 1.34; margin: 16px 0 4px; }
+.content h3, .content h4 { font-size: 1em; font-weight: bold; line-height: 1.34; margin: 12px 0 4px; color: var(--quiet); }
+.content p { margin: 0 0 8px; }
+.content ul, .content ol { margin: 0 0 8px; padding: 0 0 0 18px; }
+.content li { margin: 0 0 4px; }
+.content li > p { margin: 0 0 4px; }
+.content code { font: calc(var(--ts, 12px) - 1px)/1.45 Monaco, Menlo, Consolas, "DejaVu Sans Mono", monospace; }
+.content pre { margin: 8px 0; padding: 8px 10px; white-space: pre-wrap; overflow-wrap: anywhere; background: #000; color: #fff; cursor: text;
+  border: 1px solid #262626; box-shadow: -1px -1px 0 #999, 1px 1px 0 #fff; }
+.content pre code { color: inherit; }
+.content blockquote { margin: 0 0 8px; padding: 0 0 0 10px; border-left: 2px solid #999; color: var(--quiet); }
+.content hr { border: 0; border-top: 1px solid #262626; margin: 12px 0; }
+.content img, .content video { max-width: 100%; height: auto; }
+.content p > img:only-child { display: block; margin: 12px 0; border: 1px solid #262626; background: #ccf; box-shadow: -1px -1px 0 #999, 1px 1px 0 #fff; }
+/* pixel art keeps its pixels at every ratio: an image with class
+   "pixel", or an 88 by 31 one, which is a badge and never a picture on
+   a field, so it also loses the sunken frame and sits inline in a row */
+.content img.pixel, .content img[width="88"][height="31"] { image-rendering: pixelated; image-rendering: crisp-edges; }
+.content p > img[width="88"][height="31"]:only-child, .content p > img.pixel:only-child { display: inline-block; margin: 0; border: 0; background: none; box-shadow: none; }
+.content table { border-collapse: collapse; font-size: calc(var(--ts, 12px) - 1px); line-height: 1.4; margin: 8px 0; max-width: 100%; }
+.content th, .content td { border: 1px solid var(--cell); padding: 3px 6px; text-align: left; vertical-align: top; }
+.content th { background: var(--head); font-weight: bold; white-space: nowrap; }
+.content input[type=checkbox] { vertical-align: -1px; }
+/* A to-do item ("- [ ] words"), as the Sepia template has them: the
+   checkbox is hidden and the item draws its own in the bullet's place,
+   the desk's OS 9 check box (the Todo app's, copied): a 12px white
+   square, black border, sunken bevel, the pixel check once done, 6px off
+   its words; the done words are struck through in grey, as the desk and
+   the hub strike theirs. A numbered item keeps its number and takes the
+   box inside. Only where the browser can ask an item what it holds
+   (:has); elsewhere the checkbox stays as it comes. */
+@supports selector(li:has(> input)) {
+  .content li:is(:has(> input[type=checkbox]), :has(> p:first-child > input[type=checkbox]:first-child)) { position: relative; }
+  .content ul > li:is(:has(> input[type=checkbox]), :has(> p:first-child > input[type=checkbox]:first-child)) { list-style: none; }
+  .content ol > li:is(:has(> input[type=checkbox]), :has(> p:first-child > input[type=checkbox]:first-child)) { padding-left: 18px; }
+  .content li > input[type=checkbox], .content li > p:first-child > input[type=checkbox]:first-child { display: none; }
+  .content li:is(:has(> input[type=checkbox]), :has(> p:first-child > input[type=checkbox]:first-child))::before { content: ""; box-sizing: border-box; position: absolute; left: -18px; top: max(3px, calc(.725em - 6px)); width: 12px; height: 12px;
+    border: 1px solid var(--black); background: #fff center no-repeat; box-shadow: inset 1px 1px 0 var(--g500), inset -1px -1px 0 #fff; }
+  .content ol > li:is(:has(> input[type=checkbox]), :has(> p:first-child > input[type=checkbox]:first-child))::before { left: 0; }
+  .content li:is(:has(> input[type=checkbox]:checked), :has(> p:first-child > input[type=checkbox]:first-child:checked))::before { background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" shape-rendering="crispEdges"><path fill="black" d="M1 3h1v2h-1z M2 4h1v2h-1z M3 5h1v2h-1z M4 4h1v2h-1z M5 3h1v2h-1z M6 2h1v2h-1z M7 1h1v2h-1z M8 0h1v2h-1z"/></svg>'); }
+  .content li > input[type=checkbox]:checked + .todo-words, .content li > input[type=checkbox]:checked + p { color: #777; text-decoration: line-through; }
+  /* An item the page script numbered (todo-item-N) can be ticked by the
+     app showing the page. Only its box takes a click, and the click is
+     then the item's own: its words, a link among them and a list inside
+     it keep theirs. */
+  .content li[id^="todo-item-"] { pointer-events: none; }
+  .content li[id^="todo-item-"] > *, .content li[id^="todo-item-"]::before { pointer-events: auto; }
+}
+.video-container, .audio-container { margin: 0 0 8px; }
+.video-container video, .audio-container audio { display: block; width: 100%; }
+.tags { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin: 12px 0 0; font-size: 11px; }
+.tags .quiet { color: var(--quiet); }
+.tags .tag { color: #333399; text-decoration: none; }
+.tags .tag:hover { text-decoration: underline; }
+
+/* the button row: its own row under the text, 12px from the frame's
+   edges and between buttons, the way home rightmost and ringed */
+.btnrow { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; padding: 4px 12px 12px; }
+.btnrow .btn { font-family: inherit; }
+/* on a phone the words will not fit, so Archive, Tags, the Badge page and
+   RSS shrink to icon buttons: the desk's own colour pixel art, black
+   outlines and flat fills, the same on the pressed face; Home keeps its
+   word */
+.btnrow .btn .ix { display: none; }
+@media (max-width: 480px) {
+  .btnrow .btn.glyph { min-width: 0; width: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+  .btnrow .btn.glyph .t { display: none; }
+  .btnrow .btn.glyph .ix { display: block; shape-rendering: crispEdges; }
+}
+/* between ratios 1 and 2 a fractional scale would drop rows of a
+   crisp glyph, so it is smoothed there instead, as the crumbs' chevron is */
+@media (max-width: 480px) and (min-resolution: 1.01dppx) and (max-resolution: 1.99dppx) {
+  .btnrow .btn.glyph .ix { shape-rendering: geometricPrecision; }
+}
+.btn.default { outline: 2px solid #262626; outline-offset: 1px; border-radius: 4px; }
+/* the status strip's two ends: the first at the left, the last pushed
+   right, the room between them whatever is left */
+.statusbar > :last-child:not(:first-child) { margin-left: auto; }
+.statusbar a { color: #333399; text-decoration: none; }
+.statusbar a:hover { text-decoration: underline; }
+.foot { max-width: 720px; margin: 0 auto; text-align: center; font-size: 11px; color: #333; }
+
+/* Replies from the exe hub, under a post the site announced there: a
+   Reply window, then a Replies window holding the hub's own replies
+   frame, which draws the rows (and says how tall they are) inside this
+   window's sunken frame. The Reply window is the hub's composer, copied:
+   signed out, a line and Sign in with Solana; signed in, who is replying
+   and Sign Out, the field, and a status line beside the Reply button.
+   The head script classes <html> js (the window is all script) and
+   wallet (a wallet signed in here before), so the window has its final
+   shape before layout and never jumps while the wallet reconnects. */
+.composer { display: none; }
+.js .composer { display: block; }
+.compose { padding: 8px 12px; background: #ddd;
+  box-shadow: inset 1px 1px 0 rgba(255,255,255,.6), inset -1px -1px 0 #aaa; }
+.compose [hidden] { display: none !important; }
+.compose .in, .wallet .compose .out { display: none; }
+.wallet .compose .in { display: block; }
+.compose .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.compose .grow { flex: 1 1 12em; min-width: 0; font-size: 11px; color: #333; }
+/* the address check being made again, the hub out of reach (offline,
+   or the edge's 502 while it restarts): the hub's own dot, an 8px disc
+   of pixels in the disabled grey on the status line in place of words,
+   fading to a quarter and back each 1.2 s; still under reduced motion.
+   Why is its tooltip. Its box is the line's height, the disc centred in
+   it, so it sits on the buttons' middle and the line keeps its height. */
+.compose .pulse { display: inline-flex; align-items: center; vertical-align: top; height: 1lh; animation: hub-pulse .6s ease-in-out infinite alternate; }
+.compose .pulse svg { display: block; width: 8px; height: 8px; shape-rendering: crispEdges; fill: #999; }
+@media (min-resolution: 1.01dppx) and (max-resolution: 1.99dppx) { .compose .pulse svg { shape-rendering: geometricPrecision; } }
+@keyframes hub-pulse { from { opacity: 1; } to { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .compose .pulse { animation: none; } }
+.compose .who { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.compose .who-row { flex-wrap: nowrap; }
+.compose .who-wrap { flex: 1 1 0; display: flex; align-items: center; gap: 5px; }
+.compose .who-wrap .who { flex: 1 1 0; min-width: 0; }
+.compose .me-av { flex: none; box-sizing: border-box; width: 20px; height: 20px; border: 1px solid #262626; background: #ddd; }
+.compose .me-av img { display: block; width: 18px; height: 18px; image-rendering: pixelated; }
+/* no picture of their own: the face the hub draws from the id, its
+   size the pattern's and the pale ground padding it out to the box */
+.compose img.idn { box-sizing: content-box; background: #e6e6f5; }
+.compose .me-av img.idn { width: 10px; height: 10px; padding: 4px; }
+.compose .who b { font-size: 12px; color: #262626; }
+.compose .mono { font-family: Monaco, "Courier New", monospace; font-size: 11px; }
+.compose button { font-family: inherit; cursor: default; margin: 0; }
+.compose .btn:disabled { color: #999; }
+.compose .btn:disabled:active { background: #ddd; color: #999;
+  box-shadow: inset 1px 1px 0 #ddd, inset -1px -1px 0 #777, inset 2px 2px 0 #fff, inset -2px -2px 0 #aaa; }
+.compose .wbtn { display: inline-flex; align-items: center; gap: 5px; }
+.compose .wbtn img { width: 14px; height: 14px; display: block; }
+/* Reply wears no default ring: Return in the field is a newline
+   (Command or Control with Return replies). */
+.compose textarea { display: block; box-sizing: border-box; margin: 0; padding: 2px 5px;
+  font: inherit; line-height: 16px; color: #262626; background: #fff; border: 1px solid #262626; border-radius: 0;
+  box-shadow: -1px -1px 0 #999, -1px 0 0 #999, 0 -1px 0 #999, 1px 1px 0 #fff, 1px 0 0 #fff, 0 1px 0 #fff; }
+.compose .field { position: relative; margin: 8px 0; }
+.compose textarea { width: 100%; height: 56px; resize: vertical; }
+.compose textarea:focus { outline: none; }
+/* the line naming the reply being answered, between who is replying and
+   the field: "Replying to Name — its first words", ellipsized, and a
+   20px bevel button whose cross lets it go */
+.compose .re-row { flex-wrap: nowrap; margin-top: 8px; }
+.compose .re-q { flex: 1 1 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.compose .re-q b { font-size: 12px; color: #262626; }
+.compose .re-clear { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 20px; min-width: 0; padding: 0; }
+.compose .re-clear .x { display: block; width: 8px; height: 8px; shape-rendering: crispEdges; }
+.compose .re-clear .x .k { fill: currentColor; }
+@media (min-resolution: 1.01dppx) and (max-resolution: 1.99dppx) { .compose .re-clear .x { shape-rendering: geometricPrecision; } }
+/* the replies: the hub's frame fills the sunken frame edge to edge, as
+   tall as its rows say; before it says, the height of its empty line */
+.replies iframe.thread { display: block; width: 100%; height: 42px; border: 0; background: #fff; }

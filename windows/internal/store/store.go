@@ -30,6 +30,20 @@ type Site struct {
 	ID                string             `json:"id"`
 	Name              string             `json:"name"`
 	About             string             `json:"about"`
+	Slug              string             `json:"slug,omitempty"`
+	AuthorName        string             `json:"authorName,omitempty"`
+	Domain            string             `json:"domain,omitempty"`
+	TwitterUsername   string             `json:"twitterUsername,omitempty"`
+	GithubUsername    string             `json:"githubUsername,omitempty"`
+	TelegramUsername  string             `json:"telegramUsername,omitempty"`
+	MastodonUsername  string             `json:"mastodonUsername,omitempty"`
+	DiscordLink       string             `json:"discordLink,omitempty"`
+	PodcastLanguage   string             `json:"podcastLanguage,omitempty"`
+	PodcastExplicit   bool               `json:"podcastExplicit,omitempty"`
+	PodcastCategories []string           `json:"podcastCategories,omitempty"`
+	PodcastCoverPNG   string             `json:"podcastCoverPng,omitempty"`
+	DoNotIndex        bool               `json:"doNotIndex,omitempty"`
+	AvatarPNG         string             `json:"avatarPng,omitempty"`
 	Created           time.Time          `json:"created"`
 	IPNS              string             `json:"ipns,omitempty"`
 	LastPublishedCID  string             `json:"lastPublishedCID,omitempty"`
@@ -56,6 +70,7 @@ type Site struct {
 }
 
 func cloneSite(site Site) Site {
+	site.PodcastCategories = append([]string(nil), site.PodcastCategories...)
 	if site.PlausibleOverride != nil {
 		copy := *site.PlausibleOverride
 		site.PlausibleOverride = &copy
@@ -102,22 +117,25 @@ func ApplyPlausibleOverride(site Site) Site {
 }
 
 type Article struct {
-	ID               string    `json:"id"`
-	SiteID           string    `json:"siteId"`
-	Title            string    `json:"title"`
-	Content          string    `json:"content"`
-	Created          time.Time `json:"created"`
-	Modified         time.Time `json:"modified"`
-	Attachments      []string  `json:"attachments,omitempty"`
-	ArticleNumber    *int      `json:"articleNumber,omitempty"`
-	ArticleReference string    `json:"articleReference,omitempty"`
-	// Slug is populated only for validated imported-site rendering.
-	Slug            string            `json:"-"`
-	Tags            map[string]string `json:"tags"`
-	AudioFilename   string            `json:"audioFilename,omitempty"`
-	VideoFilename   string            `json:"videoFilename,omitempty"`
-	AudioDuration   *int              `json:"audioDuration,omitempty"`
-	AudioByteLength *int64            `json:"audioByteLength,omitempty"`
+	ID                     string            `json:"id"`
+	SiteID                 string            `json:"siteId"`
+	Title                  string            `json:"title"`
+	Content                string            `json:"content"`
+	Created                time.Time         `json:"created"`
+	Modified               time.Time         `json:"modified"`
+	Attachments            []string          `json:"attachments,omitempty"`
+	ArticleNumber          *int              `json:"articleNumber,omitempty"`
+	ArticleReference       string            `json:"articleReference,omitempty"`
+	Slug                   string            `json:"slug,omitempty"`
+	ArticleType            int               `json:"articleType,omitempty"`
+	ExternalLink           string            `json:"externalLink,omitempty"`
+	IsIncludedInNavigation bool              `json:"isIncludedInNavigation,omitempty"`
+	NavigationWeight       int               `json:"navigationWeight"`
+	Tags                   map[string]string `json:"tags"`
+	AudioFilename          string            `json:"audioFilename,omitempty"`
+	VideoFilename          string            `json:"videoFilename,omitempty"`
+	AudioDuration          *int              `json:"audioDuration,omitempty"`
+	AudioByteLength        *int64            `json:"audioByteLength,omitempty"`
 }
 
 // Draft is private local work and is never included in publication snapshots.
@@ -137,6 +155,7 @@ type Draft struct {
 
 type data struct {
 	Version        int                        `json:"version"`
+	IPFSDisabled   bool                       `json:"ipfsDisabled,omitempty"`
 	Sites          []Site                     `json:"sites"`
 	Articles       []Article                  `json:"articles"`
 	Drafts         []Draft                    `json:"drafts,omitempty"`
@@ -320,6 +339,23 @@ type Store struct {
 	mu   sync.Mutex
 	path string
 	data data
+}
+
+func (s *Store) IPFSDisabled() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.data.IPFSDisabled
+}
+
+func (s *Store) SetIPFSDisabled(disabled bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.data.IPFSDisabled == disabled {
+		return nil
+	}
+	next := s.data
+	next.IPFSDisabled = disabled
+	return s.write(next)
 }
 
 func Open(dir string) (*Store, error) {
@@ -1039,6 +1075,7 @@ func (s *Store) saveSubscription(address string, feed feeds.Feed, cid *string, p
 	for i := range feed.Items {
 		feed.Items[i].Key = feeds.ItemKey(feed.Items[i])
 		feed.Items[i].Starred = false
+		feed.Items[i].Read = false
 	}
 	now := time.Now().UTC()
 	subscription := Subscription{URL: address, Feed: feed, LastUpdated: &now}
@@ -1068,11 +1105,14 @@ func (s *Store) saveSubscription(address string, feed feeds.Feed, cid *string, p
 			seen := make(map[string]bool)
 			identity := feeds.ItemKey
 			stars := map[string]bool{}
+			reads := map[string]bool{}
 			for _, old := range item.Feed.Items {
 				stars[identity(old)] = old.Starred
+				reads[identity(old)] = old.Read
 			}
 			for i := range subscription.Feed.Items {
 				subscription.Feed.Items[i].Starred = stars[identity(subscription.Feed.Items[i])]
+				subscription.Feed.Items[i].Read = reads[identity(subscription.Feed.Items[i])]
 			}
 
 			for _, entry := range subscription.Feed.Items {
@@ -1164,6 +1204,64 @@ func (s *Store) SetSubscriptionStarred(address, key string, starred bool) error 
 	return errors.New("订阅不存在")
 }
 
+// SetSubscriptionRead changes local reading state without replacing feed data.
+func (s *Store) SetSubscriptionRead(address, key string, read bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if key == "" {
+		return errors.New("文章标识无效")
+	}
+	next := s.data
+	next.Subscriptions = append([]Subscription{}, s.data.Subscriptions...)
+	for i, sub := range next.Subscriptions {
+		if sub.URL != address {
+			continue
+		}
+		sub.Feed.Items = append([]feeds.Item{}, sub.Feed.Items...)
+		for j := range sub.Feed.Items {
+			if feeds.ItemKey(sub.Feed.Items[j]) != key {
+				continue
+			}
+			if sub.Feed.Items[j].Read == read {
+				return nil
+			}
+			sub.Feed.Items[j].Read = read
+			sub.Feed.Items[j].Key = key
+			next.Subscriptions[i] = sub
+			return s.write(next)
+		}
+		return errors.New("订阅文章不存在")
+	}
+	return errors.New("订阅不存在")
+}
+
+// MarkSubscriptionRead marks the current cached items in one atomic write.
+func (s *Store) MarkSubscriptionRead(address string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	next := s.data
+	next.Subscriptions = append([]Subscription{}, s.data.Subscriptions...)
+	for i, sub := range next.Subscriptions {
+		if sub.URL != address {
+			continue
+		}
+		sub.Feed.Items = append([]feeds.Item{}, sub.Feed.Items...)
+		changed := false
+		for j := range sub.Feed.Items {
+			if !sub.Feed.Items[j].Read {
+				sub.Feed.Items[j].Read = true
+				changed = true
+			}
+		}
+		if !changed {
+			return nil
+		}
+		next.Subscriptions[i] = sub
+		return s.write(next)
+	}
+	return errors.New("订阅不存在")
+}
+
 func (s *Store) CreateSite(name, about string) (Site, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -1185,6 +1283,15 @@ func (s *Store) CreateSite(name, about string) (Site, error) {
 }
 
 func (s *Store) UpdateSite(siteID, name, about string) (Site, error) {
+	return s.updateSite(siteID, name, about, nil)
+}
+
+// UpdateSiteSettings updates the public site settings as one revision.
+func (s *Store) UpdateSiteSettings(siteID, name, about string, doNotIndex bool) (Site, error) {
+	return s.updateSite(siteID, name, about, &doNotIndex)
+}
+
+func (s *Store) updateSite(siteID, name, about string, doNotIndex *bool) (Site, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return Site{}, errors.New("请输入站点名称")
@@ -1198,13 +1305,19 @@ func (s *Store) UpdateSite(siteID, name, about string) (Site, error) {
 		if site.ID != siteID || site.Removed {
 			continue
 		}
-		if site.Name == name && site.About == about {
+		if site.Imported && doNotIndex != nil && site.DoNotIndex != *doNotIndex {
+			return Site{}, errors.New("导入站点暂不支持修改搜索引擎收录设置")
+		}
+		if site.Name == name && site.About == about && (doNotIndex == nil || site.DoNotIndex == *doNotIndex) {
 			return cloneSite(*site), nil
 		}
 		if site.ContentRevision == ^uint64(0) {
 			return Site{}, errors.New("站点修订版本已达到上限")
 		}
 		site.Name, site.About = name, about
+		if doNotIndex != nil {
+			site.DoNotIndex = *doNotIndex
+		}
 		site.ContentRevision++
 		if err := s.write(next); err != nil {
 			return Site{}, err
@@ -1677,13 +1790,19 @@ func (s *Store) saveArticleLocked(siteID, articleID, title, content, draftID str
 		return Article{}, errors.New("文章编号已达到上限")
 	}
 	prefix := strings.ToUpper(strings.TrimSpace(original.Slug))
+	for _, site := range s.data.Sites {
+		if site.ID == siteID && !site.Imported {
+			prefix = strings.ToUpper(site.Slug)
+			break
+		}
+	}
 	if prefix == "" {
 		prefix = strings.ToUpper(siteID)
 		if len(prefix) > 8 {
 			prefix = prefix[:8]
 		}
 	}
-	article := Article{ID: id, SiteID: siteID, Title: title, Content: content, Created: now, Modified: now, Tags: copyTags(tags), ArticleNumber: &number, ArticleReference: fmt.Sprintf("%s-%d", prefix, number)}
+	article := Article{ID: id, SiteID: siteID, Title: title, Content: content, Created: now, Modified: now, Tags: copyTags(tags), ArticleNumber: &number, ArticleReference: fmt.Sprintf("%s-%d", prefix, number), NavigationWeight: 1}
 	article, rollback, err := stage(article)
 	if err != nil {
 		return Article{}, err

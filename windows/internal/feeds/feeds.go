@@ -48,6 +48,7 @@ type Item struct {
 	AudioURL      string                  `json:"audioUrl,omitempty"`
 	Key           string                  `json:"key,omitempty"`
 	Starred       bool                    `json:"starred,omitempty"`
+	Read          bool                    `json:"read,omitempty"`
 	ContentCID    string                  `json:"contentCid,omitempty"`
 	ContentPath   string                  `json:"contentPath,omitempty"`
 	ArticleID     string                  `json:"articleId,omitempty"`

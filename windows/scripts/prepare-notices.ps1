@@ -72,6 +72,9 @@ function Add-License([string]$Title, [string]$Path) {
 }
 Add-License 'Go standard library: LICENSE' $goLicense
 Add-License ("mygo-runtime " + $runtimePackage.version + ': LICENSE') $runtimeLicense
+Add-License 'Built-in Planet templates: pinned sources and license status' (Join-Path $projectRoot 'internal/templateinstall/builtins/TEMPLATE-NOTICES.txt')
+Add-License '8-bit template: upstream icon attribution' (Join-Path $projectRoot 'internal/templateinstall/builtins/gamedb/ATTRIBUTION.md')
+Add-License 'Sepia template: LICENSE' (Join-Path $projectRoot 'internal/templateinstall/builtins/sepia/LICENSE')
 $modules = @($lines | Where-Object { $_ -and $_ -notlike 'windows|*' } | Sort-Object -Unique)
 if ($modules.Count -eq 0) { throw 'No Go dependency modules were found.' }
 foreach ($line in $modules) {

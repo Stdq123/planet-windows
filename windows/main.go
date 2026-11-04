@@ -29,6 +29,7 @@ import (
 	"windows/internal/services"
 	"windows/internal/sitecleanup"
 	"windows/internal/sitegen"
+	"windows/internal/siteimage"
 	"windows/internal/store"
 	"windows/internal/templateinstall"
 	"windows/internal/updates"
@@ -78,6 +79,78 @@ func (l *Library) Sites() ([]store.Site, error) {
 		return nil, err
 	}
 	return s.ListSites()
+}
+
+// IPFSStatus observes the existing daemon without waiting for an active operation.
+func (l *Library) IPFSStatus() (ipfs.KuboStatus, error) {
+	if !l.publicMu.TryLock() {
+		return ipfs.KuboStatus{}, errors.New("节点正忙，请稍后刷新")
+	}
+	defer l.publicMu.Unlock()
+	s, err := l.open()
+	if err != nil {
+		return ipfs.KuboStatus{}, err
+	}
+	disabled := s.IPFSDisabled()
+	if l.node == nil {
+		return ipfs.KuboStatus{Disabled: disabled}, nil
+	}
+	status, err := l.node.Status()
+	status.Disabled = disabled
+	return status, err
+}
+
+// SetIPFSEnabled persists the user's node preference and controls the owned daemon.
+func (l *Library) SetIPFSEnabled(enabled bool) error {
+	if !l.publicMu.TryLock() {
+		return errors.New("节点正忙，请稍后重试")
+	}
+	defer l.publicMu.Unlock()
+	s, err := l.open()
+	if err != nil {
+		return err
+	}
+	wasDisabled := s.IPFSDisabled()
+	if err = s.SetIPFSDisabled(!enabled); err != nil {
+		return err
+	}
+	if !enabled {
+		if l.node != nil {
+			return l.node.Close()
+		}
+		return nil
+	}
+	if _, _, err = l.ensureNode(true); err != nil {
+		if wasDisabled {
+			if restoreErr := s.SetIPFSDisabled(true); restoreErr != nil {
+				return fmt.Errorf("启动节点失败：%v；恢复设置失败：%w", err, restoreErr)
+			}
+		}
+		return err
+	}
+	return nil
+}
+
+func (l *Library) IPFSRepoSize() (int64, error) {
+	if !l.publicMu.TryLock() {
+		return 0, errors.New("节点正忙，请稍后重试")
+	}
+	defer l.publicMu.Unlock()
+	if l.node == nil {
+		return 0, errors.New("IPFS 节点未运行")
+	}
+	return l.node.RepoSize()
+}
+
+func (l *Library) IPFSGarbageCollect() error {
+	if !l.publicMu.TryLock() {
+		return errors.New("节点正忙，请稍后重试")
+	}
+	defer l.publicMu.Unlock()
+	if l.node == nil {
+		return errors.New("IPFS 节点未运行")
+	}
+	return l.node.GarbageCollect()
 }
 func (l *Library) RemovedSites() ([]store.Site, error) {
 	s, err := l.open()
@@ -204,7 +277,7 @@ func (l *Library) permanentlyDeleteSiteLocked(siteID string) error {
 	if err = pinnable.Save(root, siteID, ""); err != nil {
 		return fmt.Errorf("永久删除已开始，清理固定服务配置失败，可稍后重试：%w", err)
 	}
-	for _, kind := range []string{"filebase", "plausible"} {
+	for _, kind := range []string{"filebase", "plausible", "ssh", "cloudflare"} {
 		if err = services.SaveConfig(root, siteID, kind, services.Config{}); err != nil {
 			return fmt.Errorf("永久删除已开始，清理服务配置失败，可稍后重试：%w", err)
 		}
@@ -232,6 +305,95 @@ func (l *Library) UpdateSite(siteID, name, about string) (store.Site, error) {
 		return store.Site{}, err
 	}
 	return s.UpdateSite(siteID, name, about)
+}
+
+func (l *Library) UpdateSiteSettings(siteID, name, about string, doNotIndex bool) (store.Site, error) {
+	s, err := l.open()
+	if err != nil {
+		return store.Site{}, err
+	}
+	return s.UpdateSiteSettings(siteID, name, about, doNotIndex)
+}
+
+func (l *Library) UpdateSiteDetails(siteID, name, about string, doNotIndex bool, slug, author string) (store.Site, error) {
+	s, err := l.open()
+	if err != nil {
+		return store.Site{}, err
+	}
+	return s.UpdateSiteDetails(siteID, name, about, doNotIndex, slug, author)
+}
+
+func (l *Library) UpdateSiteProfile(siteID, profileJSON string) (store.Site, error) {
+	var profile store.SiteProfile
+	if len(profileJSON) > 16<<10 || json.Unmarshal([]byte(profileJSON), &profile) != nil {
+		return store.Site{}, errors.New("站点公开资料无效")
+	}
+	s, err := l.open()
+	if err != nil {
+		return store.Site{}, err
+	}
+	return s.UpdateSiteProfile(siteID, profile)
+}
+
+func (l *Library) UpdatePodcastSettings(siteID, language string, explicit bool, categoriesJSON string) (store.Site, error) {
+	var categories []string
+	if len(categoriesJSON) > 4096 || json.Unmarshal([]byte(categoriesJSON), &categories) != nil {
+		return store.Site{}, errors.New("播客分类无效")
+	}
+	s, err := l.open()
+	if err != nil {
+		return store.Site{}, err
+	}
+	return s.UpdatePodcastSettings(siteID, language, explicit, categories)
+}
+
+func (l *Library) SelectPodcastCover(ctx context.Context, siteID string) (store.Site, error) {
+	paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Parent: mygo.CallerWindow(ctx), Title: "选择播客封面（PNG、JPEG 或 GIF）"})
+	if err != nil || len(paths) == 0 {
+		return store.Site{}, err
+	}
+	cover, err := siteimage.ReadAvatar(paths[0])
+	if err != nil {
+		return store.Site{}, err
+	}
+	s, err := l.open()
+	if err != nil {
+		return store.Site{}, err
+	}
+	return s.SetPodcastCover(siteID, cover)
+}
+
+func (l *Library) RemovePodcastCover(siteID string) (store.Site, error) {
+	s, err := l.open()
+	if err != nil {
+		return store.Site{}, err
+	}
+	return s.SetPodcastCover(siteID, "")
+}
+
+// SelectSiteAvatar uses the native file picker and saves a normalized PNG.
+func (l *Library) SelectSiteAvatar(ctx context.Context, siteID string) (store.Site, error) {
+	paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Parent: mygo.CallerWindow(ctx), Title: "选择站点头像（PNG、JPEG 或 GIF）"})
+	if err != nil || len(paths) == 0 {
+		return store.Site{}, err
+	}
+	avatar, err := siteimage.ReadAvatar(paths[0])
+	if err != nil {
+		return store.Site{}, err
+	}
+	s, err := l.open()
+	if err != nil {
+		return store.Site{}, err
+	}
+	return s.SetSiteAvatar(siteID, avatar)
+}
+
+func (l *Library) RemoveSiteAvatar(siteID string) (store.Site, error) {
+	s, err := l.open()
+	if err != nil {
+		return store.Site{}, err
+	}
+	return s.SetSiteAvatar(siteID, "")
 }
 func (l *Library) Articles(siteID string) ([]store.Article, error) {
 	s, err := l.open()
@@ -406,6 +568,14 @@ func (l *Library) SaveArticle(siteID, articleID, title, content string) (store.A
 		return store.Article{}, err
 	}
 	return s.SaveArticle(siteID, articleID, title, content)
+}
+
+func (l *Library) UpdateArticleSettings(siteID, articleID, slug string, articleType int, externalLink string, inNavigation bool, weight int) (store.Article, error) {
+	s, err := l.open()
+	if err != nil {
+		return store.Article{}, err
+	}
+	return s.UpdateArticleSettings(siteID, articleID, slug, articleType, externalLink, inNavigation, weight)
 }
 func (l *Library) SaveArticleWithTags(siteID, articleID, title, content, tagsJSON string) (store.Article, error) {
 	s, err := l.open()
@@ -700,6 +870,14 @@ func (l *Library) Subscriptions() ([]store.Subscription, error) {
 	return s.ListSubscriptions()
 }
 
+func (l *Library) SearchArticles(query string) ([]store.SearchResult, error) {
+	s, err := l.open()
+	if err != nil {
+		return nil, err
+	}
+	return s.SearchArticles(query)
+}
+
 // OfflineMediaUsage reports managed feed-cache usage without modifying files.
 func (l *Library) OfflineMediaUsage() (offline.Usage, error) { return l.collectOfflineMedia(false) }
 
@@ -946,6 +1124,22 @@ func (l *Library) StarSubscription(address, key string, starred bool) error {
 	return s.SetSubscriptionStarred(address, key, starred)
 }
 
+func (l *Library) SetSubscriptionRead(address, key string, read bool) error {
+	s, err := l.open()
+	if err != nil {
+		return err
+	}
+	return s.SetSubscriptionRead(address, key, read)
+}
+
+func (l *Library) MarkSubscriptionRead(address string) error {
+	s, err := l.open()
+	if err != nil {
+		return err
+	}
+	return s.MarkSubscriptionRead(address)
+}
+
 // SubscriptionPreview renders registered Planet images from the local IPFS repository.
 func (l *Library) SubscriptionPreview(address, key string) (string, error) {
 	l.feedMu.Lock()
@@ -1097,6 +1291,9 @@ func (l *Library) PublishSite(siteID string) (publisher.Result, error) {
 		}
 		if e = services.PinPublished(root, siteID, result.CID, services.NewClient()); e != nil {
 			result.PinnableWarning += " 站点已发布，但 Filebase 固定请求未完成：" + e.Error()
+		}
+		if warning := l.autoDeploy(root, *site, articles); warning != "" {
+			result.PinnableWarning += " IPNS 已发布，但外部发布未完成：" + warning
 		}
 	}
 	return result, nil
@@ -1529,6 +1726,25 @@ func (l *Library) SelectTemplate(ctx context.Context, siteID string) (store.Site
 	if err != nil || len(paths) == 0 {
 		return store.Site{}, err
 	}
+	return l.installTemplate(siteID, paths[0])
+}
+
+func (l *Library) BuiltinTemplates() []templateinstall.Builtin { return templateinstall.Builtins() }
+
+func (l *Library) BuiltinTemplatePreview(id string) (string, error) {
+	return templateinstall.BuiltinPreview(id)
+}
+
+func (l *Library) ApplyBuiltinTemplate(siteID, id string) (store.Site, error) {
+	source, cleanup, err := templateinstall.ExtractBuiltin(id)
+	if err != nil {
+		return store.Site{}, err
+	}
+	defer cleanup()
+	return l.installTemplate(siteID, source)
+}
+
+func (l *Library) installTemplate(siteID, source string) (store.Site, error) {
 	l.publicMu.Lock()
 	defer l.publicMu.Unlock()
 	s, err := l.open()
@@ -1566,7 +1782,7 @@ func (l *Library) SelectTemplate(ctx context.Context, siteID string) (store.Site
 	if err != nil {
 		return store.Site{}, err
 	}
-	if _, err := templateinstall.Install(root, paths[0], *site, articles, s); err != nil {
+	if _, err := templateinstall.Install(root, source, *site, articles, s); err != nil {
 		return store.Site{}, err
 	}
 	updated, err := s.ListSites()
@@ -1634,6 +1850,15 @@ func (l *Library) SaveTemplateSettings(siteID, values string) (store.Site, error
 
 // ensureNode is called with publicMu held. Import/export only need an offline repository.
 func (l *Library) ensureNode(online bool) (string, string, error) {
+	if online {
+		s, err := l.open()
+		if err != nil {
+			return "", "", err
+		}
+		if s.IPFSDisabled() {
+			return "", "", errors.New("IPFS 节点已关闭，请在节点状态面板中开启")
+		}
+	}
 	resources, err := mygo.App.Path(mygo.PathResources)
 	if err != nil {
 		return "", "", err
@@ -1759,7 +1984,7 @@ func (l *Library) maintainPublished(ctx context.Context) {
 	refresh := func() {
 		l.publicMu.Lock()
 		defer l.publicMu.Unlock()
-		if ctx.Err() != nil {
+		if ctx.Err() != nil || s.IPFSDisabled() {
 			return
 		}
 		current, err := s.ListSites()
@@ -1901,6 +2126,9 @@ func (l *Library) ExportWebsite(ctx context.Context, siteID string) (string, err
 					break
 				}
 			}
+		}
+		if err == nil {
+			err = sitegen.WriteAliases(dir, articles)
 		}
 	}
 	if err != nil {

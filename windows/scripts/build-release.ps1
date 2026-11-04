@@ -49,5 +49,6 @@ try {
     $taskInstaller = Join-Path $taskReleaseRoot ('planet-windows-safe-setup-' + $taskReleaseVersion + '-amd64.exe')
     & (Join-Path $PSScriptRoot 'build-safe-installer.ps1') -PayloadDir $taskReleaseRoot -OutputFile $taskInstaller
     & (Join-Path $PSScriptRoot 'audit-release.ps1') -BundleDir $taskReleaseRoot
+    & (Join-Path $PSScriptRoot 'publish-build.ps1') -BundleDir $taskReleaseRoot -BuildDir (Join-Path $taskProjectRoot 'build') -InstallerName ([IO.Path]::GetFileName($taskInstaller))
     Write-Host "Audited release directory: $taskReleaseRoot"
 } finally { Pop-Location }

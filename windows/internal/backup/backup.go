@@ -224,6 +224,45 @@ func Merge(original json.RawMessage, site store.Site, articles []store.Article) 
 	put(root, "id", site.ID)
 	put(root, "name", site.Name)
 	put(root, "about", site.About)
+	if !site.Imported {
+		put(root, "doNotIndex", site.DoNotIndex)
+		profile, err := store.NormalizeSiteProfile(store.SiteProfile{Domain: site.Domain, TwitterUsername: site.TwitterUsername, GithubUsername: site.GithubUsername, TelegramUsername: site.TelegramUsername, MastodonUsername: site.MastodonUsername, DiscordLink: site.DiscordLink})
+		if err != nil {
+			return nil, err
+		}
+		for key, value := range map[string]string{"domain": profile.Domain, "twitterUsername": profile.TwitterUsername, "githubUsername": profile.GithubUsername, "telegramUsername": profile.TelegramUsername, "mastodonUsername": profile.MastodonUsername, "discordLink": profile.DiscordLink} {
+			if value != "" {
+				put(root, key, value)
+			} else {
+				delete(root, key)
+			}
+		}
+		if site.PodcastLanguage != "" {
+			put(root, "podcastLanguage", site.PodcastLanguage)
+		} else {
+			delete(root, "podcastLanguage")
+		}
+		put(root, "podcastExplicit", site.PodcastExplicit)
+		categories := map[string][]string{}
+		for _, category := range site.PodcastCategories {
+			categories[category] = []string{}
+		}
+		if len(categories) > 0 {
+			put(root, "podcastCategories", categories)
+		} else {
+			delete(root, "podcastCategories")
+		}
+		if site.Slug != "" {
+			put(root, "slug", site.Slug)
+		} else {
+			delete(root, "slug")
+		}
+		if site.AuthorName != "" {
+			put(root, "authorName", site.AuthorName)
+		} else {
+			delete(root, "authorName")
+		}
+	}
 	tagSource := original
 	if len(tagSource) == 0 {
 		tagSource = json.RawMessage(`{"articles":[]}`)
@@ -325,6 +364,36 @@ func Merge(original json.RawMessage, site store.Site, articles []store.Article) 
 			item = map[string]json.RawMessage{}
 			put(item, "link", "/"+article.ID+"/")
 			put(item, "starType", 0)
+		}
+		if !site.Imported {
+			if article.Slug != "" {
+				if !store.ValidArticleSlug(article.Slug) {
+					return nil, errors.New("文章自定义路径无效")
+				}
+				put(item, "slug", article.Slug)
+				put(item, "link", "/"+article.Slug+"/")
+			} else {
+				delete(item, "slug")
+				put(item, "link", "/"+article.ID+"/")
+			}
+			if article.ArticleType != 0 && article.ArticleType != 1 {
+				return nil, errors.New("文章类型无效")
+			}
+			if !store.ValidArticleExternalLink(article.ExternalLink) {
+				return nil, errors.New("文章外部链接无效")
+			}
+			put(item, "articleType", article.ArticleType)
+			if article.ExternalLink != "" {
+				put(item, "externalLink", article.ExternalLink)
+			} else {
+				delete(item, "externalLink")
+			}
+			put(item, "isIncludedInNavigation", article.IsIncludedInNavigation)
+			if article.IsIncludedInNavigation || article.NavigationWeight != 1 {
+				put(item, "navigationWeight", article.NavigationWeight)
+			} else {
+				delete(item, "navigationWeight")
+			}
 		}
 		var oldContent string
 		_ = json.Unmarshal(item["content"], &oldContent)

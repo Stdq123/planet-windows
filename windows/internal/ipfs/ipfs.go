@@ -27,13 +27,14 @@ var safeName = regexp.MustCompile(`^[A-Za-z0-9-]+$`)
 var loopbackAPI = regexp.MustCompile(`^/ip4/127\.0\.0\.1/tcp/[0-9]{1,5}$`)
 
 type Client struct {
-	mu         sync.Mutex
-	executable string
-	repo       string
-	process    *exec.Cmd
-	exited     chan error
-	ownedAPI   string
-	offline    bool
+	mu           sync.Mutex
+	executable   string
+	repo         string
+	process      *exec.Cmd
+	exited       chan error
+	ownedAPI     string
+	ownedGateway string
+	offline      bool
 }
 
 func New(executable, repo string) *Client { return &Client{executable: executable, repo: repo} }
@@ -48,6 +49,7 @@ func (c *Client) Alive() bool {
 	case <-c.exited:
 		c.process = nil
 		c.ownedAPI = ""
+		c.ownedGateway = ""
 		return false
 	default:
 		return true
@@ -190,7 +192,9 @@ func (c *Client) Init() error {
 	}
 	addresses["API"] = json.RawMessage(`"/ip4/127.0.0.1/tcp/0"`)
 	addresses["Gateway"] = json.RawMessage(`"/ip4/127.0.0.1/tcp/0"`)
-	addresses["Swarm"] = json.RawMessage(`["/ip4/0.0.0.0/tcp/0"]`)
+	// Keep local RPC and gateway private while allowing peers to reach the node
+	// over both IP families and QUIC, including during NAT hole punching.
+	addresses["Swarm"] = json.RawMessage(`["/ip4/0.0.0.0/tcp/0","/ip6/::/tcp/0","/ip4/0.0.0.0/udp/0/quic-v1","/ip6/::/udp/0/quic-v1"]`)
 	config["Addresses"], err = json.Marshal(addresses)
 	if err != nil {
 		return err
@@ -269,6 +273,7 @@ func (c *Client) startLocked(offline bool) error {
 		return err
 	}
 	c.ownedAPI = ""
+	c.ownedGateway = ""
 	args := []string{"daemon"}
 	if offline {
 		args = append(args, "--offline")
@@ -279,7 +284,8 @@ func (c *Client) startLocked(offline bool) error {
 	if err != nil {
 		return err
 	}
-	ready := make(chan string, 1)
+	type daemonAddresses struct{ api, gateway string }
+	ready := make(chan daemonAddresses, 1)
 	if err := cmd.Start(); err != nil {
 		return err
 	}
@@ -287,14 +293,18 @@ func (c *Client) startLocked(offline bool) error {
 	go func() {
 		scanner := bufio.NewScanner(stdout)
 		announcedAPI := ""
+		announcedGateway := ""
 		for scanner.Scan() {
 			line := scanner.Text()
 			if index := strings.Index(line, "RPC API server listening on "); index >= 0 {
 				announcedAPI = strings.TrimSpace(line[index+len("RPC API server listening on "):])
 			}
+			if index := strings.Index(line, "Gateway server listening on "); index >= 0 {
+				announcedGateway = strings.TrimSpace(line[index+len("Gateway server listening on "):])
+			}
 			if strings.Contains(line, "Daemon is ready") {
 				select {
-				case ready <- announcedAPI:
+				case ready <- daemonAddresses{api: announcedAPI, gateway: announcedGateway}:
 				default:
 				}
 			}
@@ -302,11 +312,14 @@ func (c *Client) startLocked(offline bool) error {
 	}()
 	go func() { exited <- cmd.Wait() }()
 	select {
-	case announcedAPI := <-ready:
+	case announced := <-ready:
 		c.process, c.exited = cmd, exited
 		c.offline = offline
-		if b, err := os.ReadFile(filepath.Join(c.repo, "api")); err == nil && len(b) <= 512 && loopbackAPI.MatchString(announcedAPI) && strings.TrimSpace(string(b)) == announcedAPI {
-			c.ownedAPI = announcedAPI
+		if b, err := os.ReadFile(filepath.Join(c.repo, "api")); err == nil && len(b) <= 512 && loopbackAPI.MatchString(announced.api) && strings.TrimSpace(string(b)) == announced.api {
+			c.ownedAPI = announced.api
+		}
+		if loopbackAPI.MatchString(announced.gateway) && !strings.HasSuffix(announced.gateway, "/tcp/0") {
+			c.ownedGateway = "http://127.0.0.1:" + strings.TrimPrefix(announced.gateway, "/ip4/127.0.0.1/tcp/")
 		}
 		if c.ownedAPI == "" {
 			_ = cmd.Process.Kill()
@@ -369,6 +382,7 @@ func (c *Client) closeLocked() error {
 	}
 	c.process = nil
 	c.ownedAPI = ""
+	c.ownedGateway = ""
 	c.offline = false
 	return err
 }

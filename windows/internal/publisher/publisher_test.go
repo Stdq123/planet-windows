@@ -1,9 +1,11 @@
 package publisher
 
 import (
+	"encoding/binary"
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"windows/internal/attachments"
@@ -14,6 +16,58 @@ type fakeNode struct {
 	added       bool
 	published   bool
 	failPublish bool
+}
+
+func TestStagedPodcastIncludesActualAudioAndEnclosureSize(t *testing.T) {
+	root := t.TempDir()
+	library, err := store.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	site, err := library.CreateSite("Podcast", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	post, err := library.SaveArticle(site.ID, "", "Episode", "Body")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wav := make([]byte, 44+16000)
+	copy(wav, "RIFF")
+	binary.LittleEndian.PutUint32(wav[4:], uint32(len(wav)-8))
+	copy(wav[8:], "WAVEfmt ")
+	binary.LittleEndian.PutUint32(wav[16:], 16)
+	binary.LittleEndian.PutUint16(wav[20:], 1)
+	binary.LittleEndian.PutUint16(wav[22:], 1)
+	binary.LittleEndian.PutUint32(wav[24:], 8000)
+	binary.LittleEndian.PutUint32(wav[28:], 16000)
+	binary.LittleEndian.PutUint16(wav[32:], 2)
+	binary.LittleEndian.PutUint16(wav[34:], 16)
+	copy(wav[36:], "data")
+	binary.LittleEndian.PutUint32(wav[40:], 16000)
+	file := filepath.Join(t.TempDir(), "episode.wav")
+	if err = os.WriteFile(file, wav, 0600); err != nil {
+		t.Fatal(err)
+	}
+	post, err = attachments.Add(root, library, site.ID, post.ID, file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err = StagePublicSite(dir, site, []store.Article{post}, "", root); err != nil {
+		t.Fatal(err)
+	}
+	feed, err := os.ReadFile(filepath.Join(dir, "podcast.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(feed), `length="16044"`) || !strings.Contains(string(feed), "episode.wav") {
+		t.Fatalf("missing audio details: %s", feed)
+	}
+	actual, err := os.ReadFile(filepath.Join(dir, post.ID, "episode.wav"))
+	if err != nil || len(actual) != len(wav) {
+		t.Fatalf("missing staged audio: %v", err)
+	}
 }
 
 type attachmentNode struct {
@@ -54,6 +108,37 @@ func TestPublishIncludesWindowsAttachment(t *testing.T) {
 	node := &attachmentNode{expected: post.ID}
 	_, err = PublishWithAssets(node, t.TempDir(), site, []store.Article{post}, "", root)
 	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPublishCopiesAttachmentsToCustomPath(t *testing.T) {
+	root := t.TempDir()
+	library, err := store.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	site, err := library.CreateSite("Site", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	post, err := library.SaveArticle(site.ID, "", "Title", "Body")
+	if err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(t.TempDir(), "photo.png")
+	if err = os.WriteFile(file, []byte("image bytes"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	post, err = attachments.Add(root, library, site.ID, post.ID, file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	post, err = library.UpdateArticleSettings(site.ID, post.ID, "custom-path", 0, "", false, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = PublishWithAssets(&attachmentNode{expected: "custom-path"}, t.TempDir(), site, []store.Article{post}, "", root); err != nil {
 		t.Fatal(err)
 	}
 }

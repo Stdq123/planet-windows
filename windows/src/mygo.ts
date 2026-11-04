@@ -14,11 +14,23 @@ export interface Article {
   attachments?: string[];
   articleNumber?: number;
   articleReference?: string;
+  slug?: string;
+  articleType?: number;
+  externalLink?: string;
+  isIncludedInNavigation?: boolean;
+  navigationWeight: number;
   tags: Record<string, string>;
   audioFilename?: string;
   videoFilename?: string;
   audioDuration?: number;
   audioByteLength?: number;
+}
+
+export interface Builtin {
+  id: string;
+  name: string;
+  description: string;
+  build: number;
 }
 
 export interface Config {
@@ -27,6 +39,16 @@ export interface Config {
   autoCheck: boolean;
   highestVersion?: string;
   highestSHA256?: string;
+}
+
+export interface DeploymentInfo {
+  configured: boolean;
+  name: string;
+  server: string;
+  autoDeploy: boolean;
+  deleteRemote: boolean;
+  pending: boolean;
+  lastUrl: string;
 }
 
 export interface Draft {
@@ -60,6 +82,7 @@ export interface Item {
   audioUrl?: string;
   key?: string;
   starred?: boolean;
+  read?: boolean;
   contentCid?: string;
   contentPath?: string;
   articleId?: string;
@@ -69,6 +92,19 @@ export interface Item {
   media?: RemoteMedia[];
   offlineMedia?: Record<string, OfflineAsset>;
   offlineBase?: string;
+}
+
+export interface KuboStatus {
+  disabled: boolean;
+  running: boolean;
+  online: boolean;
+  version: string;
+  peers: number;
+  totalIn: number;
+  totalOut: number;
+  rateIn: number;
+  rateOut: number;
+  gateway: string;
 }
 
 export interface OfflineAsset {
@@ -107,6 +143,16 @@ export interface Result {
   pinnableWarning?: string;
 }
 
+export interface SearchResult {
+  title: string;
+  sourceName: string;
+  snippet: string;
+  siteId?: string;
+  articleId?: string;
+  subscriptionUrl?: string;
+  itemKey?: string;
+}
+
 export interface ServiceInfo {
   name: string;
   configured: boolean;
@@ -123,6 +169,20 @@ export interface Site {
   id: string;
   name: string;
   about: string;
+  slug?: string;
+  authorName?: string;
+  domain?: string;
+  twitterUsername?: string;
+  githubUsername?: string;
+  telegramUsername?: string;
+  mastodonUsername?: string;
+  discordLink?: string;
+  podcastLanguage?: string;
+  podcastExplicit?: boolean;
+  podcastCategories?: string[];
+  podcastCoverPng?: string;
+  doNotIndex?: boolean;
+  avatarPng?: string;
   created: string;
   ipns?: string;
   lastPublishedCID?: string;
@@ -196,12 +256,21 @@ export const Library = {
   addDraftAttachment(siteID: string, draftID: string): Promise<Draft> {
     return call("Library.AddDraftAttachment", siteID, draftID);
   },
+  applyBuiltinTemplate(siteID: string, id: string): Promise<Site> {
+    return call("Library.ApplyBuiltinTemplate", siteID, id);
+  },
   articles(siteID: string): Promise<Article[]> {
     return call("Library.Articles", siteID);
   },
   /** AudioURL provides a revocable loopback stream for the selected article audio. */
   audioURL(siteID: string, articleID: string): Promise<string> {
     return call("Library.AudioURL", siteID, articleID);
+  },
+  builtinTemplatePreview(id: string): Promise<string> {
+    return call("Library.BuiltinTemplatePreview", id);
+  },
+  builtinTemplates(): Promise<Builtin[]> {
+    return call("Library.BuiltinTemplates");
   },
   cancelUpdateOperation(): Promise<void> {
     return call("Library.CancelUpdateOperation");
@@ -212,6 +281,10 @@ export const Library = {
   /** CleanupOfflineMedia removes only files no saved article or active player references. */
   cleanupOfflineMedia(): Promise<Usage> {
     return call("Library.CleanupOfflineMedia");
+  },
+  /** ConfigureDeployment stores a target locally; credentials never enter backups. */
+  configureDeployment(siteID: string, kind: string, name: string, server: string, token: string, auto: boolean, deleteRemote: boolean): Promise<void> {
+    return call("Library.ConfigureDeployment", siteID, kind, name, server, token, auto, deleteRemote);
   },
   /**
    * ConfigurePinnable saves an explicitly supplied endpoint using Windows DPAPI.
@@ -241,6 +314,16 @@ export const Library = {
   deleteDraft(siteID: string, draftID: string): Promise<void> {
     return call("Library.DeleteDraft", siteID, draftID);
   },
+  /** DeploySite is an explicit manual deployment of the last saved snapshot. */
+  deploySite(siteID: string, kind: string): Promise<string> {
+    return call("Library.DeploySite", siteID, kind);
+  },
+  deploymentInfo(siteID: string, kind: string): Promise<DeploymentInfo> {
+    return call("Library.DeploymentInfo", siteID, kind);
+  },
+  disableDeployment(siteID: string, kind: string): Promise<void> {
+    return call("Library.DisableDeployment", siteID, kind);
+  },
   downloadUpdate(version: string, sha256: string): Promise<string> {
     return call("Library.DownloadUpdate", version, sha256);
   },
@@ -262,9 +345,22 @@ export const Library = {
   follow(address: string): Promise<Subscription> {
     return call("Library.Follow", address);
   },
+  ipfsGarbageCollect(): Promise<void> {
+    return call("Library.IPFSGarbageCollect");
+  },
+  ipfsRepoSize(): Promise<number> {
+    return call("Library.IPFSRepoSize");
+  },
+  /** IPFSStatus observes the existing daemon without waiting for an active operation. */
+  ipfsStatus(): Promise<KuboStatus> {
+    return call("Library.IPFSStatus");
+  },
   /** ImportPlanet imports a selected original .planet folder. */
   importPlanet(): Promise<Site> {
     return call("Library.ImportPlanet");
+  },
+  markSubscriptionRead(address: string): Promise<void> {
+    return call("Library.MarkSubscriptionRead", address);
   },
   /** OfflineMediaUsage reports managed feed-cache usage without modifying files. */
   offlineMediaUsage(): Promise<Usage> {
@@ -325,8 +421,14 @@ export const Library = {
   removeDraftAttachment(siteID: string, draftID: string, name: string): Promise<Draft> {
     return call("Library.RemoveDraftAttachment", siteID, draftID, name);
   },
+  removePodcastCover(siteID: string): Promise<Site> {
+    return call("Library.RemovePodcastCover", siteID);
+  },
   removeSite(siteID: string): Promise<void> {
     return call("Library.RemoveSite", siteID);
+  },
+  removeSiteAvatar(siteID: string): Promise<Site> {
+    return call("Library.RemoveSiteAvatar", siteID);
   },
   removedSites(): Promise<Site[]> {
     return call("Library.RemovedSites");
@@ -362,6 +464,19 @@ export const Library = {
   saveUpdateSettings(feedURL: string, publicKey: string, autoCheck: boolean): Promise<UpdateSettingsInfo> {
     return call("Library.SaveUpdateSettings", feedURL, publicKey, autoCheck);
   },
+  searchArticles(query: string): Promise<SearchResult[]> {
+    return call("Library.SearchArticles", query);
+  },
+  selectPodcastCover(siteID: string): Promise<Site> {
+    return call("Library.SelectPodcastCover", siteID);
+  },
+  selectSSHKey(): Promise<string> {
+    return call("Library.SelectSSHKey");
+  },
+  /** SelectSiteAvatar uses the native file picker and saves a normalized PNG. */
+  selectSiteAvatar(siteID: string): Promise<Site> {
+    return call("Library.SelectSiteAvatar", siteID);
+  },
   selectTemplate(siteID: string): Promise<Site> {
     return call("Library.SelectTemplate", siteID);
   },
@@ -370,6 +485,13 @@ export const Library = {
   },
   setDraftExistingAttachmentRemoved(siteID: string, draftID: string, name: string, removed: boolean): Promise<Draft> {
     return call("Library.SetDraftExistingAttachmentRemoved", siteID, draftID, name, removed);
+  },
+  /** SetIPFSEnabled persists the user's node preference and controls the owned daemon. */
+  setIPFSEnabled(enabled: boolean): Promise<void> {
+    return call("Library.SetIPFSEnabled", enabled);
+  },
+  setSubscriptionRead(address: string, key: string, read: boolean): Promise<void> {
+    return call("Library.SetSubscriptionRead", address, key, read);
   },
   sites(): Promise<Site[]> {
     return call("Library.Sites");
@@ -407,10 +529,25 @@ export const Library = {
   unfollow(address: string): Promise<void> {
     return call("Library.Unfollow", address);
   },
+  updateArticleSettings(siteID: string, articleID: string, slug: string, articleType: number, externalLink: string, inNavigation: boolean, weight: number): Promise<Article> {
+    return call("Library.UpdateArticleSettings", siteID, articleID, slug, articleType, externalLink, inNavigation, weight);
+  },
+  updatePodcastSettings(siteID: string, language: string, explicit: boolean, categoriesJSON: string): Promise<Site> {
+    return call("Library.UpdatePodcastSettings", siteID, language, explicit, categoriesJSON);
+  },
   updateSettings(): Promise<UpdateSettingsInfo> {
     return call("Library.UpdateSettings");
   },
   updateSite(siteID: string, name: string, about: string): Promise<Site> {
     return call("Library.UpdateSite", siteID, name, about);
+  },
+  updateSiteDetails(siteID: string, name: string, about: string, doNotIndex: boolean, slug: string, author: string): Promise<Site> {
+    return call("Library.UpdateSiteDetails", siteID, name, about, doNotIndex, slug, author);
+  },
+  updateSiteProfile(siteID: string, profileJSON: string): Promise<Site> {
+    return call("Library.UpdateSiteProfile", siteID, profileJSON);
+  },
+  updateSiteSettings(siteID: string, name: string, about: string, doNotIndex: boolean): Promise<Site> {
+    return call("Library.UpdateSiteSettings", siteID, name, about, doNotIndex);
   },
 } as const;

@@ -11,18 +11,21 @@ import (
 )
 
 type Config struct {
-	Name       string `json:"name"`
-	Token      string `json:"token"`
-	Server     string `json:"server,omitempty"`
-	LastCID    string `json:"lastCid,omitempty"`
-	RequestID  string `json:"requestId,omitempty"`
-	PendingCID string `json:"pendingCid,omitempty"`
+	Name         string `json:"name"`
+	Token        string `json:"token"`
+	Server       string `json:"server,omitempty"`
+	LastCID      string `json:"lastCid,omitempty"`
+	RequestID    string `json:"requestId,omitempty"`
+	PendingCID   string `json:"pendingCid,omitempty"`
+	DeleteRemote bool   `json:"deleteRemote,omitempty"`
+	AutoDeploy   bool   `json:"autoDeploy,omitempty"`
+	LastURL      string `json:"lastUrl,omitempty"`
 }
 
 var safeID = regexp.MustCompile(`^[A-Za-z0-9-]{1,100}$`)
 
 func configPath(root, id, kind string, create bool) (string, error) {
-	if !safeID.MatchString(id) || (kind != "filebase" && kind != "plausible") {
+	if !safeID.MatchString(id) || (kind != "filebase" && kind != "plausible" && kind != "cloudflare" && kind != "ssh") {
 		return "", errors.New("服务配置标识无效")
 	}
 	dir := root
@@ -49,6 +52,17 @@ func configPath(root, id, kind string, create bool) (string, error) {
 	return filepath.Join(dir, id+".dat"), nil
 }
 func SaveConfig(root, id, kind string, cfg Config) error {
+	if cfg.Token != "" && kind == "cloudflare" && !ValidCloudflareConfig(cfg.Server, cfg.Name, cfg.Token) {
+		return errors.New("Cloudflare 配置无效")
+	}
+	if cfg.Token != "" && kind == "ssh" {
+		if cfg.Token != "ssh-agent" || !ValidRsyncDestination(cfg.Name) {
+			return errors.New("SSH 配置无效")
+		}
+		if cfg.Server != "" && (!filepath.IsAbs(cfg.Server) || strings.ContainsAny(cfg.Server, "\"'`$;&|\r\n")) {
+			return errors.New("SSH 私钥路径无效")
+		}
+	}
 	if kind == "plausible" && cfg.Server != "" {
 		origin, err := PlausibleServerOrigin(cfg.Server)
 		if err != nil {
@@ -141,6 +155,12 @@ func LoadConfig(root, id, kind string) (Config, error) {
 	var cfg Config
 	if json.Unmarshal(raw, &cfg) != nil || !validToken(cfg.Token) || strings.TrimSpace(cfg.Name) == "" || len(cfg.Name) > 255 {
 		return Config{}, errors.New("服务配置无效")
+	}
+	if kind == "cloudflare" && !ValidCloudflareConfig(cfg.Server, cfg.Name, cfg.Token) {
+		return Config{}, errors.New("Cloudflare 配置无效")
+	}
+	if kind == "ssh" && (cfg.Token != "ssh-agent" || !ValidRsyncDestination(cfg.Name) || cfg.Server != "" && (!filepath.IsAbs(cfg.Server) || strings.ContainsAny(cfg.Server, "\"'`$;&|\r\n"))) {
+		return Config{}, errors.New("SSH 配置无效")
 	}
 	if kind == "plausible" && cfg.Server != "" {
 		origin, err := PlausibleServerOrigin(cfg.Server)

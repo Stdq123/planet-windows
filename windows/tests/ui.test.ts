@@ -9,6 +9,213 @@ const waitFor = async (condition: () => boolean) => {
   throw new Error("Timed out waiting for the interface");
 };
 
+test("article list presents a safe content summary and guides selection", async () => {
+  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());
+  Object.assign(globalThis,{window,document:window.document});
+  const site={id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z"};
+  const article={id:"a",siteId:"s",title:"文章标题",content:"# 第一段\n这是一段正文内容",created:"2026-01-01T00:00:00Z",modified:"2026-01-02T00:00:00Z",tags:{}};
+  (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":return [];case "Library.Articles":return [article];default:throw new Error(method);}}};
+  await import("../src/main.ts?article-list-summary");
+  await waitFor(()=>!!window.document.querySelector(".article-item"));
+  expect(window.document.querySelector(".article-item .article-excerpt")?.textContent).toContain("这是一段正文内容");
+  expect(window.document.querySelector("#empty h2")?.textContent).toContain("选择");
+  window.document.querySelector<HTMLButtonElement>(".article-item")!.click();
+  expect(window.document.querySelector<HTMLInputElement>("#title")!.value).toBe("文章标题");
+});
+
+test("favorites view identifies itself and has a persistent selection indicator", async () => {
+  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());
+  Object.assign(globalThis,{window,document:window.document});
+  const site={id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z"};
+  (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":case "Library.Articles":return [];default:throw new Error(method);}}};
+  await import("../src/main.ts?favorites-layout-state");
+  await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Site");
+  const favorite=window.document.querySelector<HTMLButtonElement>("#show-favorites")!;favorite.click();
+  expect(window.document.querySelector("#site-title")!.textContent).toBe("收藏的文章");
+  expect(window.document.querySelector("#workspace-title")!.textContent).toBe("收藏的文章");
+  expect(favorite.getAttribute("aria-pressed")).toBe("true");
+  expect(window.document.querySelector<HTMLDetailsElement>("#workspace-menu")!.hidden).toBe(true);
+  window.document.querySelector<HTMLButtonElement>("#sites .site-item")!.click();
+  await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Site");
+  expect(favorite.getAttribute("aria-pressed")).toBe("false");
+});
+
+test("IPFS status panel displays owned node diagnostics and refreshes on demand", async () => {
+  const window = new Window({url:"http://localhost/"});
+  window.document.write(await Bun.file("index.html").text());
+  Object.assign(globalThis, {window, document:window.document});
+  let reads = 0;
+  (globalThis as any).mygo = {call:async(method:string)=>{
+    switch (method) {
+      case "Library.Sites": case "Library.Subscriptions": return [];
+      case "Library.IPFSStatus": reads++; return {running:true,online:true,version:"0.30.0",peers:12,totalIn:2048,totalOut:4096,rateIn:512,rateOut:1024};
+      default: throw new Error(method);
+    }
+  }};
+  await import("../src/main.ts?ipfs-status-panel");
+  expect(reads).toBe(0);
+  window.document.querySelector<HTMLButtonElement>("#show-ipfs-status")!.click();
+  await waitFor(()=>reads===1 && window.document.querySelector("#ipfs-peer-count")?.textContent==="12");
+  expect(window.document.querySelector("#ipfs-version")!.textContent).toContain("0.30.0");
+  expect(window.document.querySelector("#ipfs-status-message")!.textContent).toContain("在线");
+  window.document.querySelector<HTMLButtonElement>("#refresh-ipfs-status")!.click();
+  await waitFor(()=>reads===2);
+  window.document.querySelector<HTMLButtonElement>("#close-ipfs-status")!.click();
+  expect(window.document.querySelector<HTMLDialogElement>("#ipfs-status-dialog")!.open).toBe(false);
+});
+
+test("IPFS status panel reports a stopped node and clears stale values", async () => {
+  const window = new Window({url:"http://localhost/"});
+  window.document.write(await Bun.file("index.html").text());
+  Object.assign(globalThis, {window, document:window.document});
+  let reads = 0;
+  (globalThis as any).mygo = {call:async(method:string)=>{
+    switch(method) {
+      case "Library.Sites": case "Library.Subscriptions": return [];
+      case "Library.IPFSStatus": return ++reads === 1 ? {running:true,online:true,version:"0.30.0",peers:12,totalIn:0,totalOut:0,rateIn:0,rateOut:0} : {running:false,online:false,version:"",peers:0,totalIn:0,totalOut:0,rateIn:0,rateOut:0};
+      default: throw new Error(method);
+    }
+  }};
+  await import("../src/main.ts?ipfs-status-stopped");
+  window.document.querySelector<HTMLButtonElement>("#show-ipfs-status")!.click();
+  await waitFor(()=>window.document.querySelector("#ipfs-peer-count")?.textContent==="12");
+  window.document.querySelector<HTMLButtonElement>("#refresh-ipfs-status")!.click();
+  await waitFor(()=>window.document.querySelector("#ipfs-status-message")!.textContent!.includes("尚未启动"));
+  expect(window.document.querySelector("#ipfs-peer-count")!.textContent).toBe("—");
+  expect(window.document.querySelector("#ipfs-version")!.textContent).toBe("—");
+  window.document.querySelector<HTMLButtonElement>("#close-ipfs-status")!.click();
+});
+
+test("IPFS panel collects traffic samples and lets the user stop and restart the node", async () => {
+  const window = new Window({url:"http://localhost/"});
+  window.document.write(await Bun.file("index.html").text());
+  Object.assign(globalThis,{window,document:window.document});
+  window.confirm=()=>true;
+  let enabled=true, reads=0;
+  const site={id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z",ipns:"k51example",lastPublishedCID:"bafyexample"};
+  (globalThis as any).mygo={call:async(method:string,...args:any[])=>{
+    switch(method){
+      case "Library.Sites":return [site];case "Library.Subscriptions":case "Library.Articles":return [];
+      case "Library.IPFSStatus":reads++;return {disabled:!enabled,running:enabled,online:enabled,version:"0.38.2",peers:3,rateIn:1024*reads,rateOut:256,totalIn:1024,totalOut:256,gateway:enabled?"http://127.0.0.1:12345":""};
+      case "Library.SetIPFSEnabled":enabled=args[0];return null;
+      default:throw new Error(method);
+    }
+  }};
+  await import("../src/main.ts?ipfs-control-chart");
+  await waitFor(()=>window.document.querySelector<HTMLInputElement>("#published-url")?.value!=="");
+  window.document.querySelector<HTMLButtonElement>("#show-ipfs-status")!.click();
+  await waitFor(()=>reads===1 && window.document.querySelector("#ipfs-gateway")?.textContent?.includes("12345")===true);
+  const link=window.document.querySelector<HTMLAnchorElement>("#ipfs-open-site")!;
+  expect(link.href).toBe("http://127.0.0.1:12345/ipns/k51example/");
+  const input=window.document.querySelector<HTMLInputElement>("#ipfs-resource")!;
+  input.value="ipfs://bafy123/page";input.dispatchEvent(new window.Event("input"));
+  expect(window.document.querySelector<HTMLAnchorElement>("#ipfs-open-resource")!.href).toBe("http://127.0.0.1:12345/ipfs/bafy123/page");
+  window.document.querySelector<HTMLButtonElement>("#refresh-ipfs-status")!.click();
+  await waitFor(()=>reads===2 && window.document.querySelectorAll("#ipfs-chart-in circle").length===2);
+  window.document.querySelector<HTMLButtonElement>("#toggle-ipfs")!.click();
+  await waitFor(()=>!enabled && window.document.querySelector("#ipfs-status-message")!.textContent!.includes("已关闭"));
+  expect(link.hidden).toBe(true);
+  window.document.querySelector<HTMLButtonElement>("#toggle-ipfs")!.click();
+  await waitFor(()=>enabled && window.document.querySelector("#ipfs-status-message")!.textContent!.includes("在线"));
+  window.document.querySelector<HTMLButtonElement>("#close-ipfs-status")!.click();
+});
+
+test("restarting IPFS retries saved pending publications", async () => {
+  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());
+  Object.assign(globalThis,{window,document:window.document});
+  let enabled=false, published=0;
+  const site={id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z",publishPending:true};
+  (globalThis as any).mygo={call:async(method:string,...args:any[])=>{
+    switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":case "Library.Articles":return [];
+      case "Library.IPFSStatus":return {disabled:!enabled,running:enabled,online:enabled,version:"0.38",peers:0,rateIn:0,rateOut:0,totalIn:0,totalOut:0,gateway:"http://127.0.0.1:1234"};
+      case "Library.SetIPFSEnabled":enabled=args[0];return null;
+      case "Library.PublishSite":if(!enabled)throw new Error("节点已关闭");published++;return {ipns:"k51test",cid:"bafytest",revision:1,pending:false};
+      default:throw new Error(method);}
+  }};
+  await import("../src/main.ts?ipfs-resume-publish");
+  window.document.querySelector<HTMLButtonElement>("#show-ipfs-status")!.click();
+  await waitFor(()=>window.document.querySelector("#ipfs-status-message")!.textContent!.includes("已关闭"));
+  window.document.querySelector<HTMLButtonElement>("#toggle-ipfs")!.click();
+  await waitFor(()=>published===1);
+  window.document.querySelector<HTMLButtonElement>("#close-ipfs-status")!.click();
+});
+
+test("open IPFS panel automatically samples traffic", async () => {
+  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());
+  Object.assign(globalThis,{window,document:window.document});let reads=0;
+  (globalThis as any).mygo={call:async(method:string)=>{
+    switch(method){case "Library.Sites":case "Library.Subscriptions":return [];
+      case "Library.IPFSStatus":reads++;return {disabled:false,running:true,online:true,version:"0.38",peers:1,rateIn:10,rateOut:20,totalIn:0,totalOut:0,gateway:"http://127.0.0.1:1234"};
+      default:throw new Error(method);}
+  }};
+  await import("../src/main.ts?ipfs-automatic-sampling");
+  window.document.querySelector<HTMLButtonElement>("#show-ipfs-status")!.click();
+  await waitFor(()=>reads===1);
+  await new Promise(resolve=>setTimeout(resolve,5200));
+  expect(reads).toBeGreaterThanOrEqual(2);
+  expect(window.document.querySelectorAll("#ipfs-chart-in circle").length).toBeGreaterThanOrEqual(2);
+  window.document.querySelector<HTMLButtonElement>("#close-ipfs-status")!.click();
+}, 12000);
+
+test("gateway selection updates and persists the published site address", async () => {
+  const window = new Window({url:"http://localhost/"});
+  window.document.write(await Bun.file("index.html").text());
+  Object.assign(globalThis,{window,document:window.document});
+  let copied = "";
+  Object.defineProperty(window.navigator,"clipboard",{value:{writeText:async (value:string)=>{copied=value;}},configurable:true});
+  const site={id:"site",name:"Site",about:"",created:"2026-01-01T00:00:00Z",ipns:"k51example",lastPublishedCID:"bafyexample"};
+  (globalThis as any).mygo={call:async(method:string)=>{
+    switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":case "Library.Articles":return [];default:throw new Error(method);}
+  }};
+  await import("../src/main.ts?gateway-selection");
+  await waitFor(()=>window.document.querySelector<HTMLInputElement>("#published-url")?.value!=="");
+  const select=window.document.querySelector<HTMLSelectElement>("#public-gateway")!;
+  expect(select).not.toBeNull();
+  expect(window.document.querySelector<HTMLInputElement>("#published-url")!.value).toBe("https://ipfs.io/ipns/k51example/");
+  select.value="eth.sucks";select.dispatchEvent(new window.Event("change"));
+  expect(window.document.querySelector<HTMLInputElement>("#published-url")!.value).toBe("https://k51example.eth.sucks/");
+  window.document.querySelector<HTMLButtonElement>("#copy-published-url")!.click();
+  await waitFor(()=>copied!=="");expect(copied).toBe("https://k51example.eth.sucks/");
+  expect(window.localStorage.getItem("planet.publicGateway")).toBe("eth.sucks");
+  select.value="aleph";select.dispatchEvent(new window.Event("change"));
+  expect(window.document.querySelector<HTMLInputElement>("#published-url")!.value).toBe("https://ipfs.aleph.cloud/ipns/k51example/");
+});
+
+test("saved gateway is restored when the app starts", async () => {
+  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());
+  window.localStorage.setItem("planet.publicGateway","dweb.link");Object.assign(globalThis,{window,document:window.document});
+  const site={id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z",ipns:"k51example",lastPublishedCID:"bafyexample"};
+  (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":case "Library.Articles":return [];default:throw new Error(method);}}};
+  await import("../src/main.ts?gateway-restored");
+  await waitFor(()=>window.document.querySelector<HTMLInputElement>("#published-url")?.value!=="");
+  expect(window.document.querySelector<HTMLSelectElement>("#public-gateway")!.value).toBe("dweb.link");
+  expect(window.document.querySelector<HTMLInputElement>("#published-url")!.value).toBe("https://dweb.link/ipns/k51example/");
+});
+
+test("unsupported eth.sucks identity is not copied as a misleading address", async () => {
+  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());
+  window.localStorage.setItem("planet.publicGateway","eth.sucks");Object.assign(globalThis,{window,document:window.document});
+  const site={id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z",ipns:"QmLegacyIdentity",lastPublishedCID:"bafyexample"};
+  (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":case "Library.Articles":return [];default:throw new Error(method);}}};
+  await import("../src/main.ts?gateway-unsupported");
+  await waitFor(()=>window.document.querySelector("#copy-status")?.textContent?.includes("暂不支持")===true);
+  expect(window.document.querySelector<HTMLButtonElement>("#copy-published-url")!.disabled).toBe(true);
+  expect(window.document.querySelector<HTMLInputElement>("#published-url")!.value).toBe("");
+});
+
+test("copying a Planet subscription article uses the selected gateway", async () => {
+  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});
+  const post={id:"post",key:"post",title:"Article",link:"https://ipfs.io/ipns/k51example/post/",description:"",content:"Text",published:"",contentCid:"bafy"};
+  const sub={url:"k51example",lastUpdated:new Date().toISOString(),feed:{title:"Planet",description:"",link:"",items:[post]}};let copied="";
+  Object.defineProperty(window.navigator,"clipboard",{value:{writeText:async(value:string)=>{copied=value;}},configurable:true});
+  (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [];case "Library.Subscriptions":return [sub];case "Library.SubscriptionPreview":return "Text";default:throw new Error(method);}}};
+  await import("../src/main.ts?gateway-planet-share");await waitFor(()=>!!window.document.querySelector("#subscriptions .site-item"));
+  const select=window.document.querySelector<HTMLSelectElement>("#public-gateway")!;select.value="eth.sucks";select.dispatchEvent(new window.Event("change"));
+  window.document.querySelector<HTMLButtonElement>("#subscriptions .site-item")!.click();window.document.querySelector<HTMLButtonElement>(".article-item")!.click();
+  window.document.querySelector<HTMLButtonElement>("#share-item")!.click();await waitFor(()=>copied!=="");
+  expect(copied).toBe("https://k51example.eth.sucks/post/");
+});
+
 test("Filebase and Plausible credentials are configured separately and stats can be queried", async () => {
  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});
  const site={id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z"};let saved:any,statsArgs:any;
@@ -516,6 +723,7 @@ test("selecting a template updates the imported site without a second list reque
     case "Library.SelectTemplate":return {...initial,templateId:"template-1",templateName:"Plain",contentRevision:1};default:throw new Error(method);}}};
   window.alert=()=>{};await import("../src/main.ts?template-update");await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Imported");
   window.document.querySelector<HTMLButtonElement>("#new-article")!.click();window.document.querySelector<HTMLButtonElement>("#select-template")!.click();
+  window.document.querySelector<HTMLButtonElement>("#template-import")!.click();
   await waitFor(()=>window.document.querySelector("#imported-warning")?.textContent?.includes("通过检查")===true);
   expect(siteCalls).toBe(1);
 });
@@ -623,6 +831,7 @@ test("saving and deleting an article restores site actions", async () => {
   Array.from(window.document.querySelectorAll<HTMLButtonElement>(".site-item")).find(item => item.textContent?.includes("Test"))!.click();
   await waitFor(() => window.document.querySelector("#site-title")?.textContent === "Test" && !button("publish-site").disabled);
   window.document.querySelector<HTMLButtonElement>(".article-item")!.click();
+  button("edit-article").click();
   expect(window.document.querySelector("#save-state")?.textContent).toContain("已发布");
   failPublish = true;
   content.value = "断网时保存"; content.dispatchEvent(new window.Event("input"));
@@ -711,6 +920,7 @@ test("saving cancels an older pending site switch and still publishes", async ()
   await import("../src/main.ts?navigation-race");
   await waitFor(()=>!!window.document.querySelector(".article-item"));
   window.document.querySelector<HTMLButtonElement>(".article-item")!.click();
+  window.document.querySelector<HTMLButtonElement>("#edit-article")!.click();
   const content=window.document.querySelector<HTMLTextAreaElement>("#content")!;content.value="changed";content.dispatchEvent(new window.Event("input"));
   window.confirm=()=>true;
   Array.from(window.document.querySelectorAll<HTMLButtonElement>(".site-item")).find(item=>item.textContent?.includes("Second"))!.click();
@@ -767,7 +977,7 @@ test("imported articles expose attachment editing", async () => {
     case "Library.RemoveAttachment":post={...post,attachments:post.attachments.filter(name=>name!=="old.txt")};return post;
     default:throw new Error(`Unexpected ${method}`);
   }}};
-  window.confirm=()=>true; await import("../src/main.ts?imported-attachments"); await waitFor(()=>!!window.document.querySelector(".article-item")); window.document.querySelector<HTMLButtonElement>(".article-item")!.click();
+  window.confirm=()=>true; await import("../src/main.ts?imported-attachments"); await waitFor(()=>!!window.document.querySelector(".article-item")); window.document.querySelector<HTMLButtonElement>(".article-item")!.click();window.document.querySelector<HTMLButtonElement>("#edit-article")!.click();
   expect(window.document.querySelector<HTMLButtonElement>("#add-attachment")!.disabled).toBe(false);
   window.document.querySelector<HTMLButtonElement>(".remove-attachment")!.click(); await waitFor(()=>!window.document.querySelector("#attachment-list")?.textContent?.includes("old.txt"));
   window.document.querySelector<HTMLButtonElement>("#add-attachment")!.click(); await waitFor(()=>window.document.querySelector("#attachment-list")?.textContent?.includes("new.txt")===true);
@@ -783,7 +993,7 @@ test("saved article preview shows and removes a local image", async () => {
  case "Library.RemoveAttachment":post={...post,attachments:[]};return post;
  default:throw new Error(`Unexpected ${method} ${args}`);
  }}};
- window.confirm=()=>true;await import("../src/main.ts?local-image-preview");await waitFor(()=>!!window.document.querySelector(".article-item"));window.document.querySelector<HTMLButtonElement>(".article-item")!.click();
+ window.confirm=()=>true;await import("../src/main.ts?local-image-preview");await waitFor(()=>!!window.document.querySelector(".article-item"));window.document.querySelector<HTMLButtonElement>(".article-item")!.click();window.document.querySelector<HTMLButtonElement>("#edit-article")!.click();
  const frame=window.document.querySelector<HTMLIFrameElement>("#preview")!;await waitFor(()=>frame.srcdoc.includes("data:image/png;base64,aW1hZ2U="));expect(frame.srcdoc).toContain("img-src data:");
  window.document.querySelector<HTMLButtonElement>(".remove-attachment")!.click();await waitFor(()=>!frame.srcdoc.includes("base64,aW1hZ2U="));
 });
@@ -794,7 +1004,7 @@ test("global audio player remains visible after switching sites", async () => {
  const post={id:"post",siteId:"first",title:"Song",content:"",created:"2026-01-01T00:00:00Z",modified:"2026-01-01T00:00:00Z",attachments:["sound.mp3"],audioFilename:"sound.mp3"};
  (globalThis as any).mygo={call:async(method:string,...args:string[])=>{switch(method){case "Library.Sites":return [first,second];case "Library.Subscriptions":return [];case "Library.Articles":return args[0]==="first"?[post]:[];case "Library.PreviewArticle":return "";case "Library.AudioURL":return "http://127.0.0.1:1234/token";case "Library.StopAudio":return;default:throw new Error(`Unexpected ${method}`)}}};
  await import("../src/main.ts?global-player");await waitFor(()=>!!window.document.querySelector(".article-item"));window.document.querySelector<HTMLButtonElement>(".article-item")!.click();
- window.document.querySelector<HTMLButtonElement>("#play-article-audio")!.click();await waitFor(()=>!window.document.querySelector<HTMLElement>("#audio-player")!.hidden);
+ window.document.querySelector<HTMLButtonElement>("#play-own-audio")!.click();await waitFor(()=>!window.document.querySelector<HTMLElement>("#audio-player")!.hidden);
  expect(window.document.querySelector<HTMLAudioElement>("#global-audio")!.src).toBe("http://127.0.0.1:1234/token");
  Array.from(window.document.querySelectorAll<HTMLButtonElement>(".site-item")).find(x=>x.textContent?.includes("Second"))!.click();await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Second");expect(window.document.querySelector<HTMLElement>("#audio-player")!.hidden).toBe(false);
  window.document.querySelector<HTMLButtonElement>("#close-audio")!.click();expect(window.document.querySelector<HTMLElement>("#audio-player")!.hidden).toBe(true);
@@ -865,7 +1075,7 @@ test("article tags stay local until save and trigger the normal publish", async 
     case "Library.PublishSite":publishes++;return {ipns:"k51",cid:"bafy",revision:1,pending:false};
     default:throw new Error(method);
   }}};
-  await import("../src/main.ts?edit-tags");await waitFor(()=>!!window.document.querySelector(".article-item"));window.document.querySelector<HTMLButtonElement>(".article-item")!.click();
+  await import("../src/main.ts?edit-tags");await waitFor(()=>!!window.document.querySelector(".article-item"));window.document.querySelector<HTMLButtonElement>(".article-item")!.click();window.document.querySelector<HTMLButtonElement>("#edit-article")!.click();
   expect(window.document.querySelector("#tag-list")?.textContent).toContain("Go");
   const input=window.document.querySelector<HTMLInputElement>("#tag-input")!;input.value="New tag";window.document.querySelector<HTMLButtonElement>("#add-tag")!.click();
   expect(window.document.querySelector("#tag-list")?.textContent).toContain("New tag");expect(publishes).toBe(0);
@@ -879,7 +1089,7 @@ test("unadded tag input blocks saving and prompts before navigation", async () =
   const site={id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z"};const post={id:"p",siteId:"s",title:"Post",content:"Body",created:site.created,modified:site.created};let saves=0, confirms=0;
   window.confirm=()=>{confirms++;return false;};
   (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [site];case "Library.Articles":return [post];case "Library.Subscriptions":return [];case "Library.PreviewArticle":return "";case "Library.SaveArticle":case "Library.SaveDraft":saves++;return {};default:throw new Error(method);}}};
-  await import("../src/main.ts?pending-tag-input");await waitFor(()=>!!window.document.querySelector(".article-item"));window.document.querySelector<HTMLButtonElement>(".article-item")!.click();
+  await import("../src/main.ts?pending-tag-input");await waitFor(()=>!!window.document.querySelector(".article-item"));window.document.querySelector<HTMLButtonElement>(".article-item")!.click();window.document.querySelector<HTMLButtonElement>("#edit-article")!.click();
   const input=window.document.querySelector<HTMLInputElement>("#tag-input")!;input.value="Pending";input.dispatchEvent(new window.Event("input"));
   window.document.querySelector<HTMLButtonElement>("#save")!.click();window.document.querySelector<HTMLButtonElement>("#save-draft")!.click();await new Promise(resolve=>setTimeout(resolve,20));
   expect(saves).toBe(0);expect(window.document.querySelector("#error")!.textContent).toContain("请先添加标签");expect(input.value).toBe("Pending");
