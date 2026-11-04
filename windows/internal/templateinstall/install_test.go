@@ -101,7 +101,7 @@ func TestInstallOriginalTextTemplates(t *testing.T) {
 	if root == "" {
 		t.Skip("original templates unavailable")
 	}
-	for _, item := range []struct{ dir, name string }{{"gamedb", "8-bit"}, {"grid", "Grid"}} {
+	for _, item := range []struct{ dir, name string }{{"gamedb", "8-bit"}, {"grid", "Grid"}, {"platinum", "Platinum"}, {"sepia", "Sepia"}} {
 		t.Run(item.name, func(t *testing.T) {
 			app := t.TempDir()
 			library, err := store.Open(app)
@@ -120,5 +120,38 @@ func TestInstallOriginalTextTemplates(t *testing.T) {
 				t.Fatalf("sites=%#v err=%v", sites, err)
 			}
 		})
+	}
+}
+
+func TestChangingTemplateDoesNotPassOldSettingsIntoNewTemplate(t *testing.T) {
+	root := os.Getenv("PLANET_TEST_TEMPLATES_DIR")
+	if root == "" {
+		t.Skip("original templates unavailable")
+	}
+	app := t.TempDir()
+	lib, err := store.Open(app)
+	if err != nil {
+		t.Fatal(err)
+	}
+	site, err := lib.CreateSite("Site", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = Install(app, filepath.Join(root, "sepia"), site, nil, lib); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = lib.SetTemplateSettings(site.ID, map[string]string{"backgroundColor": "#123456"}); err != nil {
+		t.Fatal(err)
+	}
+	current, _, _, err := lib.PublicationSnapshot(site.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = Install(app, filepath.Join(root, "plain"), current, nil, lib); err != nil {
+		t.Fatalf("could not switch template: %v", err)
+	}
+	current, _, _, err = lib.PublicationSnapshot(site.ID)
+	if err != nil || current.TemplateSettings != nil || current.TemplateName != "Plain" {
+		t.Fatalf("old settings retained: %+v %v", current, err)
 	}
 }

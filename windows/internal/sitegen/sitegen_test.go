@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 	"windows/internal/store"
+
+	"golang.org/x/net/html"
 )
 
 func TestRenderProducesSiteAndEscapesTitles(t *testing.T) {
@@ -32,6 +34,59 @@ func TestRenderProducesSiteAndEscapesTitles(t *testing.T) {
 	}
 	if !strings.Contains(string(page), "&lt;Unsafe&gt;") || !strings.Contains(string(page), "<strong>world</strong>") {
 		t.Fatalf("unexpected page: %s", page)
+	}
+}
+
+func TestRenderAppliesPlausibleTrackingOverride(t *testing.T) {
+	dir := t.TempDir()
+	site := store.Site{ID: "SITE", Name: "Site", PlausibleOverride: &store.PlausibleTracking{Enabled: true, Domain: "example.com"}}
+	if err := Render(dir, site, nil); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `data-domain="example.com"`) || !strings.Contains(string(b), `https://plausible.io/js/plausible.local.js`) {
+		t.Fatalf("tracking missing: %s", b)
+	}
+}
+
+func TestRenderUsesSiteSpecificPlausibleScript(t *testing.T) {
+	dir := t.TempDir()
+	site := store.Site{ID: "SITE", Name: "Site", PlausibleOverride: &store.PlausibleTracking{Enabled: true, Domain: "example.com", ScriptID: "pa-ABC_123"}}
+	article := store.Article{ID: "ARTICLE", SiteID: "SITE", Title: "Post"}
+	if err := Render(dir, site, []store.Article{article}); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"index.html", "ARTICLE/index.html"} {
+		b, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(path)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		page := string(b)
+		if !strings.Contains(page, "https://plausible.io/js/pa-ABC_123.js") || !strings.Contains(page, "plausible.init()") || strings.Contains(page, "plausible.local.js") {
+			t.Fatalf("incorrect tracking in %s: %s", path, page)
+		}
+	}
+}
+
+func TestRenderUsesValidatedSelfHostedPlausibleServer(t *testing.T) {
+	dir := t.TempDir()
+	site := store.Site{ID: "SITE", Name: "Site", PlausibleOverride: &store.PlausibleTracking{Enabled: true, Domain: "example.com", ScriptID: "pa-Test123", Server: "https://stats.example.com:8443"}}
+	if err := Render(dir, site, nil); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), "https://stats.example.com:8443/js/pa-Test123.js") {
+		t.Fatalf("wrong host: %s", b)
+	}
+	site.PlausibleOverride.Server = "https://user:secret@evil.example/path"
+	if err := Render(t.TempDir(), site, nil); err == nil {
+		t.Fatal("unsafe server accepted")
 	}
 }
 
@@ -190,7 +245,7 @@ func TestOriginalTextCompatibleTemplates(t *testing.T) {
 	if root == "" {
 		t.Skip("original template checkouts unavailable")
 	}
-	for _, name := range []string{"gamedb", "grid"} {
+	for _, name := range []string{"gamedb", "grid", "platinum"} {
 		t.Run(name, func(t *testing.T) {
 			now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 			site := store.Site{ID: "SITE", Name: "Test site", About: "My description", Created: now}
@@ -222,6 +277,169 @@ func TestOriginalTextCompatibleTemplates(t *testing.T) {
 				t.Fatalf("missing second page item: %v", err)
 			}
 		})
+	}
+}
+
+func TestOriginalPlatinumTemplateRendersArticleAndArchive(t *testing.T) {
+	root := os.Getenv("PLANET_TEST_TEMPLATES_DIR")
+	if root == "" {
+		t.Skip("original templates unavailable")
+	}
+	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	site := store.Site{ID: "SITE", Name: "Test site", About: "My description", Created: now}
+	article := store.Article{ID: "POST", SiteID: site.ID, Title: "Example", Content: "**Body**", Created: now, Modified: now}
+	out := t.TempDir()
+	if err := RenderWithTemplate(out, site, []store.Article{article}, filepath.Join(root, "platinum")); err != nil {
+		t.Fatal(err)
+	}
+	for file, want := range map[string]string{"index.html": "Example", "POST/index.html": "<strong>Body</strong>", "archive.html": "Example"} {
+		data, err := os.ReadFile(filepath.Join(out, filepath.FromSlash(file)))
+		if err != nil || !strings.Contains(string(data), want) {
+			t.Fatalf("%s missing %q: %v", file, want, err)
+		}
+	}
+}
+
+func TestOriginalSepiaTemplateRendersArticleMetadataAndArchive(t *testing.T) {
+	root := os.Getenv("PLANET_TEST_TEMPLATES_DIR")
+	if root == "" {
+		t.Skip("original templates unavailable")
+	}
+	now := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	site := store.Site{ID: "SITE", Name: "Site", Created: now}
+	article := store.Article{ID: "POST", SiteID: site.ID, Title: "Example", Content: "**Body**", Created: now, Modified: now, ArticleReference: "SITE-1", Attachments: []string{`quote"image.png`}}
+	out := t.TempDir()
+	if err := RenderWithTemplate(out, site, []store.Article{article}, filepath.Join(root, "sepia")); err != nil {
+		t.Fatal(err)
+	}
+	index, err := os.ReadFile(filepath.Join(out, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"Example", `data-article-created="1767323045"`, "SITE-1", `data-page-type="index"`} {
+		if !strings.Contains(string(index), want) {
+			t.Fatalf("index missing %q", want)
+		}
+	}
+	if strings.Contains(string(index), `quote"image.png`) {
+		t.Fatal("unsafe attachment name in HTML attribute")
+	}
+	page, err := os.ReadFile(filepath.Join(out, "POST", "index.html"))
+	if err != nil || !strings.Contains(string(page), "<strong>Body</strong>") || !strings.Contains(string(page), `data-page-type="blog"`) {
+		t.Fatalf("article page=%s err=%v", page, err)
+	}
+	archive, err := os.ReadFile(filepath.Join(out, "archive.html"))
+	if err != nil || !strings.Contains(string(archive), "Example") {
+		t.Fatalf("archive=%s err=%v", archive, err)
+	}
+}
+
+func TestSepiaAttachmentDataRemainsValidJSONAndUsesURLSafeNames(t *testing.T) {
+	root := os.Getenv("PLANET_TEST_TEMPLATES_DIR")
+	if root == "" {
+		t.Skip("original templates unavailable")
+	}
+	now := time.Now()
+	site := store.Site{ID: "S", Name: "Site", Created: now}
+	post := store.Article{ID: "P", SiteID: "S", Title: "Test", Created: now, Modified: now, Attachments: []string{"a,]# \".png"}}
+	out := t.TempDir()
+	if err := RenderWithTemplate(out, site, []store.Article{post}, filepath.Join(root, "sepia")); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(filepath.Join(out, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, err := html.Parse(strings.NewReader(string(b)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var data string
+	var visit func(*html.Node)
+	visit = func(n *html.Node) {
+		for _, a := range n.Attr {
+			if a.Key == "data-attachments" {
+				data = a.Val
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			visit(c)
+		}
+	}
+	visit(doc)
+	var values []string
+	if err := json.Unmarshal([]byte(strings.ReplaceAll(data, ",]", "]")), &values); err != nil || len(values) != 1 || values[0] != "a%2C%5D%23%20%22.png" {
+		t.Fatalf("attachments=%q parsed=%v err=%v", data, values, err)
+	}
+}
+
+func TestSepiaSocialImageUsesSiteAvatarAndArticleImage(t *testing.T) {
+	root := os.Getenv("PLANET_TEST_TEMPLATES_DIR")
+	if root == "" {
+		t.Skip("original templates unavailable")
+	}
+	now := time.Now()
+	site := store.Site{ID: "S", Name: "Site", IPNS: "k51test", Created: now}
+	posts := []store.Article{{ID: "P", SiteID: "S", Title: "Image", Created: now, Modified: now, Attachments: []string{"hero #1.png"}}, {ID: "Q", SiteID: "S", Title: "Plain", Created: now, Modified: now}}
+	out := t.TempDir()
+	if err := os.WriteFile(filepath.Join(out, "avatar.png"), []byte("avatar"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := RenderWithTemplate(out, site, posts, filepath.Join(root, "sepia")); err != nil {
+		t.Fatal(err)
+	}
+	for file, want := range map[string]string{"index.html": "https://k51test.eth.sucks/avatar.png", "P/index.html": "https://k51test.eth.sucks/P/hero%20%231.png", "Q/index.html": "https://k51test.eth.sucks/avatar.png"} {
+		b, err := os.ReadFile(filepath.Join(out, filepath.FromSlash(file)))
+		if err != nil || !strings.Contains(string(b), want) {
+			t.Fatalf("%s missing %q: %v", file, want, err)
+		}
+	}
+}
+
+func TestSepiaSettingsColorIconsAsWellAsText(t *testing.T) {
+	root := os.Getenv("PLANET_TEST_TEMPLATES_DIR")
+	if root == "" {
+		t.Skip("original templates unavailable")
+	}
+	site := store.Site{ID: "S", Name: "Site", TemplateSettings: map[string]string{"highlightColor": "#FF0000", "foregroundSecondaryColor": "#123456"}}
+	out := t.TempDir()
+	if err := RenderWithTemplate(out, site, nil, filepath.Join(root, "sepia")); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(filepath.Join(out, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"--icon-hover-filter: url(#planet-highlight-filter)", `id="planet-highlight-filter"`, `flood-color="#FF0000"`, `id="planet-secondary-filter"`, `flood-color="#123456"`} {
+		if !strings.Contains(string(b), want) {
+			t.Fatalf("missing %q", want)
+		}
+	}
+}
+
+func TestSepiaSettingsFileContainsOnlyEditableValues(t *testing.T) {
+	root := os.Getenv("PLANET_TEST_TEMPLATES_DIR")
+	if root == "" {
+		t.Skip("original templates unavailable")
+	}
+	site := store.Site{ID: "S", Name: "Site", TemplateSettings: map[string]string{"backgroundColor": "#123456", "showRef": "true"}}
+	out := t.TempDir()
+	if err := RenderWithTemplate(out, site, nil, filepath.Join(root, "sepia")); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(filepath.Join(out, "templateSettings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var values map[string]string
+	if err = json.Unmarshal(b, &values); err != nil {
+		t.Fatal(err)
+	}
+	if values["backgroundColor"] != "#123456" || values["showRef"] != "true" || values["linkColor"] == "" {
+		t.Fatalf("settings=%v", values)
+	}
+	if _, ok := values["highlightColorFilter"]; ok {
+		t.Fatal("derived filter was exposed as editable setting")
 	}
 }
 
@@ -299,5 +517,50 @@ func TestPublicMetadataIncludesAttachments(t *testing.T) {
 		if !strings.Contains(string(b), `"attachments"`) || !strings.Contains(string(b), `"photo.png"`) {
 			t.Fatalf("metadata missing attachments: %s", b)
 		}
+	}
+}
+
+func TestMediaFieldsReachPublicMetadataAndBasicPage(t *testing.T) {
+	dir := t.TempDir()
+	site := store.Site{ID: "site", Name: "Site", Created: time.Now()}
+	duration := 12
+	size := int64(1234)
+	post := store.Article{ID: "post", SiteID: site.ID, Title: "Media", Created: time.Now(), Modified: time.Now(), AudioFilename: "audio.mp3", VideoFilename: "video.mp4", AudioDuration: &duration, AudioByteLength: &size, Attachments: []string{"audio.mp3", "video.mp4"}}
+	if err := Render(dir, site, []store.Article{post}); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "post", "article.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range []string{`"audioFilename": "audio.mp3"`, `"videoFilename": "video.mp4"`, `"audioDuration": 12`, `"audioByteLength": 1234`, `"hasAudio": true`, `"hasVideo": true`} {
+		if !strings.Contains(string(b), value) {
+			t.Fatalf("missing %s in %s", value, b)
+		}
+	}
+	page, err := os.ReadFile(filepath.Join(dir, "post", "index.html"))
+	if err != nil || !strings.Contains(string(page), "<audio") || !strings.Contains(string(page), "<video") {
+		t.Fatalf("page=%s err=%v", page, err)
+	}
+}
+
+func TestVerifiedTemplatesRenderAudioAndVideo(t *testing.T) {
+	root := os.Getenv("PLANET_TEST_TEMPLATES_DIR")
+	if root == "" {
+		t.Skip("verified templates required")
+	}
+	site := store.Site{ID: "site", Name: "Site", Created: time.Now()}
+	post := store.Article{ID: "post", SiteID: "site", Title: "Media", Created: time.Now(), Modified: time.Now(), AudioFilename: "sound #1.mp3", VideoFilename: "clip.mp4", Attachments: []string{"sound #1.mp3", "clip.mp4"}}
+	for _, name := range []string{"plain", "gamedb", "grid"} {
+		t.Run(name, func(t *testing.T) {
+			out := t.TempDir()
+			if err := RenderWithTemplate(out, site, []store.Article{post}, filepath.Join(root, name)); err != nil {
+				t.Fatal(err)
+			}
+			b, err := os.ReadFile(filepath.Join(out, "post", "index.html"))
+			if err != nil || !strings.Contains(string(b), "sound%20%231.mp3") || !strings.Contains(string(b), "clip.mp4") {
+				t.Fatalf("page=%s err=%v", b, err)
+			}
+		})
 	}
 }

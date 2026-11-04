@@ -45,3 +45,16 @@ func TestJSONFeedTextIsNotInterpretedAsHTML(t *testing.T) {
 		t.Fatalf("items = %#v", feed.Items)
 	}
 }
+
+func TestFetchExposesAudioEnclosuresAndRejectsUnsafeURLs(t *testing.T) {
+	body := `<rss version="2.0"><channel><title>Show</title><item><guid>1</guid><title>Episode</title><enclosure url="https://example.com/episode.mp3" type="audio/mpeg" length="123"/></item><item><guid>2</guid><title>Unsafe</title><enclosure url="file:///secret.mp3" type="audio/mpeg" length="1"/></item></channel></rss>`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(body)) }))
+	defer server.Close()
+	feed, err := Fetch(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(feed.Items) != 2 || feed.Items[0].AudioURL != "https://example.com/episode.mp3" || feed.Items[1].AudioURL != "" {
+		t.Fatalf("items=%+v", feed.Items)
+	}
+}

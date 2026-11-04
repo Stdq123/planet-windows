@@ -9,15 +9,28 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/flosch/pongo2/v6"
+	"golang.org/x/net/html"
+	"golang.org/x/net/html/atom"
 	"windows/internal/preview"
 )
 
 var countPattern = regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_.]*)\.count\b`)
+var indexedCountPattern = regexp.MustCompile(`\b([A-Za-z_][A-Za-z0-9_.]*\s*\[\s*[A-Za-z_][A-Za-z0-9_.]*\s*\])\.count\b`)
 var nilPattern = regexp.MustCompile(`\bnil\b`)
+var relativeImageFilter = regexp.MustCompile(`^(\{\{\s*[A-Za-z_][A-Za-z0-9_.]*\s*)\|absoluteImageURL\s*:\s*["']\.["']\s*,\s*article\.id(\s*\}\})$`)
+var rssImageFilter = regexp.MustCompile(`^(\{\{\s*[A-Za-z_][A-Za-z0-9_.]*\s*\|md2html\s*)\|absoluteImageURL\s*:\s*root_prefix\s*,\s*article\.id(\s*\}\})$`)
+var imageScheme = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9+.-]*:`)
+var safeArticleID = regexp.MustCompile(`^[A-Za-z0-9-]+$`)
+
+type imageWithSitePrefix struct {
+	body   string
+	prefix string
+}
 
 func init() {
 	// Stencil emits values verbatim unless the template asks for escaping.
@@ -39,7 +52,8 @@ func init() {
 		format := layout
 		if err := pongo2.RegisterFilter(name, func(in, _ *pongo2.Value) (*pongo2.Value, *pongo2.Error) {
 			if date, ok := in.Interface().(time.Time); ok {
-				return pongo2.AsValue(date.Format(format)), nil
+				// Planet's DateFormatter uses the user's system time zone.
+				return pongo2.AsValue(date.In(time.Local).Format(format)), nil
 			}
 			return in, nil
 		}); err != nil {
@@ -58,6 +72,64 @@ func init() {
 	if err := pongo2.RegisterFilter("hhmmss", func(in, _ *pongo2.Value) (*pongo2.Value, *pongo2.Error) {
 		n := in.Integer()
 		return pongo2.AsValue(fmt.Sprintf("%02d:%02d:%02d", n/3600, (n%3600)/60, n%60)), nil
+	}); err != nil {
+		panic(err)
+	}
+	if err := pongo2.RegisterFilter("planetUnixTime", func(in, fallback *pongo2.Value) (*pongo2.Value, *pongo2.Error) {
+		if date, ok := in.Interface().(time.Time); ok {
+			seconds := float64(date.Unix()) + float64(date.Nanosecond())/1e9
+			return pongo2.AsValue(strconv.FormatFloat(seconds, 'f', -1, 64)), nil
+		}
+		return fallback, nil
+	}); err != nil {
+		panic(err)
+	}
+	// Pongo filters accept one argument. Preserve the first Stencil argument
+	// until the following absoluteImageURL filter receives the article ID.
+	if err := pongo2.RegisterFilter("planetImageSitePrefix", func(in, arg *pongo2.Value) (*pongo2.Value, *pongo2.Error) {
+		return pongo2.AsValue(imageWithSitePrefix{body: in.String(), prefix: arg.String()}), nil
+	}); err != nil {
+		panic(err)
+	}
+	if err := pongo2.RegisterFilter("absoluteImageURL", func(in, arg *pongo2.Value) (*pongo2.Value, *pongo2.Error) {
+		id := arg.String()
+		if !safeArticleID.MatchString(id) {
+			return nil, &pongo2.Error{Sender: "absoluteImageURL", OrigError: errors.New("invalid article ID")}
+		}
+		content, prefix := in.String(), "."
+		if value, ok := in.Interface().(imageWithSitePrefix); ok {
+			content, prefix = value.body, value.prefix
+		}
+		body := &html.Node{Type: html.ElementNode, Data: "body", DataAtom: atom.Body}
+		nodes, err := html.ParseFragment(strings.NewReader(content), body)
+		if err != nil {
+			return nil, &pongo2.Error{Sender: "absoluteImageURL", OrigError: err}
+		}
+		var visit func(*html.Node)
+		visit = func(node *html.Node) {
+			if node.Type == html.ElementNode && node.DataAtom == atom.Img {
+				for i := range node.Attr {
+					if node.Attr[i].Key != "src" {
+						continue
+					}
+					src := strings.Trim(node.Attr[i].Val, " \t\n\r\f")
+					if src != "" && !strings.ContainsAny(src[:1], "/?#") && !imageScheme.MatchString(src) {
+						node.Attr[i].Val = prefix + "/" + id + "/" + src
+					}
+				}
+			}
+			for child := node.FirstChild; child != nil; child = child.NextSibling {
+				visit(child)
+			}
+		}
+		var out bytes.Buffer
+		for _, node := range nodes {
+			visit(node)
+			if err := html.Render(&out, node); err != nil {
+				return nil, &pongo2.Error{Sender: "absoluteImageURL", OrigError: err}
+			}
+		}
+		return pongo2.AsValue(out.String()), nil
 	}); err != nil {
 		panic(err)
 	}
@@ -119,6 +191,12 @@ func rewrite(source string) string {
 			break
 		}
 		tag := source[:end+2]
+		tag = relativeImageFilter.ReplaceAllString(tag, "${1}|absoluteImageURL:article.id${2}")
+		tag = rssImageFilter.ReplaceAllString(tag, "${1}|planetImageSitePrefix:root_prefix|absoluteImageURL:article.id${2}")
+		// Sepia uses Stencil's comma as an AND in this condition.
+		if tag == "{% if article.content.count == 0, article.tags.count > 0 %}" {
+			tag = "{% if article.content.count == 0 and article.tags.count > 0 %}"
+		}
 		source = source[end+2:]
 		start := 0
 		var quote byte
@@ -139,8 +217,10 @@ func rewrite(source string) string {
 			}
 			if c == '\'' || c == '"' {
 				segment := tag[start:i]
+				segment = indexedCountPattern.ReplaceAllString(segment, "${1}|length")
 				segment = countPattern.ReplaceAllString(segment, "${1}|length")
 				segment = nilPattern.ReplaceAllString(segment, "None")
+				segment = strings.ReplaceAll(segment, "article.created.timeIntervalSince1970", "article.created|planetUnixTime:article.createdTimestamp")
 				out.WriteString(segment)
 				start = i
 				quote = c
@@ -148,8 +228,10 @@ func rewrite(source string) string {
 		}
 		segment := tag[start:]
 		if quote == 0 {
+			segment = indexedCountPattern.ReplaceAllString(segment, "${1}|length")
 			segment = countPattern.ReplaceAllString(segment, "${1}|length")
 			segment = nilPattern.ReplaceAllString(segment, "None")
+			segment = strings.ReplaceAll(segment, "article.created.timeIntervalSince1970", "article.created|planetUnixTime:article.createdTimestamp")
 		}
 		out.WriteString(segment)
 	}

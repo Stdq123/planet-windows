@@ -11,21 +11,49 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 	"time"
 
 	"windows/internal/preview"
+	"windows/internal/services"
 	"windows/internal/store"
+	"windows/internal/tagname"
 )
 
 var safeID = regexp.MustCompile(`^[A-Za-z0-9-]+$`)
 
-const header = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{.Title}}</title><style>body{max-width:740px;margin:70px auto;padding:0 24px;font:17px/1.8 system-ui,sans-serif;color:#262b32}h1,h2{line-height:1.25}a{color:#52649c}article{margin:48px 0}footer{margin-top:80px;color:#888;font-size:13px}pre{overflow:auto;background:#f5f5f5;padding:16px}img{max-width:100%}</style></head><body>`
+func articleLink(article store.Article) string {
+	if article.Slug != "" {
+		return "/" + article.Slug + "/"
+	}
+	return "/" + article.ID + "/"
+}
+
+const header = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{.Title}}</title>{{if .Site.PlausibleEnabled}}{{if .Site.PlausibleScriptID}}<script async src="https://{{.Site.PlausibleAPIServer}}/js/{{.Site.PlausibleScriptID}}.js"></script><script>window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};plausible.init()</script>{{else}}<script defer data-domain="{{.Site.PlausibleDomain}}" src="https://{{.Site.PlausibleAPIServer}}/js/plausible.local.js"></script>{{end}}{{end}}<style>body{max-width:740px;margin:70px auto;padding:0 24px;font:17px/1.8 system-ui,sans-serif;color:#262b32}h1,h2{line-height:1.25}a{color:#52649c}article{margin:48px 0}footer{margin-top:80px;color:#888;font-size:13px}pre{overflow:auto;background:#f5f5f5;padding:16px}img{max-width:100%}</style></head><body>`
 const footer = `<footer>Published with Planet</footer></body></html>`
 
-var indexTemplate = template.Must(template.New("index").Parse(header + `<header><h1>{{.Site.Name}}</h1><p>{{.Site.About}}</p></header><main>{{range .Articles}}<article><h2><a href="{{.ID}}/">{{.Title}}</a></h2><time>{{.Created.Format "2006-01-02"}}</time></article>{{end}}</main>` + footer))
-var postTemplate = template.Must(template.New("post").Parse(header + `<header><a href="../">{{.Site.Name}}</a></header><article><h1>{{.Article.Title}}</h1><time>{{.Article.Created.Format "2006-01-02"}}</time><div>{{.HTML}}</div></article>` + footer))
+var indexTemplate = template.Must(template.New("index").Parse(header + `<header><h1>{{.Site.Name}}</h1><p>{{.Site.About}}</p>{{if .Site.Tags}}<a href="tags.html">标签</a>{{end}}</header><main>{{range .Articles}}<article><h2><a href="{{.ID}}/">{{.Title}}</a></h2><time>{{.Created.Format "2006-01-02"}}</time></article>{{end}}</main>` + footer))
+var postTemplate = template.Must(template.New("post").Parse(header + `<header><a href="../">{{.Site.Name}}</a></header><article><h1>{{.Article.Title}}</h1><time>{{.Article.Created.Format "2006-01-02"}}</time>{{if .Article.AudioFilename}}<audio controls preload="metadata" src="{{.Article.AudioFilename}}"></audio>{{end}}{{if .Article.VideoFilename}}<video controls preload="metadata" src="{{.Article.VideoFilename}}"></video>{{end}}<div>{{.HTML}}</div>{{if .Article.Tags}}<p>标签：{{range $key,$label := .Article.Tags}} <a href="../{{$key}}.html">{{$label}}</a>{{end}}</p>{{end}}</article>` + footer))
+var tagIndexTemplate = template.Must(template.New("tag-index").Parse(header + `<header><a href="./">{{.Site.Name}}</a></header><main><h1>标签</h1>{{range $key,$label:=.Site.Tags}}<p><a href="{{$key}}.html">{{$label}}</a></p>{{end}}</main>` + footer))
+var tagPageTemplate = template.Must(template.New("tag-page").Parse(header + `<header><a href="./">{{.Site.Name}}</a> · <a href="tags.html">标签</a></header><main><h1>{{.Label}}</h1>{{range .Articles}}<article><h2><a href="{{.ID}}/">{{.Title}}</a></h2><time>{{.Created.Format "2006-01-02"}}</time></article>{{end}}</main>` + footer))
 
 func Render(dir string, site store.Site, articles []store.Article) error {
+	var err error
+	site, err = prepareTags(site, articles)
+	if err != nil {
+		return err
+	}
+	site = store.ApplyPlausibleOverride(site)
+	if site.PlausibleEnabled {
+		origin, err := services.PlausibleServerOrigin(site.PlausibleAPIServer)
+		if err != nil {
+			return err
+		}
+		site.PlausibleAPIServer = strings.TrimPrefix(origin, "https://")
+	}
+	if !store.ValidPlausibleScriptID(site.PlausibleScriptID) {
+		return fmt.Errorf("Plausible 脚本 ID 无效")
+	}
 	for _, article := range articles {
 		if article.SiteID != site.ID || !safeID.MatchString(article.ID) {
 			return fmt.Errorf("invalid article ID or site: %q", article.ID)
@@ -37,27 +65,39 @@ func Render(dir string, site store.Site, articles []store.Article) error {
 	items := append([]store.Article{}, articles...)
 	sort.Slice(items, func(i, j int) bool { return items[i].Created.After(items[j].Created) })
 	type publicArticle struct {
-		ID               string   `json:"id"`
-		Link             string   `json:"link"`
-		Title            string   `json:"title"`
-		Content          string   `json:"content"`
-		ContentRendered  string   `json:"contentRendered"`
-		Created          float64  `json:"created"`
-		Modified         float64  `json:"modified"`
-		Attachments      []string `json:"attachments,omitempty"`
-		ArticleNumber    *int     `json:"articleNumber,omitempty"`
-		ArticleReference string   `json:"articleReference,omitempty"`
+		ID               string            `json:"id"`
+		Link             string            `json:"link"`
+		Slug             string            `json:"slug,omitempty"`
+		Tags             map[string]string `json:"tags,omitempty"`
+		Title            string            `json:"title"`
+		Content          string            `json:"content"`
+		ContentRendered  string            `json:"contentRendered"`
+		Created          float64           `json:"created"`
+		Modified         float64           `json:"modified"`
+		Attachments      []string          `json:"attachments,omitempty"`
+		ArticleNumber    *int              `json:"articleNumber,omitempty"`
+		ArticleReference string            `json:"articleReference,omitempty"`
+		HasAudio         bool              `json:"hasAudio"`
+		HasVideo         bool              `json:"hasVideo"`
+		AudioFilename    string            `json:"audioFilename,omitempty"`
+		VideoFilename    string            `json:"videoFilename,omitempty"`
+		AudioDuration    *int              `json:"audioDuration,omitempty"`
+		AudioByteLength  *int64            `json:"audioByteLength,omitempty"`
 	}
 	seconds := func(t time.Time) float64 { return float64(t.Unix()-978307200) + float64(t.Nanosecond())/1e9 }
 	metadata := struct {
-		ID       string          `json:"id"`
-		Name     string          `json:"name"`
-		About    string          `json:"about"`
-		IPNS     string          `json:"ipns"`
-		Created  float64         `json:"created"`
-		Updated  float64         `json:"updated"`
-		Articles []publicArticle `json:"articles"`
-	}{ID: site.ID, Name: site.Name, About: site.About, IPNS: site.IPNS, Created: seconds(site.Created), Updated: seconds(site.Created), Articles: []publicArticle{}}
+		ID                 string            `json:"id"`
+		Name               string            `json:"name"`
+		About              string            `json:"about"`
+		IPNS               string            `json:"ipns"`
+		Created            float64           `json:"created"`
+		Updated            float64           `json:"updated"`
+		PlausibleEnabled   bool              `json:"plausibleEnabled,omitempty"`
+		PlausibleDomain    string            `json:"plausibleDomain,omitempty"`
+		PlausibleAPIServer string            `json:"plausibleAPIServer,omitempty"`
+		Tags               map[string]string `json:"tags,omitempty"`
+		Articles           []publicArticle   `json:"articles"`
+	}{ID: site.ID, Name: site.Name, About: site.About, IPNS: site.IPNS, Created: seconds(site.Created), Updated: seconds(site.Created), PlausibleEnabled: site.PlausibleEnabled, PlausibleDomain: site.PlausibleDomain, PlausibleAPIServer: site.PlausibleAPIServer, Tags: site.Tags, Articles: []publicArticle{}}
 	for _, article := range items {
 		path := filepath.Join(dir, article.ID)
 		if err := os.MkdirAll(path, 0700); err != nil {
@@ -67,7 +107,7 @@ func Render(dir string, site store.Site, articles []store.Article) error {
 		if err != nil {
 			return err
 		}
-		public := publicArticle{ID: article.ID, Link: "/" + article.ID + "/", Title: article.Title, Content: article.Content, ContentRendered: html, Created: seconds(article.Created), Modified: seconds(article.Modified), Attachments: article.Attachments, ArticleNumber: article.ArticleNumber, ArticleReference: article.ArticleReference}
+		public := publicArticle{ID: article.ID, Link: articleLink(article), Slug: article.Slug, Tags: article.Tags, Title: article.Title, Content: article.Content, ContentRendered: html, Created: seconds(article.Created), Modified: seconds(article.Modified), Attachments: article.Attachments, ArticleNumber: article.ArticleNumber, ArticleReference: article.ArticleReference, HasAudio: article.AudioFilename != "", HasVideo: article.VideoFilename != "", AudioFilename: article.AudioFilename, VideoFilename: article.VideoFilename, AudioDuration: article.AudioDuration, AudioByteLength: article.AudioByteLength}
 		metadata.Articles = append(metadata.Articles, public)
 		articleJSON, err := json.MarshalIndent(public, "", "  ")
 		if err != nil {
@@ -125,7 +165,7 @@ func Render(dir string, site store.Site, articles []store.Article) error {
 	}
 	channel := rssChannel{Title: site.Name, Link: base, Description: site.About, Items: []rssItem{}}
 	for _, a := range items {
-		link := base + a.ID + "/"
+		link := base + strings.TrimPrefix(articleLink(a), "/")
 		channel.Items = append(channel.Items, rssItem{Title: a.Title, Link: link, GUID: link, Description: a.Content, PubDate: a.Created.UTC().Format(time.RFC1123Z)})
 	}
 	feed := struct {
@@ -141,6 +181,46 @@ func Render(dir string, site store.Site, articles []store.Article) error {
 	if err = os.WriteFile(filepath.Join(dir, "rss.xml"), rss, 0600); err != nil {
 		return err
 	}
+	if len(site.Tags) > 0 {
+		index, err := os.Create(filepath.Join(dir, "tags.html"))
+		if err != nil {
+			return err
+		}
+		err = tagIndexTemplate.Execute(index, struct {
+			Title string
+			Site  store.Site
+		}{site.Name + " - 标签", site})
+		if closeErr := index.Close(); err == nil {
+			err = closeErr
+		}
+		if err != nil {
+			return err
+		}
+		for key, label := range site.Tags {
+			var tagged []store.Article
+			for _, article := range items {
+				if _, ok := article.Tags[key]; ok {
+					tagged = append(tagged, article)
+				}
+			}
+			page, err := os.Create(filepath.Join(dir, key+".html"))
+			if err != nil {
+				return err
+			}
+			err = tagPageTemplate.Execute(page, struct {
+				Title    string
+				Site     store.Site
+				Label    string
+				Articles []store.Article
+			}{site.Name + " - " + label, site, label, tagged})
+			if closeErr := page.Close(); err == nil {
+				err = closeErr
+			}
+			if err != nil {
+				return err
+			}
+		}
+	}
 	f, err := os.Create(filepath.Join(dir, "index.html"))
 	if err != nil {
 		return err
@@ -154,4 +234,38 @@ func Render(dir string, site store.Site, articles []store.Article) error {
 		err = closeErr
 	}
 	return err
+}
+
+func prepareTags(site store.Site, articles []store.Article) (store.Site, error) {
+	seen := map[string]string{}
+	if site.Tags == nil {
+		site.Tags = map[string]string{}
+	}
+	validate := func(tags map[string]string) error {
+		for key, label := range tags {
+			if !tagname.Valid(key, label) {
+				return fmt.Errorf("标签名称或路径无效")
+			}
+			folded := tagname.FoldKey(key)
+			if old, ok := seen[folded]; ok && old != key {
+				return fmt.Errorf("标签路径存在大小写冲突")
+			}
+			seen[folded] = key
+		}
+		return nil
+	}
+	if err := validate(site.Tags); err != nil {
+		return site, err
+	}
+	for _, article := range articles {
+		if err := validate(article.Tags); err != nil {
+			return site, err
+		}
+		for key, label := range article.Tags {
+			if _, ok := site.Tags[key]; !ok {
+				site.Tags[key] = label
+			}
+		}
+	}
+	return site, nil
 }

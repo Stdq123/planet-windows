@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "mygo dev",
-    "build": "powershell -NoProfile -File scripts/prepare-kubo.ps1 && mygo build",
+    "build": "powershell -NoProfile -File scripts/build-release.ps1",
     "generate": "mygo generate",
     "test": "bun test",
     "dev:web": "vite",

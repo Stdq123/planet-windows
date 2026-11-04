@@ -6,24 +6,49 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
+	"strings"
+	"time"
 
 	"windows/internal/backup"
 	"windows/internal/preview"
+	"windows/internal/services"
 	"windows/internal/store"
 	"windows/internal/templates"
 )
 
 // RenderWithTemplate implements the index, article and archive subset of Planet templates.
 func RenderWithTemplate(dir string, site store.Site, articles []store.Article, templateDir string) error {
+	return RenderWithTemplateSettings(dir, site, articles, templateDir, site.TemplateSettings)
+}
+
+func RenderWithTemplateSettings(dir string, site store.Site, articles []store.Article, templateDir string, settings map[string]string) error {
+	return renderWithTemplateSettings(dir, site, articles, templateDir, settings, "")
+}
+
+// RenderWithTemplateSettingsForOwnership supplies a private comparison marker;
+// its output is evidence only and must never be published.
+func RenderWithTemplateSettingsForOwnership(dir string, site store.Site, articles []store.Article, templateDir string, settings map[string]string, marker string) error {
+	return renderWithTemplateSettings(dir, site, articles, templateDir, settings, marker)
+}
+
+func renderWithTemplateSettings(dir string, site store.Site, articles []store.Article, templateDir string, settings map[string]string, buildTimestamp string) error {
+	site = store.ApplyPlausibleOverride(site)
+	var err error
+	site, err = prepareTags(site, articles)
+	if err != nil {
+		return err
+	}
 	var metadata struct {
 		Name       string `json:"name"`
 		Ideal      int    `json:"idealItemsPerPage"`
 		Pagination bool   `json:"generateIndexPagination"`
 		Archive    bool   `json:"generateArchive"`
+		Tags       bool   `json:"generateTagPages"`
 	}
 	b, err := os.ReadFile(filepath.Join(templateDir, "template.json"))
 	if err != nil {
@@ -32,8 +57,36 @@ func RenderWithTemplate(dir string, site store.Site, articles []store.Article, t
 	if err = json.Unmarshal(b, &metadata); err != nil || metadata.Name == "" {
 		return errors.New("模板信息无效")
 	}
+	seenTags := map[string]string{}
+	for _, tags := range append([]map[string]string{site.Tags}, articleTagMaps(articles)...) {
+		for key, label := range tags {
+			if !backup.ValidTag(key, label) {
+				return errors.New("标签名称或路径无效")
+			}
+			folded := backup.TagFoldKey(key)
+			if old, ok := seenTags[folded]; ok && old != key {
+				return errors.New("标签路径存在大小写冲突")
+			}
+			seenTags[folded] = key
+		}
+	}
+	userSettings, err := settingsContext(metadata.Name, settings)
+	if err != nil {
+		return err
+	}
 	if err := Render(dir, site, articles); err != nil {
 		return err
+	}
+	if metadata.Name == "Sepia" {
+		b, err := json.MarshalIndent(userSettings, "", "  ")
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(dir, "templateSettings.json"), append(b, '\n'), 0600); err != nil {
+			return err
+		}
+		userSettings["highlightColorFilter"] = "url(#planet-highlight-filter)"
+		userSettings["foregroundSecondaryColorFilter"] = "url(#planet-secondary-filter)"
 	}
 	assets := filepath.Join(templateDir, "assets")
 	if info, err := os.Stat(assets); err == nil && info.IsDir() {
@@ -51,32 +104,66 @@ func RenderWithTemplate(dir string, site store.Site, articles []store.Article, t
 		hash := sha256.Sum256(css)
 		cssHash = hex.EncodeToString(hash[:])
 	}
-	planet := map[string]any{"id": site.ID, "name": site.Name, "about": site.About, "ipns": site.IPNS, "created": site.Created, "tags": map[string]string{}}
+	planetTags := escapedTags(site.Tags)
+	if metadata.Name == "Platinum" {
+		// This pinned template explicitly escapes tag labels itself.
+		planetTags = site.Tags
+	}
+	planet := map[string]any{"id": site.ID, "name": site.Name, "about": site.About, "ipns": site.IPNS, "created": site.Created, "tags": planetTags, "plausibleEnabled": site.PlausibleEnabled, "plausibleDomain": site.PlausibleDomain, "plausibleAPIServer": site.PlausibleAPIServer}
+	if site.PlausibleScriptID != "" {
+		planet["plausibleEnabled"] = false
+	}
 	items := append([]store.Article{}, articles...)
 	sort.Slice(items, func(i, j int) bool { return items[i].Created.After(items[j].Created) })
 	rows := make([]map[string]any, 0, len(items))
 	byID := map[string]map[string]any{}
 	archive := map[string][]map[string]any{}
 	sections := []string{}
+	tagArticles := map[string][]map[string]any{}
 	for _, a := range items {
 		html, err := preview.Markdown(a.Content)
 		if err != nil {
 			return err
 		}
-		row := map[string]any{"id": a.ID, "link": "/" + a.ID + "/", "title": a.Title, "content": a.Content, "contentRendered": html, "created": a.Created, "modified": a.Modified, "attachments": a.Attachments, "externalLink": "", "slug": "", "hasVideo": false, "hasAudio": false, "heroImage": nil, "tags": map[string]string{}}
-		rows = append(rows, row)
-		byID[a.ID] = row
-		year := strconv.Itoa(a.Created.Year())
-		if _, ok := archive[year]; !ok {
-			sections = append(sections, year)
+		row := map[string]any{"id": a.ID, "link": articleLink(a), "title": a.Title, "content": a.Content, "contentRendered": html, "created": a.Created, "createdTimestamp": a.Created.Unix(), "modified": a.Modified, "attachments": a.Attachments, "articleReference": a.ArticleReference, "externalLink": "", "slug": a.Slug, "hasVideo": a.VideoFilename != "", "hasAudio": a.AudioFilename != "", "videoFilename": url.PathEscape(a.VideoFilename), "audioFilename": url.PathEscape(a.AudioFilename), "audioDuration": a.AudioDuration, "audioByteLength": a.AudioByteLength, "heroImage": nil, "tags": escapedTags(a.Tags)}
+		if metadata.Name == "Platinum" || metadata.Name == "Sepia" {
+			// These pinned templates escape article tag labels explicitly.
+			row["tags"] = a.Tags
 		}
-		archive[year] = append(archive[year], row)
+		if metadata.Name == "Sepia" {
+			// Sepia inserts names into a JSON array embedded in an HTML attribute.
+			names := make([]string, 0, len(a.Attachments))
+			for _, name := range a.Attachments {
+				encoded, _ := json.Marshal(url.PathEscape(name))
+				names = append(names, htmlEscapeJSON(encoded))
+			}
+			row["attachments"] = names
+		}
+		rows = append(rows, row)
+		for key := range a.Tags {
+			tagArticles[key] = append(tagArticles[key], row)
+		}
+		byID[a.ID] = row
+		month := a.Created.In(time.Local).Format("January 2006")
+		if _, ok := archive[month]; !ok {
+			sections = append(sections, month)
+		}
+		archive[month] = append(archive[month], row)
 	}
 	aboutHTML, err := preview.Markdown(site.About)
 	if err != nil {
 		return err
 	}
-	context := map[string]any{"planet": planet, "articles": rows, "assets_prefix": "./", "page_title": site.Name, "page_description": site.About, "page_description_html": aboutHTML, "article_summary": "", "current_item_type": "index", "site_navigation": []any{}, "template_settings": map[string]any{}, "style_css_sha256": cssHash, "custom_code_head": "", "custom_code_body_start": "", "custom_code_body_end": "", "total_pages": 1, "current_page": 1, "has_avatar": false, "has_podcast": false}
+	avatar, avatarErr := os.Lstat(filepath.Join(dir, "avatar.png"))
+	hasAvatar := avatarErr == nil && avatar.Mode().IsRegular()
+	ogImage := ""
+	if site.IPNS != "" {
+		ogImage = "https://" + site.IPNS + ".eth.sucks/avatar.png"
+	}
+	context := map[string]any{"planet": planet, "articles": rows, "assets_prefix": "./", "page_title": site.Name, "page_description": site.About, "page_description_html": aboutHTML, "article_summary": "", "current_item_type": "index", "site_navigation": []any{}, "template_settings": map[string]any{}, "user_settings": userSettings, "og_image_url": ogImage, "style_css_sha256": cssHash, "custom_code_head": "", "custom_code_body_start": "", "custom_code_body_end": "", "total_pages": 1, "current_page": 1, "has_avatar": hasAvatar, "has_podcast": false}
+	if buildTimestamp != "" {
+		context["build_timestamp"] = buildTimestamp
+	}
 	templatesDir := filepath.Join(templateDir, "templates")
 	perPage := len(rows)
 	if metadata.Pagination && metadata.Ideal > 0 {
@@ -112,6 +199,13 @@ func RenderWithTemplate(dir string, site store.Site, articles []store.Article, t
 		if err != nil {
 			return fmt.Errorf("模板首页渲染失败：%w", err)
 		}
+		if metadata.Name == "Sepia" {
+			index = sepiaIconFilters(index, userSettings)
+		}
+		index, err = withPlausibleScript(index, site)
+		if err != nil {
+			return err
+		}
 		if err = os.WriteFile(filepath.Join(dir, fmt.Sprintf("page%d.html", page)), []byte(index), 0600); err != nil {
 			return err
 		}
@@ -129,16 +223,88 @@ func RenderWithTemplate(dir string, site store.Site, articles []store.Article, t
 		ctx["assets_prefix"] = "../"
 		ctx["page_title"] = a.Title
 		ctx["current_item_type"] = "article"
+		if metadata.Name == "Sepia" {
+			ctx["current_item_type"] = "blog"
+		}
 		ctx["article"] = byID[a.ID]
 		ctx["article_id"] = a.ID
 		ctx["article_type"] = 0
 		ctx["content_html"] = byID[a.ID]["contentRendered"]
+		ctx["social_image_url"] = ogImage
+		if site.IPNS != "" {
+			for _, name := range a.Attachments {
+				switch strings.ToLower(filepath.Ext(name)) {
+				case ".avif", ".jpeg", ".jpg", ".png", ".webp", ".gif", ".tiff", ".heic":
+					ctx["social_image_url"] = "https://" + site.IPNS + ".eth.sucks/" + url.PathEscape(a.ID) + "/" + url.PathEscape(name)
+				}
+				if ctx["social_image_url"] != ogImage {
+					break
+				}
+			}
+		}
 		page, err := templates.Render(templatesDir, "blog.html", ctx)
 		if err != nil {
 			return fmt.Errorf("模板文章渲染失败：%w", err)
 		}
+		if metadata.Name == "Sepia" {
+			page = sepiaIconFilters(page, userSettings)
+		}
+		page, err = withPlausibleScript(page, site)
+		if err != nil {
+			return err
+		}
 		if err = os.WriteFile(filepath.Join(dir, a.ID, "index.html"), []byte(page), 0600); err != nil {
 			return err
+		}
+	}
+	if metadata.Tags {
+		for key, tagged := range tagArticles {
+			ctx := map[string]any{}
+			for k, v := range context {
+				ctx[k] = v
+			}
+			ctx["articles"], ctx["tag_key"], ctx["tag_value"] = tagged, key, planetTags[key]
+			ctx["current_item_type"], ctx["page_title"] = "tags", site.Name+" - "+site.Tags[key]
+			page, err := templates.Render(templatesDir, "index.html", ctx)
+			if err != nil {
+				return fmt.Errorf("模板标签页面渲染失败：%w", err)
+			}
+			if metadata.Name == "Sepia" {
+				page = sepiaIconFilters(page, userSettings)
+			}
+			page, err = withPlausibleScript(page, site)
+			if err != nil {
+				return err
+			}
+			if err = os.WriteFile(filepath.Join(dir, key+".html"), []byte(page), 0600); err != nil {
+				return err
+			}
+		}
+		if info, statErr := os.Lstat(filepath.Join(templatesDir, "tags.html")); statErr == nil {
+			if !info.Mode().IsRegular() {
+				return errors.New("模板标签索引无效")
+			}
+			ctx := map[string]any{}
+			for k, v := range context {
+				ctx[k] = v
+			}
+			ctx["tags"], ctx["tag_articles"], ctx["current_item_type"] = planetTags, tagArticles, "tags"
+			page, err := templates.Render(templatesDir, "tags.html", ctx)
+			if err != nil {
+				return fmt.Errorf("模板标签索引渲染失败：%w", err)
+			}
+			if metadata.Name == "Sepia" {
+				page = sepiaIconFilters(page, userSettings)
+			}
+			page, err = withPlausibleScript(page, site)
+			if err != nil {
+				return err
+			}
+			if err = os.WriteFile(filepath.Join(dir, "tags.html"), []byte(page), 0600); err != nil {
+				return err
+			}
+		} else if !errors.Is(statErr, os.ErrNotExist) {
+			return statErr
 		}
 	}
 	if metadata.Archive {
@@ -154,9 +320,64 @@ func RenderWithTemplate(dir string, site store.Site, articles []store.Article, t
 		if err != nil {
 			return fmt.Errorf("模板归档渲染失败：%w", err)
 		}
+		if metadata.Name == "Sepia" {
+			page = sepiaIconFilters(page, userSettings)
+		}
+		page, err = withPlausibleScript(page, site)
+		if err != nil {
+			return err
+		}
 		if err = os.WriteFile(filepath.Join(dir, "archive.html"), []byte(page), 0600); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func escapedTags(tags map[string]string) map[string]string {
+	result := make(map[string]string, len(tags))
+	for key, value := range tags {
+		result[key] = html.EscapeString(value)
+	}
+	return result
+}
+
+func articleTagMaps(articles []store.Article) []map[string]string {
+	result := make([]map[string]string, 0, len(articles))
+	for _, article := range articles {
+		result = append(result, article.Tags)
+	}
+	return result
+}
+
+func withPlausibleScript(page string, site store.Site) (string, error) {
+	if !site.PlausibleEnabled || site.PlausibleScriptID == "" {
+		return page, nil
+	}
+	if !store.ValidPlausibleScriptID(site.PlausibleScriptID) || !strings.Contains(page, "</head>") {
+		return "", errors.New("无法安全插入 Plausible 站点专属脚本")
+	}
+	origin, err := services.PlausibleServerOrigin(site.PlausibleAPIServer)
+	if err != nil {
+		return "", err
+	}
+	script := `<script async src="` + origin + `/js/` + site.PlausibleScriptID + `.js"></script><script>window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};plausible.init()</script>`
+	return strings.Replace(page, "</head>", script+"</head>", 1), nil
+}
+
+// SVG flood filters tint icon alpha masks exactly to the chosen color.
+// Both colors have already passed the strict six-digit hex validator.
+func sepiaIconFilters(page string, settings map[string]any) string {
+	defs := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden"><defs><filter id="planet-highlight-filter" color-interpolation-filters="sRGB"><feFlood flood-color="%s" result="color"/><feComposite in="color" in2="SourceGraphic" operator="in"/></filter><filter id="planet-secondary-filter" color-interpolation-filters="sRGB"><feFlood flood-color="%s" result="color"/><feComposite in="color" in2="SourceGraphic" operator="in"/></filter></defs></svg>`, settings["highlightColor"], settings["foregroundSecondaryColor"])
+	if strings.Contains(page, "</body>") {
+		return strings.Replace(page, "</body>", defs+"</body>", 1)
+	}
+	return defs + page
+}
+
+func htmlEscapeJSON(encoded []byte) string {
+	if len(encoded) < 2 {
+		return ""
+	}
+	return html.EscapeString(string(encoded[1 : len(encoded)-1]))
 }

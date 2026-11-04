@@ -71,6 +71,46 @@ var gridFiles = map[string]string{
 	"tags.html":                 "819aaef1d399f04e526997953b1223fa845ba6cb5d3f7b91e11933741108efa8",
 }
 
+// Platinum build 20 from the pinned PlanetSiteTemplates checkout.
+var platinumFiles = map[string]string{
+	"archive.html":               "23f7d884cb5f7d6e17a62fe77b7765c0a30d8c385e092f27af8760b4caec19d3",
+	"base.html":                  "dd337da57933773d828b053f1c4ccc2c783c33402a3077c87560d95eb38cde1d",
+	"blog.html":                  "693f2ebca5405891cf95dd764464548aff000606b1a27ab9cf67a1ca965a8a40",
+	"index.html":                 "bf74c028d1c6780c12ef9b6c6c4a094cb2820a89f96936f70dbbff2c753cfdff",
+	"tags.html":                  "484d9048106f7bde721132a615b5cfc37ed720f209c5b505735b6c6624d99571",
+	"modules/alternates.html":    "49e50aa7698e111f08d27900ca157ae7b1a09a284c356086a099e46c1434a847",
+	"modules/article_seo.html":   "9c23b07424f4655acaa30b1331270c9b56f3a16734e8cbb50d2c85df372eadab",
+	"modules/buttons.html":       "6d9f425f8c8a055812c480cfa1a43c246cba3241770969a38d756441024120c4",
+	"modules/glyph_archive.html": "94fbbeae550d46e6afb8a2128fce73eb331b919d21587d8c4538a42caae5f00c",
+	"modules/glyph_badge.html":   "a2f4d47dc16eb037e63f0af79476fc156f333dd41f36a33472d5eb733a42e8d6",
+	"modules/glyph_cross.html":   "5bcbf48b4fb0ba153573bda2416bde2eadeeca9310a0f2311018acaabc449de5",
+	"modules/glyph_rss.html":     "2b612ebfc5f8bd4998adb5d87092a266e52bc482cba6e4baa25e5590f489155d",
+	"modules/glyph_tags.html":    "6769e7c49c1b710a8fbf9a87fbf39360e061489cd5dc19093c83667a6fe0e33e",
+	"modules/lang.html":          "38d1cf6473b1dda87bee5644047885b4e73c3a11ffda5afc9ace5ae0fbb0d48a",
+	"modules/langs.html":         "2843bb62a58eae205f0dcac2b517e40abffcc169d758d65769ed1fcd6eb65fa0",
+	"modules/planet_seo.html":    "62b23916ccd1f8ee3f97a3e7f7a31cdf6ead3459787304c6ec5e3fceefd8b3e8",
+	"modules/replies.html":       "2771969fdf5f667f0214b0f632aa1249eda99c072ea1c1e4fd2b4dcff113f4a4",
+	"modules/replies_head.html":  "8b0f823ec6d8d60a7a4eb88f1e21780c2e04daccb7db392af321dcd12815e7ef",
+	"modules/sep.html":           "b66277e1d2f5cc12ce489392ddcf660c15956b5fb150def26c0c4a8f8c7933ab",
+	"modules/todo.html":          "b26e887a02ea5205c6de36409b7de3c131855058f6d20cfbb9c572cea75a593a",
+	"modules/type.html":          "4ca4ed820d5aa92964d3587304fb0ec9f14fd177cc041886adbcb35c3f475add",
+}
+
+// Sepia build 90 from the pinned PlanetSiteTemplates checkout.
+var sepiaFiles = map[string]string{
+	"archive.html":              "223efbc52a895ee9c0636dbac79b11869842429dedd20170a96eb327997c64c2",
+	"base.html":                 "54ba1abfa1847f8bc9314ee5facb8ec645583fa715e0f3c52c1b6f2763e74bb9",
+	"blog.html":                 "7fe72f33df1183e429ee04cabad6108bd6617e328af4e61ea597a9395f4a605e",
+	"index.html":                "96935f516570cdeef2493a38edde45c25e9beef1279ef7ea2659dfe469427245",
+	"modules/donate_modal.html": "6f07ff5e9a4d373618d3312615ef46780e00287794fd495f7d7b004f456ff86b",
+	"modules/item.html":         "27cf7455e943e8972bf4e4ea6a8d78fbc3fdbb87f551a95c5a2392da2d628dc9",
+	"modules/planet_seo.html":   "86d73bd6dd2ce49da5df466a0f9c2279324ec0fb5ce00c0e224f93bf1e9bd316",
+	"modules/post_seo.html":     "e52e95b34333650ccf00f4b10977c9d3faee32255f5368af52bd55fd067c3b9c",
+	"modules/site_header.html":  "b08a0b739a7caeaeba79f34990d6667f0c3fbee000882d03058103f64410f817",
+	"modules/video.js":          "83f8db44e2847dd83c214319e5e115f8a6adea673c84d0a57da4f7b754189673",
+	"tags.html":                 "fa83c9d89bc44ca6e0e60e81eeeafe43241e55dc7f96dc445cbc627a6cd08e24",
+}
+
 func verifyFiles(root string, files map[string]string) error {
 	count := 0
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
@@ -136,6 +176,12 @@ func Verify(root string) error {
 	case "37f7b376ef903d66599e9bc8702baaa53d48e8a6e5b75932e324b4ae56221985":
 		files = gridFiles
 		assetsHash = "2a252f1b8643c076b43c38b108bdae2ed95bb4d5ef19719b7fdf4bfda40c34f5"
+	case "9e2e3c5221eb22b0af3a8ec32da25c9e74f5a904883b0732e80b3c0a8ff53bbe":
+		files = platinumFiles
+		assetsHash = "7d8312640591940763ed3040ff5b3dc462cd7703e56d0f3a3e29c5bf6c048566"
+	case "c86d5d5047c56326478143d5ef4ce6bd9c6de79b9643b72cb394ea4accb75454":
+		files = sepiaFiles
+		assetsHash = "146e7dffea1e9fcca7b3470cbd5d1d9bc710520a4d8de16bb7cccb6544540bd1"
 	default:
 		return errors.New("模板信息与已验证版本不同")
 	}

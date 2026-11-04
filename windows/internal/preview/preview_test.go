@@ -1,6 +1,7 @@
 package preview
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -35,5 +36,39 @@ func TestFootnotesAreRendered(t *testing.T) {
 	}
 	if strings.Contains(html, "[^note]") || !strings.Contains(html, "Footnote body") || !strings.Contains(html, "footnote") {
 		t.Fatalf("footnote not rendered: %q", html)
+	}
+}
+
+func TestMarkdownPreviewEmbedsOnlyResolvedLocalImages(t *testing.T) {
+	source := "![local](%E5%9B%BE%20%E7%89%87.png) ![remote](https://example.com/x.png) ![outside](../secret.png) ![inline](data:image/png;base64,AAAA)"
+	output, err := MarkdownWithImages(source, func(name string) ([]byte, string, error) {
+		if name == "图 片.png" {
+			return []byte("image"), "image/png", nil
+		}
+		return nil, "", fmt.Errorf("unknown")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output, `src="data:image/png;base64,aW1hZ2U="`) {
+		t.Fatalf("local image missing: %s", output)
+	}
+	if strings.Contains(output, "https://example.com") || strings.Contains(output, "../secret.png") || strings.Contains(output, "base64,AAAA") {
+		t.Fatalf("untrusted images retained: %s", output)
+	}
+}
+
+func TestHTMLPreviewEmbedsOnlyRegisteredImages(t *testing.T) {
+	result, err := HTMLWithImages(`<p><img src="./picture.png"><img src="https://example.test/a.png"></p>`, func(name string) ([]byte, string, error) {
+		if name == "picture.png" {
+			return []byte("image"), "image/png", nil
+		}
+		return nil, "", fmt.Errorf("unknown")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result, "data:image/png;base64,aW1hZ2U=") || strings.Contains(result, "https://example.test") {
+		t.Fatalf("preview=%s", result)
 	}
 }

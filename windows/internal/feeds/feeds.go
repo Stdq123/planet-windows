@@ -2,6 +2,8 @@
 package feeds
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,13 +24,39 @@ type Feed struct {
 	Items       []Item `json:"items"`
 }
 
+type OfflineAsset struct {
+	Snapshot     string `json:"snapshot"`
+	File         string `json:"file"`
+	ContentType  string `json:"contentType"`
+	Size         int64  `json:"size"`
+	SHA256       string `json:"sha256,omitempty"`
+	ETag         string `json:"etag,omitempty"`
+	LastModified string `json:"lastModified,omitempty"`
+}
+type RemoteMedia struct {
+	URL  string `json:"url"`
+	Type string `json:"type"`
+}
+
 type Item struct {
-	ID          string `json:"id"`
-	Title       string `json:"title"`
-	Link        string `json:"link"`
-	Description string `json:"description"`
-	Content     string `json:"content"`
-	Published   string `json:"published"`
+	ID            string                  `json:"id"`
+	Title         string                  `json:"title"`
+	Link          string                  `json:"link"`
+	Description   string                  `json:"description"`
+	Content       string                  `json:"content"`
+	Published     string                  `json:"published"`
+	AudioURL      string                  `json:"audioUrl,omitempty"`
+	Key           string                  `json:"key,omitempty"`
+	Starred       bool                    `json:"starred,omitempty"`
+	ContentCID    string                  `json:"contentCid,omitempty"`
+	ContentPath   string                  `json:"contentPath,omitempty"`
+	ArticleID     string                  `json:"articleId,omitempty"`
+	Attachments   []string                `json:"attachments,omitempty"`
+	AudioFilename string                  `json:"audioFilename,omitempty"`
+	VideoURL      string                  `json:"videoUrl,omitempty"`
+	Media         []RemoteMedia           `json:"media,omitempty"`
+	OfflineMedia  map[string]OfflineAsset `json:"offlineMedia,omitempty"`
+	OfflineBase   string                  `json:"offlineBase,omitempty"`
 }
 
 func Fetch(address string) (Feed, error) {
@@ -95,7 +123,46 @@ func Fetch(address string) (Feed, error) {
 		if text, ok := plain[entry.GUID]; ok {
 			content = text
 		}
-		out.Items = append(out.Items, Item{ID: entry.GUID, Title: entry.Title, Link: entry.Link, Description: entry.Description, Content: content, Published: entry.Published})
+		audioURL, videoURL := "", ""
+		media := []RemoteMedia{}
+		for _, enclosure := range entry.Enclosures {
+			if enclosure == nil {
+				continue
+			}
+			mediaType := strings.ToLower(strings.TrimSpace(strings.SplitN(enclosure.Type, ";", 2)[0]))
+			if !strings.HasPrefix(mediaType, "audio/") && !strings.HasPrefix(mediaType, "video/") && !strings.HasPrefix(mediaType, "image/") {
+				continue
+			}
+			address, err := url.Parse(enclosure.URL)
+			if err != nil {
+				continue
+			}
+			address = resp.Request.URL.ResolveReference(address)
+			if (address.Scheme == "http" || address.Scheme == "https") && address.Host != "" && address.User == nil {
+				address.Fragment = ""
+				value := address.String()
+				media = append(media, RemoteMedia{URL: value, Type: mediaType})
+				if audioURL == "" && strings.HasPrefix(mediaType, "audio/") {
+					audioURL = value
+				}
+				if videoURL == "" && strings.HasPrefix(mediaType, "video/") {
+					videoURL = value
+				}
+			}
+		}
+		out.Items = append(out.Items, Item{ID: entry.GUID, Title: entry.Title, Link: entry.Link, Description: entry.Description, Content: content, Published: entry.Published, AudioURL: audioURL, VideoURL: videoURL, Media: media})
 	}
 	return out, nil
+}
+
+// ItemKey is stable across refreshes and scoped to a subscription.
+func ItemKey(item Item) string {
+	if item.ID != "" {
+		return item.ID
+	}
+	if item.Link != "" {
+		return item.Link
+	}
+	digest := sha256.Sum256([]byte(item.Title + "\x00" + item.Published))
+	return "synthetic:" + hex.EncodeToString(digest[:])
 }

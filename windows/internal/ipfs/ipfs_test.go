@@ -1,12 +1,316 @@
 package ipfs
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 )
+
+func TestInitPreservesExistingDNSAndUnknownConfig(t *testing.T) {
+	exe := os.Getenv("PLANET_TEST_KUBO")
+	if exe == "" {
+		t.Skip("Kubo required")
+	}
+	repo := filepath.Join(t.TempDir(), "repo")
+	c := New(exe, repo)
+	if err := c.Init(); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(repo, "config")
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var config map[string]any
+	if err = json.Unmarshal(b, &config); err != nil {
+		t.Fatal(err)
+	}
+	config["FutureSetting"] = map[string]any{"keep": "value"}
+	dns := config["DNS"].(map[string]any)
+	dns["Resolvers"] = map[string]any{"eth.": "https://example.test/dns-query", "custom.": "https://example.test/custom"}
+	b, err = json.Marshal(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(path, b, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Init(); err != nil {
+		t.Fatal(err)
+	}
+	b, err = os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = json.Unmarshal(b, &config); err != nil {
+		t.Fatal(err)
+	}
+	if config["FutureSetting"].(map[string]any)["keep"] != "value" {
+		t.Fatal("unknown config lost")
+	}
+	resolvers := config["DNS"].(map[string]any)["Resolvers"].(map[string]any)
+	if resolvers["eth."] != "https://example.test/dns-query" || resolvers["custom."] != "https://example.test/custom" {
+		t.Fatalf("resolvers changed: %+v", resolvers)
+	}
+}
+
+func TestRemoveKeyIfMatchesPreservesOtherOrUnexpectedKeys(t *testing.T) {
+	exe := os.Getenv("PLANET_TEST_KUBO")
+	if exe == "" {
+		t.Skip("Kubo required")
+	}
+	c := New(exe, filepath.Join(t.TempDir(), "ipfs"))
+	if err := c.Init(); err != nil {
+		t.Fatal(err)
+	}
+	id, err := c.EnsureKey("site-one")
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := c.EnsureKey("site-two")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.RemoveKeyIfMatches("site-one", id); err == nil {
+		t.Fatal("offline key deletion accepted without owned daemon")
+	}
+	if err := c.Start(true); err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if err := c.RemoveKeyIfMatches("site-one", other); err == nil {
+		t.Fatal("mismatched key deleted")
+	}
+	if err := c.RemoveKeyIfMatches("site-one", ""); err == nil {
+		t.Fatal("unverified key deleted")
+	}
+	if got, err := c.LookupKey("site-one"); err != nil || got != id {
+		t.Fatalf("key changed: %s %v", got, err)
+	}
+	if err := c.RemoveKeyIfMatches("site-one", id); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.RemoveKeyIfMatches("site-one", id); err != nil {
+		t.Fatal("retry failed", err)
+	}
+	if got, err := c.LookupKey("site-two"); err != nil || got != other {
+		t.Fatalf("other key changed: %s %v", got, err)
+	}
+}
+
+func TestCloseNeverShutsDownForeignDaemonFromTamperedAPIFile(t *testing.T) {
+	exe := os.Getenv("PLANET_TEST_KUBO")
+	if exe == "" {
+		t.Skip("Kubo required")
+	}
+	root := t.TempDir()
+	local := New(exe, filepath.Join(root, "local"))
+	foreign := New(exe, filepath.Join(root, "foreign"))
+	if err := local.Init(); err != nil {
+		t.Fatal(err)
+	}
+	if err := foreign.Init(); err != nil {
+		t.Fatal(err)
+	}
+	if err := local.Start(true); err != nil {
+		t.Fatal(err)
+	}
+	defer local.Close()
+	if err := foreign.Start(true); err != nil {
+		t.Fatal(err)
+	}
+	defer foreign.Close()
+	foreignAPI, err := os.ReadFile(filepath.Join(root, "foreign", "api"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(root, "local", "api"), foreignAPI, 0600); err != nil {
+		t.Fatal(err)
+	}
+	_ = local.Close()
+	if !foreign.Alive() {
+		t.Fatal("foreign daemon was shut down")
+	}
+	if _, err = foreign.EnsureKey("still-running"); err != nil {
+		t.Fatalf("foreign daemon unavailable: %v", err)
+	}
+}
+
+func TestExplicitOwnedAPIKeyCommandIgnoresReplacedRepositoryAPIFile(t *testing.T) {
+	exe := os.Getenv("PLANET_TEST_KUBO")
+	if exe == "" {
+		t.Skip("Kubo required")
+	}
+	root := t.TempDir()
+	local := New(exe, filepath.Join(root, "local"))
+	foreign := New(exe, filepath.Join(root, "foreign"))
+	if err := local.Init(); err != nil {
+		t.Fatal(err)
+	}
+	if err := foreign.Init(); err != nil {
+		t.Fatal(err)
+	}
+	identity, err := foreign.EnsureKey("site")
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyfile := filepath.Join(root, "key.bin")
+	if err = foreign.ExportKey("site", keyfile); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = local.ImportKey("site", keyfile); err != nil {
+		t.Fatal(err)
+	}
+	if err = foreign.Start(true); err != nil {
+		t.Fatal(err)
+	}
+	defer foreign.Close()
+	if err = local.Start(true); err != nil {
+		t.Fatal(err)
+	}
+	defer local.Close()
+	api, err := os.ReadFile(filepath.Join(root, "foreign", "api"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(root, "local", "api"), api, 0600); err != nil {
+		t.Fatal(err)
+	}
+	local.mu.Lock()
+	_, err = local.run(local.ownedAPIArgs("key", "rm", "site")...)
+	local.mu.Unlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if key, err := foreign.LookupKey("site"); err != nil || key != identity {
+		t.Fatalf("foreign key changed: %s %v", key, err)
+	}
+	if key, err := local.LookupKey("site"); err != nil || key != "" {
+		t.Fatalf("local key retained: %s %v", key, err)
+	}
+}
+
+func TestOfflineCommandsIgnoreForeignRepositoryAPIFile(t *testing.T) {
+	exe := os.Getenv("PLANET_TEST_KUBO")
+	if exe == "" {
+		t.Skip("Kubo required")
+	}
+	root := t.TempDir()
+	local := New(exe, filepath.Join(root, "local"))
+	foreign := New(exe, filepath.Join(root, "foreign"))
+	if err := local.Init(); err != nil {
+		t.Fatal(err)
+	}
+	if err := foreign.Init(); err != nil {
+		t.Fatal(err)
+	}
+	if err := foreign.Start(true); err != nil {
+		t.Fatal(err)
+	}
+	defer foreign.Close()
+	api, err := os.ReadFile(filepath.Join(root, "foreign", "api"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(root, "local", "api"), api, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = local.EnsureKey("local-only"); err == nil {
+		t.Fatal("foreign API was accepted")
+	}
+	if key, err := foreign.LookupKey("local-only"); err != nil || key != "" {
+		t.Fatalf("foreign repo changed: %s %v", key, err)
+	}
+	if err = os.Remove(filepath.Join(root, "local", "api")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = local.EnsureKey("local-only"); err != nil {
+		t.Fatal(err)
+	}
+	if key, err := local.LookupKey("local-only"); err != nil || key == "" {
+		t.Fatalf("local repo unchanged: %s %v", key, err)
+	}
+}
+
+func TestLocalKeyImportExportCLIRejectsForeignAPI(t *testing.T) {
+	exe := os.Getenv("PLANET_TEST_KUBO")
+	if exe == "" {
+		t.Skip("Kubo required")
+	}
+	root := t.TempDir()
+	local := New(exe, filepath.Join(root, "local"))
+	foreign := New(exe, filepath.Join(root, "foreign"))
+	if err := local.Init(); err != nil {
+		t.Fatal(err)
+	}
+	if err := foreign.Init(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := foreign.EnsureKey("site"); err != nil {
+		t.Fatal(err)
+	}
+	keyfile := filepath.Join(root, "key.bin")
+	exportCmd := exec.Command(exe, "--offline", "key", "export", "site", "-o", keyfile)
+	foreign.configure(exportCmd)
+	if out, err := exportCmd.CombinedOutput(); err != nil {
+		t.Fatalf("prepare key: %s %v", out, err)
+	}
+	if err := foreign.Start(true); err != nil {
+		t.Fatal(err)
+	}
+	defer foreign.Close()
+	api, err := os.ReadFile(filepath.Join(root, "foreign", "api"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(root, "local", "api"), api, 0600); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(root, "out.bin")
+	cmd := exec.Command(exe, "--offline", "key", "export", "site", "-o", out)
+	local.configure(cmd)
+	if data, err := cmd.CombinedOutput(); err == nil {
+		t.Fatalf("remote export unexpectedly succeeded: %s", data)
+	}
+	if _, err := local.ImportKey("another", keyfile); err == nil {
+		t.Fatal("import accepted foreign API")
+	}
+	if key, err := foreign.LookupKey("another"); err != nil || key != "" {
+		t.Fatalf("foreign repo changed: %s %v", key, err)
+	}
+}
+
+func TestKeyExportFromRunningDaemonRestartsItAndKeepsIdentity(t *testing.T) {
+	exe := os.Getenv("PLANET_TEST_KUBO")
+	if exe == "" {
+		t.Skip("Kubo required")
+	}
+	root := t.TempDir()
+	node := New(exe, filepath.Join(root, "repo"))
+	if err := node.Init(); err != nil {
+		t.Fatal(err)
+	}
+	identity, err := node.EnsureKey("site")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = node.Start(true); err != nil {
+		t.Fatal(err)
+	}
+	defer node.Close()
+	if err = node.ExportKey("site", filepath.Join(root, "key.bin")); err != nil {
+		t.Fatal(err)
+	}
+	if !node.Alive() {
+		t.Fatal("owned daemon not restarted")
+	}
+	if got, err := node.LookupKey("site"); err != nil || got != identity {
+		t.Fatalf("identity changed: %s %v", got, err)
+	}
+}
 
 func TestPublishOnlineRejectsUnsafeInput(t *testing.T) {
 	client := New("missing", filepath.Join(t.TempDir(), "repo"))
@@ -193,5 +497,93 @@ func TestKeyExportImportKeepsIdentity(t *testing.T) {
 	match, err = destination.KeyMatches("site", "not-the-key")
 	if err != nil || match {
 		t.Fatalf("wrong key accepted: %v", err)
+	}
+}
+
+func TestResolveReadAndPinFromOfflineRepository(t *testing.T) {
+	exe := os.Getenv("PLANET_TEST_KUBO")
+	if exe == "" {
+		t.Skip("Kubo required")
+	}
+	c := New(exe, filepath.Join(t.TempDir(), "repo"))
+	if err := c.Init(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.EnsureKey("test-site"); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "planet.json"), []byte(`{"name":"offline"}`), 0600)
+	cid, err := c.Add(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	name, err := c.PublishOffline("test-site", cid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Start(true); err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	resolved, err := c.Resolve(name)
+	if err != nil || resolved != cid {
+		t.Fatalf("resolved=%s err=%v", resolved, err)
+	}
+	data, err := c.Read(cid, "planet.json")
+	if err != nil || string(data) != `{"name":"offline"}` {
+		t.Fatalf("data=%s err=%v", data, err)
+	}
+	if _, err = c.run("pin", "rm", cid); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Pin(cid); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = c.run("repo", "gc"); err != nil {
+		t.Fatal(err)
+	}
+	if data, err = c.Read(cid, "planet.json"); err != nil || string(data) != `{"name":"offline"}` {
+		t.Fatalf("pinned data lost after GC: %s %v", data, err)
+	}
+	if _, err = c.Read(cid, "../planet.key"); err == nil {
+		t.Fatal("path traversal accepted")
+	}
+}
+
+func TestResolveAndReadIPNSContentSubdirectoryOffline(t *testing.T) {
+	exe := os.Getenv("PLANET_TEST_KUBO")
+	if exe == "" {
+		t.Skip("Kubo required")
+	}
+	c := New(exe, filepath.Join(t.TempDir(), "repo"))
+	if err := c.Init(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.EnsureKey("site"); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "nested", "site"), 0700)
+	os.WriteFile(filepath.Join(dir, "nested", "site", "planet.json"), []byte(`{"name":"Nested"}`), 0600)
+	cid, err := c.Add(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	name, err := c.run("--offline", "name", "publish", "--allow-offline", "--quieter", "--key=site", "/ipfs/"+cid+"/nested/site")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Start(true); err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	path, err := c.Resolve(name)
+	if err != nil || path != cid+"/nested/site" {
+		t.Fatalf("path=%q err=%v", path, err)
+	}
+	b, err := c.Read(cid, "nested/site/planet.json")
+	if err != nil || string(b) != `{"name":"Nested"}` {
+		t.Fatalf("data=%q err=%v", b, err)
 	}
 }

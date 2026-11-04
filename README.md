@@ -6,16 +6,18 @@ A work-in-progress Windows application for publishing websites with IPFS and fol
 
 ## What works
 
-- Create local sites and Markdown posts, preview them, and export basic static HTML.
+- Create local sites, edit Markdown posts and private drafts, manage attachments, and export static HTML.
 - Publish supported sites to IPFS and IPNS with a bundled Kubo node. Saving an article triggers background publication of the saved site and attachments.
-- Follow and manually refresh RSS, Atom and JSON feeds.
-- Import selected Planet backups and export backups containing IPNS keys. Some imported sites can be regenerated using verified versions of the Plain, 8-bit and Grid templates; support varies by site and template.
+- Follow and refresh RSS, Atom, JSON Feed, IPNS and supported ENS sites, and keep selected content available offline.
+- Import selected Planet backups and export backups containing IPNS keys. Compatible sites can be rebuilt using verified versions of Plain, 8-bit, Grid, Platinum and Sepia.
+- Configure Filebase or Pinnable for remote pinning, and Plausible for site analytics.
+- Check for signed updates through a configured HTTPS feed, download a verified installer, and run it to upgrade a compatible installation.
 
 Published content is public. Long-term availability depends on other nodes or pinning services. Exported backups contain unencrypted IPNS private keys; store them securely. For supported import scenarios, restrictions and known gaps, read [windows/README.md](windows/README.md).
 
 ## Build and test
 
-Windows x64, WebView2 Runtime, Bun and Go 1.27.3 or a compatible toolchain are required. With `GOTOOLCHAIN=auto`, Go can download the required toolchain.
+Windows x64, WebView2 Runtime, Bun and Go 1.27.3 or a compatible toolchain are required. The installer build also needs 7-Zip. With `GOTOOLCHAIN=auto`, Go can download the required toolchain.
 
 ```powershell
 cd windows
@@ -26,7 +28,7 @@ bun run typecheck
 bun run build
 ```
 
-The build downloads Kubo 0.38.2 from its official release and verifies its SHA-512 checksum before packaging it. Output is placed under `windows/build/windows-amd64/`. Default tests do not publish to the IPFS network; optional Kubo, online and template tests are documented in [windows/README.md](windows/README.md).
+The build downloads Kubo 0.38.2 from its official release and verifies its SHA-512 checksum before packaging it. The build prints the release directory under `windows/.mygo/releases/<build-id>/windows-amd64/`. Default tests run without publishing to IPFS. See the optional Kubo, online and template tests in the [Windows guide](windows/README.md).
 
 ## Contributing and support
 
@@ -36,4 +38,4 @@ The source snapshot is also available on [Gitea](https://gitea.com/puremixai/pla
 
 ## Origin and license
 
-This repository contains a snapshot of the Windows port from the Planet-derived working tree, rather than the original full upstream Git history. Original Planet copyright notices are retained in [LICENSE](LICENSE). Planet Windows is distributed under the MIT license; third-party dependencies and bundled components have their own licenses. See [NOTICE.md](NOTICE.md).
+This repository is the development home of the Windows port. Its history begins with a snapshot of the Planet-derived working tree. Original Planet copyright notices are retained in [LICENSE](LICENSE). Planet Windows is distributed under the MIT license. See the separate licenses for third-party dependencies and bundled components in [NOTICE.md](NOTICE.md).

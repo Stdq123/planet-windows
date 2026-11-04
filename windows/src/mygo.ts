@@ -14,6 +14,33 @@ export interface Article {
   attachments?: string[];
   articleNumber?: number;
   articleReference?: string;
+  tags: Record<string, string>;
+  audioFilename?: string;
+  videoFilename?: string;
+  audioDuration?: number;
+  audioByteLength?: number;
+}
+
+export interface Config {
+  feedURL: string;
+  publicKey: string;
+  autoCheck: boolean;
+  highestVersion?: string;
+  highestSHA256?: string;
+}
+
+export interface Draft {
+  id: string;
+  siteId: string;
+  articleId?: string;
+  title: string;
+  content: string;
+  tags: Record<string, string>;
+  created: string;
+  modified: string;
+  baseModified?: string;
+  attachments?: string[];
+  removedAttachments?: string[];
 }
 
 export interface Feed {
@@ -30,6 +57,46 @@ export interface Item {
   description: string;
   content: string;
   published: string;
+  audioUrl?: string;
+  key?: string;
+  starred?: boolean;
+  contentCid?: string;
+  contentPath?: string;
+  articleId?: string;
+  attachments?: string[];
+  audioFilename?: string;
+  videoUrl?: string;
+  media?: RemoteMedia[];
+  offlineMedia?: Record<string, OfflineAsset>;
+  offlineBase?: string;
+}
+
+export interface OfflineAsset {
+  snapshot: string;
+  file: string;
+  contentType: string;
+  size: number;
+  sha256?: string;
+  etag?: string;
+  lastModified?: string;
+}
+
+export interface PinStatus {
+  requestid: string;
+  status: string;
+  pin: { cid: string };
+}
+
+export interface PlausibleTracking {
+  enabled: boolean;
+  domain?: string;
+  scriptId?: string;
+  server?: string;
+}
+
+export interface RemoteMedia {
+  url: string;
+  type: string;
 }
 
 export interface Result {
@@ -37,6 +104,19 @@ export interface Result {
   ipns: string;
   revision: number;
   pending: boolean;
+  pinnableWarning?: string;
+}
+
+export interface ServiceInfo {
+  name: string;
+  configured: boolean;
+  lastCid?: string;
+  requestId?: string;
+  pendingCid?: string;
+  scriptId?: string;
+  trackingEnabled?: boolean;
+  trackingWarning?: string;
+  server?: string;
 }
 
 export interface Site {
@@ -49,15 +129,60 @@ export interface Site {
   lastPublished?: string;
   templateId?: string;
   templateName?: string;
+  templateSettings?: Record<string, string>;
+  nextArticleNumber?: number;
   imported?: boolean;
+  tagsUnsupported?: boolean;
+  removed?: boolean;
+  deletionPending?: boolean;
   contentRevision?: number;
   publishedRevision?: number;
   publishPending?: boolean;
+  plausibleOverride?: PlausibleTracking;
+}
+
+export interface Stats {
+  visitors: number;
+  pageviews: number;
+}
+
+export interface Status {
+  status: string;
+  last_known_ipns: string;
+  last_known_cid: string;
 }
 
 export interface Subscription {
   url: string;
   feed: Feed;
+  cid?: string;
+  pinnedCid?: string;
+  lastUpdated?: string;
+  lastError?: string;
+  offlinePinned?: boolean;
+  offlineSnapshot?: string;
+}
+
+export interface UpdateCheckInfo {
+  version: string;
+  sha256: string;
+  size: number;
+  available: boolean;
+}
+
+export interface UpdateSettingsInfo {
+  settings: Config;
+  currentVersion: string;
+  configured: boolean;
+}
+
+export interface Usage {
+  totalBytes: number;
+  reclaimableBytes: number;
+  reclaimedBytes: number;
+  managedFiles: number;
+  reclaimableFiles: number;
+  reclaimedFiles: number;
 }
 
 // ---- Services ----
@@ -68,14 +193,59 @@ export const Library = {
   addAttachment(siteID: string, articleID: string): Promise<Article> {
     return call("Library.AddAttachment", siteID, articleID);
   },
+  addDraftAttachment(siteID: string, draftID: string): Promise<Draft> {
+    return call("Library.AddDraftAttachment", siteID, draftID);
+  },
   articles(siteID: string): Promise<Article[]> {
     return call("Library.Articles", siteID);
+  },
+  /** AudioURL provides a revocable loopback stream for the selected article audio. */
+  audioURL(siteID: string, articleID: string): Promise<string> {
+    return call("Library.AudioURL", siteID, articleID);
+  },
+  cancelUpdateOperation(): Promise<void> {
+    return call("Library.CancelUpdateOperation");
+  },
+  checkUpdates(): Promise<UpdateCheckInfo> {
+    return call("Library.CheckUpdates");
+  },
+  /** CleanupOfflineMedia removes only files no saved article or active player references. */
+  cleanupOfflineMedia(): Promise<Usage> {
+    return call("Library.CleanupOfflineMedia");
+  },
+  /**
+   * ConfigurePinnable saves an explicitly supplied endpoint using Windows DPAPI.
+   * An empty endpoint disables the integration for this site.
+   */
+  configurePinnable(siteID: string, endpoint: string): Promise<void> {
+    return call("Library.ConfigurePinnable", siteID, endpoint);
+  },
+  /** ConfigurePlausible sets the domain, optional site-specific script ID and key. */
+  configurePlausible(siteID: string, domain: string, token: string, scriptID: string): Promise<void> {
+    return call("Library.ConfigurePlausible", siteID, domain, token, scriptID);
+  },
+  /** ConfigurePlausibleAt accepts an HTTPS service selected explicitly by the user. */
+  configurePlausibleAt(siteID: string, domain: string, token: string, scriptID: string, server: string): Promise<void> {
+    return call("Library.ConfigurePlausibleAt", siteID, domain, token, scriptID, server);
+  },
+  /** ConfigureService stores credentials encrypted for the current Windows user. */
+  configureService(siteID: string, kind: string, name: string, token: string): Promise<void> {
+    return call("Library.ConfigureService", siteID, kind, name, token);
   },
   createSite(name: string, about: string): Promise<Site> {
     return call("Library.CreateSite", name, about);
   },
   deleteArticle(siteID: string, articleID: string): Promise<void> {
     return call("Library.DeleteArticle", siteID, articleID);
+  },
+  deleteDraft(siteID: string, draftID: string): Promise<void> {
+    return call("Library.DeleteDraft", siteID, draftID);
+  },
+  downloadUpdate(version: string, sha256: string): Promise<string> {
+    return call("Library.DownloadUpdate", version, sha256);
+  },
+  drafts(siteID: string): Promise<Draft[]> {
+    return call("Library.Drafts", siteID);
   },
   /** ExportPlanet writes a .planet backup containing the site's private key. */
   exportPlanet(siteID: string): Promise<string> {
@@ -85,6 +255,10 @@ export const Library = {
   exportWebsite(siteID: string): Promise<string> {
     return call("Library.ExportWebsite", siteID);
   },
+  filebaseStatus(siteID: string): Promise<PinStatus> {
+    return call("Library.FilebaseStatus", siteID);
+  },
+  /** Follow adds or refreshes either a web feed or a Planet/IPNS/ENS site. */
   follow(address: string): Promise<Subscription> {
     return call("Library.Follow", address);
   },
@@ -92,27 +266,151 @@ export const Library = {
   importPlanet(): Promise<Site> {
     return call("Library.ImportPlanet");
   },
+  /** OfflineMediaUsage reports managed feed-cache usage without modifying files. */
+  offlineMediaUsage(): Promise<Usage> {
+    return call("Library.OfflineMediaUsage");
+  },
+  /** PermanentlyDeleteSite starts or resumes deletion of a previously removed site. */
+  permanentlyDeleteSite(siteID: string): Promise<void> {
+    return call("Library.PermanentlyDeleteSite", siteID);
+  },
+  /** PinSubscription stores the current Planet revision in Kubo for offline use. */
+  pinSubscription(address: string): Promise<void> {
+    return call("Library.PinSubscription", address);
+  },
+  pinnableConfigured(siteID: string): Promise<boolean> {
+    return call("Library.PinnableConfigured", siteID);
+  },
+  pinnableStatus(siteID: string): Promise<Status> {
+    return call("Library.PinnableStatus", siteID);
+  },
+  plausibleStats(siteID: string): Promise<Stats> {
+    return call("Library.PlausibleStats", siteID);
+  },
+  plausibleStatsRange(siteID: string, period: string): Promise<Stats> {
+    return call("Library.PlausibleStatsRange", siteID, period);
+  },
   preview(content: string): Promise<string> {
     return call("Library.Preview", content);
+  },
+  /** PreviewArticle renders the draft with images registered to its saved article. */
+  previewArticle(siteID: string, articleID: string, content: string): Promise<string> {
+    return call("Library.PreviewArticle", siteID, articleID, content);
+  },
+  /** PreviewDraft supports both private new files and the original article's files. */
+  previewDraft(siteID: string, draftID: string, content: string): Promise<string> {
+    return call("Library.PreviewDraft", siteID, draftID, content);
+  },
+  publishDraft(siteID: string, draftID: string, title: string, content: string): Promise<Article> {
+    return call("Library.PublishDraft", siteID, draftID, title, content);
+  },
+  publishDraftWithTags(siteID: string, draftID: string, title: string, content: string, tagsJSON: string): Promise<Article> {
+    return call("Library.PublishDraftWithTags", siteID, draftID, title, content, tagsJSON);
   },
   /** PublishSite publishes the saved snapshot; Kubo is started only on request. */
   publishSite(siteID: string): Promise<Result> {
     return call("Library.PublishSite", siteID);
   },
+  /**
+   * RefreshSubscription only refreshes an existing subscription. A refresh
+   * queued before removal must not recreate the removed subscription.
+   */
+  refreshSubscription(address: string): Promise<Subscription> {
+    return call("Library.RefreshSubscription", address);
+  },
   /** RemoveAttachment removes a file previously added to a Windows article. */
   removeAttachment(siteID: string, articleID: string, name: string): Promise<Article> {
     return call("Library.RemoveAttachment", siteID, articleID, name);
   },
+  removeDraftAttachment(siteID: string, draftID: string, name: string): Promise<Draft> {
+    return call("Library.RemoveDraftAttachment", siteID, draftID, name);
+  },
+  removeSite(siteID: string): Promise<void> {
+    return call("Library.RemoveSite", siteID);
+  },
+  removedSites(): Promise<Site[]> {
+    return call("Library.RemovedSites");
+  },
+  requestFilebasePin(siteID: string): Promise<void> {
+    return call("Library.RequestFilebasePin", siteID);
+  },
+  requestPinnablePin(siteID: string): Promise<void> {
+    return call("Library.RequestPinnablePin", siteID);
+  },
+  restoreSite(siteID: string): Promise<Site> {
+    return call("Library.RestoreSite", siteID);
+  },
+  revealDownloadedUpdate(): Promise<void> {
+    return call("Library.RevealDownloadedUpdate");
+  },
   saveArticle(siteID: string, articleID: string, title: string, content: string): Promise<Article> {
     return call("Library.SaveArticle", siteID, articleID, title, content);
   },
-  selectTemplate(siteID: string): Promise<string> {
+  saveArticleWithTags(siteID: string, articleID: string, title: string, content: string, tagsJSON: string): Promise<Article> {
+    return call("Library.SaveArticleWithTags", siteID, articleID, title, content, tagsJSON);
+  },
+  saveDraft(siteID: string, draftID: string, articleID: string, title: string, content: string): Promise<Draft> {
+    return call("Library.SaveDraft", siteID, draftID, articleID, title, content);
+  },
+  saveDraftWithTags(siteID: string, draftID: string, articleID: string, title: string, content: string, tagsJSON: string): Promise<Draft> {
+    return call("Library.SaveDraftWithTags", siteID, draftID, articleID, title, content, tagsJSON);
+  },
+  /** SaveTemplateSettings validates values before persisting them locally. */
+  saveTemplateSettings(siteID: string, values: string): Promise<Site> {
+    return call("Library.SaveTemplateSettings", siteID, values);
+  },
+  saveUpdateSettings(feedURL: string, publicKey: string, autoCheck: boolean): Promise<UpdateSettingsInfo> {
+    return call("Library.SaveUpdateSettings", feedURL, publicKey, autoCheck);
+  },
+  selectTemplate(siteID: string): Promise<Site> {
     return call("Library.SelectTemplate", siteID);
+  },
+  serviceInfo(siteID: string, kind: string): Promise<ServiceInfo> {
+    return call("Library.ServiceInfo", siteID, kind);
+  },
+  setDraftExistingAttachmentRemoved(siteID: string, draftID: string, name: string, removed: boolean): Promise<Draft> {
+    return call("Library.SetDraftExistingAttachmentRemoved", siteID, draftID, name, removed);
   },
   sites(): Promise<Site[]> {
     return call("Library.Sites");
   },
+  starSubscription(address: string, key: string, starred: boolean): Promise<void> {
+    return call("Library.StarSubscription", address, key, starred);
+  },
+  /** StopAudio revokes the requested stream without stopping newer playback. */
+  stopAudio(address: string): Promise<void> {
+    return call("Library.StopAudio", address);
+  },
+  /** SubscriptionAudioURL streams a registered Planet audio file from a private temporary copy. */
+  subscriptionAudioURL(address: string, key: string): Promise<string> {
+    return call("Library.SubscriptionAudioURL", address, key);
+  },
+  /** SubscriptionMediaURL serves an already-fixed feed media file without network access. */
+  subscriptionMediaURL(address: string, key: string, mediaURL: string): Promise<string> {
+    return call("Library.SubscriptionMediaURL", address, key, mediaURL);
+  },
+  /** SubscriptionPreview renders registered Planet images from the local IPFS repository. */
+  subscriptionPreview(address: string, key: string): Promise<string> {
+    return call("Library.SubscriptionPreview", address, key);
+  },
   subscriptions(): Promise<Subscription[]> {
     return call("Library.Subscriptions");
+  },
+  /** TemplateSettings returns supported settings, including imported values. */
+  templateSettings(siteID: string): Promise<Record<string, string>> {
+    return call("Library.TemplateSettings", siteID);
+  },
+  /**
+   * Unfollow removes the subscription and its saved item state. Shared IPFS pins
+   * and cached files are not deleted by this operation.
+   */
+  unfollow(address: string): Promise<void> {
+    return call("Library.Unfollow", address);
+  },
+  updateSettings(): Promise<UpdateSettingsInfo> {
+    return call("Library.UpdateSettings");
+  },
+  updateSite(siteID: string, name: string, about: string): Promise<Site> {
+    return call("Library.UpdateSite", siteID, name, about);
   },
 } as const;

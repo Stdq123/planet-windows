@@ -34,9 +34,6 @@ func Install(root, source string, site store.Site, articles []store.Article, lib
 	if err = json.Unmarshal(b, &metadata); err != nil || metadata.Name == "" {
 		return "", errors.New("模板信息无效")
 	}
-	if site.Imported && metadata.Name != "Plain" {
-		return "", errors.New("导入的 Plain 站点目前只能选择原版 Plain 模板")
-	}
 	parent := filepath.Join(root, "templates")
 	if err = os.MkdirAll(parent, 0700); err != nil {
 		return "", err
@@ -72,7 +69,7 @@ func Install(root, source string, site store.Site, articles []store.Article, lib
 		}
 	}
 	if err = Verify(stage); err != nil {
-		return "", fmt.Errorf("当前仅支持已验证的 Plain、8-bit 和 Grid 原版模板：%w", err)
+		return "", fmt.Errorf("当前仅支持已验证的 Plain、8-bit、Grid、Platinum 和 Sepia 原版模板：%w", err)
 	}
 	check, err := os.MkdirTemp(root, ".template-check-")
 	if err != nil {
@@ -83,7 +80,11 @@ func Install(root, source string, site store.Site, articles []store.Article, lib
 		now := time.Now().UTC()
 		articles = []store.Article{{ID: "00000000-0000-4000-8000-000000000001", SiteID: site.ID, Title: "Preview", Content: "Preview", Created: now, Modified: now}}
 	}
-	if err = sitegen.RenderWithTemplate(check, site, articles, stage); err != nil {
+	previewSite := site
+	if previewSite.TemplateName != metadata.Name {
+		previewSite.TemplateSettings = nil
+	}
+	if err = sitegen.RenderWithTemplate(check, previewSite, articles, stage); err != nil {
 		return "", err
 	}
 	if err = library.SetTemplate(site.ID, filepath.Base(stage), metadata.Name); err != nil {

@@ -18,10 +18,11 @@ type Node interface {
 }
 
 type Result struct {
-	CID      string `json:"cid"`
-	IPNS     string `json:"ipns"`
-	Revision uint64 `json:"revision"`
-	Pending  bool   `json:"pending"`
+	CID             string `json:"cid"`
+	IPNS            string `json:"ipns"`
+	Revision        uint64 `json:"revision"`
+	Pending         bool   `json:"pending"`
+	PinnableWarning string `json:"pinnableWarning,omitempty"`
 }
 
 func Publish(node Node, tempParent string, site store.Site, articles []store.Article) (Result, error) {
@@ -38,6 +39,12 @@ func PublishWithAssets(node Node, tempParent string, site store.Site, articles [
 		return Result{}, err
 	}
 	defer os.RemoveAll(dir)
+	if attachmentRoot != "" {
+		articles, err = attachments.EnrichMedia(attachmentRoot, site, articles)
+		if err != nil {
+			return Result{}, fmt.Errorf("读取媒体附件失败：%w", err)
+		}
+	}
 	if templateDir != "" {
 		err = sitegen.RenderWithTemplate(dir, site, articles, templateDir)
 	} else {
@@ -49,6 +56,11 @@ func PublishWithAssets(node Node, tempParent string, site store.Site, articles [
 	if attachmentRoot != "" {
 		if err := attachments.CopyToSite(attachmentRoot, dir, articles); err != nil {
 			return Result{}, fmt.Errorf("复制附件失败：%w", err)
+		}
+		for _, article := range articles {
+			if err := attachments.GenerateVideoThumbnail(attachmentRoot, site, article, dir); err != nil {
+				return Result{}, fmt.Errorf("生成视频缩略图失败：%w", err)
+			}
 		}
 	} else {
 		for _, article := range articles {
