@@ -28,6 +28,24 @@ func configPath(root, id, kind string, create bool) (string, error) {
 	if !safeID.MatchString(id) || (kind != "filebase" && kind != "plausible" && kind != "cloudflare" && kind != "ssh") {
 		return "", errors.New("服务配置标识无效")
 	}
+	// Check ancestors directly: EvalSymlinks also expands Windows short names,
+	// so comparing its result with the input would reject ordinary directories.
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		return "", err
+	}
+	for ancestor := absRoot; ; ancestor = filepath.Dir(ancestor) {
+		info, err := os.Lstat(ancestor)
+		if err != nil {
+			return "", err
+		}
+		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+			return "", errors.New("服务配置目录不可重定向")
+		}
+		if filepath.Dir(ancestor) == ancestor {
+			break
+		}
+	}
 	dir := root
 	for _, part := range []string{"integrations", kind} {
 		dir = filepath.Join(dir, part)
@@ -43,10 +61,6 @@ func configPath(root, id, kind string, create bool) (string, error) {
 		}
 		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 			return "", errors.New("服务配置目录无效")
-		}
-		resolved, e := filepath.EvalSymlinks(dir)
-		if e != nil || !strings.EqualFold(filepath.Clean(resolved), filepath.Clean(dir)) {
-			return "", errors.New("服务配置目录不可重定向")
 		}
 	}
 	return filepath.Join(dir, id+".dat"), nil
