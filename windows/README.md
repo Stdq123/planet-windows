@@ -78,6 +78,8 @@ bun run build
 
 `bun run check` 是本地与 CI 共用的检查入口：依次执行 Go 格式检查、`go vet`、前端测试、禁用结果缓存的 Go 测试、TypeScript 类型检查和前端生产构建。任一步失败即停止；安装器仍需另行执行 `bun run build` 和发行验收。分支、提交、可选 Git hooks 与版本管理见 [Git 协作指南](../docs/git-workflow.md)。
 
+当前云端 CI 暂停，使用本地验证。依赖变化和发布前运行 `bun run security:check`；该命令需要联网查询漏洞库。`bun run release:prepare -BundleDir <独立发行目录>` 只生成本地草稿材料，正式发布要求见 [发布流程](../docs/releasing.md) 与 [原生 Windows 验收模板](../docs/release-acceptance-template.md)。
+
 可设置 `PLANET_TEST_FEEDS_LIVE=1` 后运行 `go test . -run TestLiveFollowOlividaHomepage -count=1 -v`，验证从 `https://olivida.eth.limo` 首页发现 RSS、读取文章并保存订阅。该测试只读取公网内容，使用临时资料库，不修改现有订阅；默认测试不访问此站点。
 
 构建并检查成功后，最新版程序、Kubo 和独立安装包位于固定目录 `build/windows-amd64/`，同时保留一份在 `.mygo/releases/<构建ID>/windows-amd64/`。原 `build/windows-amd64/` 会移至 `build/.previous-<ID>/` 保存；构建前请先关闭正在运行的 Planet 和 Kubo，避免绑定生成或目录替换被占用。终端会打印两个输出路径；目录同步失败时独立发行目录仍会保留。可运行 `powershell -NoProfile -File scripts/test-publish-build.ps1` 检查最新目录更新逻辑。`go test ./...` 默认跳过真实 Kubo 集成测试；如已有可信的 Kubo Windows 程序，可设置 `PLANET_TEST_KUBO` 指向该程序，再运行 `go test -count=1 ./internal/ipfs`。测试只使用临时仓库和测试密钥执行离线操作。要验证真实 Ethereum ENS 解析，可设置 `PLANET_TEST_ENS_LIVE=1` 并运行 `go test ./internal/ipfs -run TestLiveENS -count=1 -v`；该测试访问主网 RPC，链上记录可能随时间改变。可通过 `PLANET_ENS_RPC_URL` 选择 RPC，或通过 `PLANET_TEST_ENS_NAMES` 指定候选名称。

@@ -60,9 +60,9 @@ hook 由 Git for Windows 执行，检查脚本使用 Windows PowerShell。取消
 
 完成检查后推送任务分支并在 GitHub 创建 PR。使用仓库 PR 模板说明问题、修改后的行为、检查结果和限制。新增可见行为时同步更新 [CHANGELOG](../CHANGELOG.md) 的 `Unreleased`，按 Added、Changed、Fixed、Deprecated、Removed、Security 分类。破坏兼容性的改动写出迁移方法。
 
-CI 在 `main` 推送、所有 PR 和手动触发时运行，固定使用锁文件安装依赖。每周的 Dependabot 更新需要正常审查与 CI，不会自动合并；Bun 与 MyGo 相关包升级需要检查兼容性。依赖支持与并发行为参见 [Dependabot 文档](https://docs.github.com/en/code-security/reference/supply-chain-security/supported-ecosystems-and-repositories) 和 [Actions 并发文档](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)。
+当前按维护者要求暂停云端 CI：工作流仅保留手动触发，远端工作流保持停用。PR 中记录本地 `bun run check` 的结果；恢复自动检查需要另行决定。Dependabot 更新提议需要正常审查及本地检查，不会自动合并；Bun 与 MyGo 相关包升级需要检查兼容性。依赖支持参见 [Dependabot 文档](https://docs.github.com/en/code-security/reference/supply-chain-security/supported-ecosystems-and-repositories)。
 
-维护者可在 GitHub ruleset 中保护 `main`：要求 PR、成功的 Windows CI 检查、解决审查讨论并禁止强制推送及删除。协作团队可再要求至少一位审查者批准。**这些是服务器设置，添加仓库文件不会自动启用。** 配置必需检查时选择实际 CI 运行产生的检查名称。
+GitHub ruleset 已要求 `main` 通过 PR 合并、解决审查讨论并禁止非快进推送及删除，管理员保留应急通道。当前单人维护不要求独立批准；CI 暂停时不设置必需云端检查。恢复 CI 后先验证实际运行，再添加对应必需检查。配置记录和已核验状态见 [维护标准](maintenance.md)。
 
 ## 版本与发布
 
@@ -70,15 +70,16 @@ CI 在 `main` 推送、所有 PR 和手动触发时运行，固定使用锁文�
 
 采用语义化版本：修复通常递增 PATCH，兼容的新功能递增 MINOR，破坏已有兼容承诺的改动递增 MAJOR。当前仍为 `0.x` 开发阶段；任何不兼容变化都应在记录中突出说明，并提供迁移说明，不把它隐藏在补丁版本中。
 
-发布通过单独 PR 更新 `release.json`，将对应 Unreleased 条目移到新版本标题并填写实际发布日期。合并后，在干净的 `main` 上运行共享检查、`bun run build` 及 [发行验收](../windows/docs/release-audit.md)，核对构建程序的 `--planet-version` 输出。签名、Windows 安装/升级/卸载、真实备份兼容性和第三方许可的待验证项以现有验收文档为准。
+发布通过单独 PR 更新 `release.json`，整理 Changelog，并按 [本地发布流程](releasing.md) 检查元数据、构建、准备材料和完成原生 Windows 验收。程序版本、标签和最终安装包必须一致。
 
-确认所需验收和发布内容后，才创建并推送对应标签：
+先确认发布元数据与目标提交，创建本地附注标签：
 
 ```powershell
 $releaseVersion = (Get-Content windows/release.json -Raw -Encoding UTF8 | ConvertFrom-Json).version
 git tag -a "v$releaseVersion" -m "Release $releaseVersion"
-git push origin "v$releaseVersion"
 ```
+
+从该标签对应的干净提交构建，完成本地发布流程中的严格检查和验收后，再运行 `git push origin "v$releaseVersion"`。不要在验收前推送标签或创建公开发布。
 
 当前 CI 不会因标签自动发布安装包，也不会修改更新源。上传安装包与签名更新清单沿用 [更新发布指南](../windows/docs/update-publisher.md)。已发布标签不移动；发现问题后创建修复提交与新版本。撤销已合并的代码时，通过新分支执行 `git revert <commit>`、验证后提交 PR。
 

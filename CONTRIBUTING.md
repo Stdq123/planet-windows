@@ -10,4 +10,6 @@ Contributions are welcome. Please discuss substantial changes in a [GitHub issue
 
 The [Git workflow guide (Chinese)](docs/git-workflow.md) covers optional Git hooks, branch and commit practices, release tags, rollback and mirror synchronization. Files use UTF-8 and the line endings defined by `.editorconfig` and `.gitattributes`. Keep dependency lock files tracked; update them with the corresponding package manager.
 
+Cloud CI is currently paused. Include local check results in your PR; do not enable automatic workflows as part of unrelated changes. Run `bun run security:check` for dependency changes. Release preparation follows [docs/releasing.md](docs/releasing.md), with explicit draft output and separate native Windows acceptance.
+
 Compatibility changes should document which Planet backup formats and template revisions were tested. Never publish imported site data or IPNS keys as test fixtures. By contributing, you agree that your contributions may be distributed under the repository's MIT license.

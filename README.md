@@ -55,6 +55,8 @@ The build downloads Kubo 0.38.2 from its official release and verifies its SHA-5
 
 `bun run check` is the shared local and CI entry point for Go formatting, static analysis, frontend and Go tests, TypeScript checks and the frontend production build. It stops on the first failure. Installer validation remains part of `bun run build` and the release audits.
 
+Cloud CI is currently paused; validation runs locally. Use `bun run security:check` for online dependency advisory checks. The [maintenance standard](docs/maintenance.md) records repository protection and validation requirements; the [release guide](docs/releasing.md) explains Changelog maintenance, local draft materials, version checks and native Windows acceptance.
+
 ## Contributing and support
 
 See [CONTRIBUTING.md](CONTRIBUTING.md), the [Git workflow guide (Chinese)](docs/git-workflow.md), [CHANGELOG.md](CHANGELOG.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). For bugs and feature requests, use the [GitHub issue tracker](https://github.com/Stdq123/planet-windows/issues). For security concerns, see [SECURITY.md](SECURITY.md).
