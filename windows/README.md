@@ -72,10 +72,13 @@
 ```powershell
 cd windows
 bun install --frozen-lockfile
-bun test
-go test ./...
+bun run check
 bun run build
 ```
+
+`bun run check` 是本地与 CI 共用的检查入口：依次执行 Go 格式检查、`go vet`、前端测试、禁用结果缓存的 Go 测试、TypeScript 类型检查和前端生产构建。任一步失败即停止；安装器仍需另行执行 `bun run build` 和发行验收。分支、提交、可选 Git hooks 与版本管理见 [Git 协作指南](../docs/git-workflow.md)。
+
+当前云端 CI 暂停，使用本地验证。依赖变化和发布前运行 `bun run security:check`；该命令需要联网查询漏洞库。`bun run release:prepare -BundleDir <独立发行目录>` 只生成本地草稿材料，正式发布要求见 [发布流程](../docs/releasing.md) 与 [原生 Windows 验收模板](../docs/release-acceptance-template.md)。
 
 可设置 `PLANET_TEST_FEEDS_LIVE=1` 后运行 `go test . -run TestLiveFollowOlividaHomepage -count=1 -v`，验证从 `https://olivida.eth.limo` 首页发现 RSS、读取文章并保存订阅。该测试只读取公网内容，使用临时资料库，不修改现有订阅；默认测试不访问此站点。
 

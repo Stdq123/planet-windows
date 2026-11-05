@@ -8,10 +8,11 @@ require (
 	github.com/ensdomains/go-ens/v4 v4.0.0
 	github.com/ethereum/go-ethereum v1.17.5
 	github.com/flosch/pongo2/v6 v6.0.0
+	github.com/ipfs/go-cid v0.4.1
 	github.com/mmcdole/gofeed v1.3.0
-	github.com/yuin/goldmark v1.7.13
-	golang.org/x/net v0.59.0
-	golang.org/x/sys v0.48.0
+	github.com/yuin/goldmark v1.7.17
+	golang.org/x/net v0.62.0
+	golang.org/x/sys v0.49.0
 )
 
 require (
@@ -35,7 +36,6 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/holiman/uint256 v1.3.2 // indirect
-	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
 	github.com/minio/sha256-simd v1.0.1 // indirect
@@ -60,7 +60,7 @@ require (
 	go.opentelemetry.io/otel v1.41.0 // indirect
 	go.opentelemetry.io/otel/metric v1.41.0 // indirect
 	go.opentelemetry.io/otel/trace v1.41.0 // indirect
-	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 	lukechampine.com/blake3 v1.3.0 // indirect

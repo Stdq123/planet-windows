@@ -29,6 +29,24 @@ func TestLineBreakMatchesPlanetRendering(t *testing.T) {
 	}
 }
 
+func TestMarkdownRejectsEncodedAndAutomaticScriptURLs(t *testing.T) {
+	for _, source := range []string{
+		`[click](&#106;avascript:alert(1))`,
+		`<javascript:alert(document.domain)>`,
+		`![image](&#106;avascript:alert(1))`,
+	} {
+		t.Run(source, func(t *testing.T) {
+			output, err := Markdown(source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(output, `href="javascript:`) || strings.Contains(output, `src="javascript:`) {
+				t.Fatalf("active script URL reached the preview: %s", output)
+			}
+		})
+	}
+}
+
 func TestFootnotesAreRendered(t *testing.T) {
 	html, err := Markdown("Text[^note]\n\n[^note]: Footnote body")
 	if err != nil {

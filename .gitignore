@@ -2,3 +2,23 @@
 .idea/
 .vscode/
 .DS_Store
+
+# Local dependencies and build output (Windows-specific output is ignored below).
+node_modules/
+/dist/
+/build/
+coverage/
+*.log
+
+# Local credentials and private Planet backups.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.planet/
+
+# Optional in-repository worktrees.
+/.worktrees/

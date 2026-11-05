@@ -7,6 +7,10 @@
     "build": "powershell -NoProfile -File scripts/build-release.ps1",
     "generate": "mygo generate",
     "test": "bun test",
+    "check": "powershell -NoProfile -File ../scripts/check.ps1",
+    "release:check": "bun ../scripts/release-metadata.ts --release",
+    "release:prepare": "powershell -NoProfile -File ../scripts/prepare-release.ps1",
+    "security:check": "powershell -NoProfile -File ../scripts/security-check.ps1",
     "dev:web": "vite",
     "build:web": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit"

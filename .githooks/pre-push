@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+repo_root=$(git rev-parse --show-toplevel)
+# Use Windows PowerShell, which is also used by the application's build scripts.
+exec powershell.exe -NoProfile -File "$repo_root/scripts/check.ps1"
