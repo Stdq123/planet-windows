@@ -41,6 +41,34 @@ export interface Config {
   highestSHA256?: string;
 }
 
+export interface DashboardEntry {
+  id: string;
+  siteId: string;
+  siteName: string;
+  title: string;
+  modified: string;
+}
+
+export interface DashboardSite {
+  id: string;
+  name: string;
+  articleCount: number;
+  draftCount: number;
+  lastPublished?: string;
+  hasPublished: boolean;
+  publishPending: boolean;
+}
+
+export interface DashboardSnapshot {
+  siteCount: number;
+  articleCount: number;
+  draftCount: number;
+  unreadCount: number;
+  sites: DashboardSite[];
+  recentArticles: DashboardEntry[];
+  recentDrafts: DashboardEntry[];
+}
+
 export interface DeploymentInfo {
   configured: boolean;
   name: string;
@@ -307,6 +335,9 @@ export const Library = {
   },
   createSite(name: string, about: string): Promise<Site> {
     return call("Library.CreateSite", name, about);
+  },
+  dashboard(): Promise<DashboardSnapshot> {
+    return call("Library.Dashboard");
   },
   deleteArticle(siteID: string, articleID: string): Promise<void> {
     return call("Library.DeleteArticle", siteID, articleID);
