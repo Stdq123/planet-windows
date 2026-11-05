@@ -1,5 +1,5 @@
 version: 2
-# Dependency update proposals are enabled independently of the paused build CI.
+# Dependency update proposals are managed separately from build CI.
 updates:
   - package-ecosystem: github-actions
     directory: /

@@ -1,4 +1,4 @@
-# Online advisory lookups run locally; no GitHub Actions job is started.
+# Run online advisory lookups; this script does not dispatch GitHub Actions.
 [CmdletBinding()]
 param()
 $ErrorActionPreference = 'Stop'
