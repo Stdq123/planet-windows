@@ -1,4 +1,4 @@
-; MyGo 0.7.3 unconditionally follows this hook with RMDir /r "$INSTDIR".
+; MyGo 0.7.4 unconditionally follows this hook with RMDir /r "$INSTDIR".
 ; Remove only known payload files, then point that recursive operation at a
 ; nonexistent child of NSIS's private plugin directory, never the install path.
 ; Unrecognized files and nonempty directories are intentionally preserved.

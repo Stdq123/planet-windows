@@ -21,5 +21,6 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` a
 
 ### Changed
 
+- Updated the MyGo desktop framework, frontend runtime and build CLI together to 0.7.4, with the installer safety hook re-audited for that version.
 - Windows CI uses the shared checks and pinned action revisions; cloud execution is paused and automatic triggers are disabled at the maintainer's request.
 - Repository defaults now specify UTF-8 and consistent line endings, and exclude local credentials, Planet backup directories and build output from new commits.

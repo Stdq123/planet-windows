@@ -4,6 +4,12 @@
 
 ## 构建和静态校验
 
+当前已审查的 MyGo Go 模块及 CLI 版本为 `0.7.4`。上游 [NSIS 模板](https://github.com/egoist/mygo/blob/v0.7.4/cmd/mygo/nsis.go) 仍在 `customUnInstall` 后执行 `RMDir /r "$INSTDIR"`，现有 hook 的目录重定向保护继续适用。升级只更新精确版本检查，不移除重新审查要求；最终交付包仍由本仓库的安全安装器脚本构建。
+
+2026-11-05 的升级验证包括：冻结锁文件安装、生成绑定无差异、本地安全扫描、Windows 原生构建、10 项安装内容哈希一致，以及合成安装包的正常接受/篡改拒绝测试。隔离资料库中的真实窗口通过启动、中文表单输入、本地站点创建和退出检查；测试数据未提交。检查应用互斥锁的单元测试应在测试应用退出后执行。
+
+本次开发安装包 SHA-256 为 `1d4a8cb66be5e34b6c1dd7d18bb3c2d9fd89f479a5418cbf928251f71e9c683e`。这次升级不是正式发布；未签名、Kubo 许可待审和完整原生安装/升级/卸载验收的限制仍然适用。
+
 在 `windows/` 目录运行 `bun run build`，构建结束会打印唯一发行目录 `.mygo/releases/<GUID>/windows-amd64/`，检查通过后还会同步到固定的 `build/windows-amd64/`；两个目录均包含独立安装器和所需 payload。MyGo 默认生成的安装器因进程关闭和目录处理行为不能作为交付包。`prepare-kubo.ps1` 验证固定 Kubo 包的 SHA-512；MyGo 的前端构建命令会调用 `prepare-notices.ps1`，从 Windows/amd64 构建依赖及 `mygo-runtime` 生成 `LICENSE-PLANET.txt`、`THIRD-PARTY-NOTICES.txt` 和 `KUBO-BUILDINFO.txt`，并校验及复制 `KUBO-DEPENDENCY-LICENSES.txt`。
 
 ```powershell
