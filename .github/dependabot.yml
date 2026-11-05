@@ -1,11 +1,11 @@
 version: 2
-# Dependabot runs separately from normal Actions. Keep updates paused with CI.
+# Dependency update proposals are enabled independently of the paused build CI.
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 3
     rebase-strategy: disabled
     commit-message:
       prefix: chore
@@ -13,7 +13,7 @@ updates:
     directory: /windows
     schedule:
       interval: weekly
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 3
     rebase-strategy: disabled
     commit-message:
       prefix: chore
@@ -21,7 +21,7 @@ updates:
     directory: /windows
     schedule:
       interval: weekly
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 3
     rebase-strategy: disabled
     commit-message:
       prefix: chore
