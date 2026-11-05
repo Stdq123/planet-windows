@@ -1,23 +1,27 @@
 version: 2
+# Dependabot runs separately from normal Actions. Keep updates paused with CI.
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0
+    rebase-strategy: disabled
     commit-message:
       prefix: chore
   - package-ecosystem: gomod
     directory: /windows
     schedule:
       interval: weekly
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0
+    rebase-strategy: disabled
     commit-message:
       prefix: chore
   - package-ecosystem: bun
     directory: /windows
     schedule:
       interval: weekly
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0
+    rebase-strategy: disabled
     commit-message:
       prefix: chore

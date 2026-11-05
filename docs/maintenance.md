@@ -4,6 +4,8 @@
 
 以本地验证为准，云端 CI 按维护者要求暂停。工作流文件仅保留 `workflow_dispatch`，远端 Windows checks 当前为 `disabled_manually`。不得自动恢复 push、PR、schedule 触发，也不要启用会自动运行的 CodeQL 默认配置。恢复云端 CI 需要维护者另行决定。
 
+仓库级 Actions 开关也已关闭。Dependabot 的动态更新任务独立于普通工作流开关，因此各生态的 `open-pull-requests-limit` 均设为 `0`，并禁用自动 rebase；安全更新自动 PR 也保持关闭。恢复依赖自动更新同样需要维护者决定。合并基础配置时意外启动的任务已结束，不能将此记录为从未发生过云端运行。
+
 维护入口是 [Git 协作指南](git-workflow.md)、[本地发布流程](releasing.md) 和 [验收模板](release-acceptance-template.md)。维护人通过 [CODEOWNERS](../.github/CODEOWNERS) 路由；尚无第二名维护者时不要求无法完成的独立批准。
 
 ## GitHub 服务端状态（2026-11-05 核验）
