@@ -47,17 +47,17 @@ Windows x64, WebView2 Runtime, Bun and Go 1.27.3 or a compatible toolchain are r
 ```powershell
 cd windows
 bun install --frozen-lockfile
-bun test
-go test ./...
-bun run typecheck
+bun run check
 bun run build
 ```
 
 The build downloads Kubo 0.38.2 from its official release and verifies its SHA-512 checksum before packaging it. The build prints the release directory under `windows/.mygo/releases/<build-id>/windows-amd64/`. Default tests run without publishing to IPFS. See the optional Kubo, online and template tests in the [Windows guide](windows/README.md).
 
+`bun run check` is the shared local and CI entry point for Go formatting, static analysis, frontend and Go tests, TypeScript checks and the frontend production build. It stops on the first failure. Installer validation remains part of `bun run build` and the release audits.
+
 ## Contributing and support
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). For bugs and feature requests, use the [GitHub issue tracker](https://github.com/Stdq123/planet-windows/issues). For security concerns, see [SECURITY.md](SECURITY.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md), the [Git workflow guide (Chinese)](docs/git-workflow.md), [CHANGELOG.md](CHANGELOG.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). For bugs and feature requests, use the [GitHub issue tracker](https://github.com/Stdq123/planet-windows/issues). For security concerns, see [SECURITY.md](SECURITY.md).
 
 The source snapshot is also available on [Gitea](https://gitea.com/puremixai/planet-windows) and [Codeberg](https://codeberg.org/puremixai/planet-windows). GitHub is the preferred place for collaboration. These are independent repositories; synchronization is manual.
 

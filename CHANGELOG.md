@@ -1,0 +1,17 @@
+# Changelog
+
+User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` and an immutable `vMAJOR.MINOR.PATCH` Git tag. Earlier development snapshots are described in the [Windows guide](windows/README.md); this file does not reconstruct unverified release dates.
+
+## [Unreleased]
+
+### Added
+
+- A single `bun run check` command for Go formatting and static analysis, frontend and Go tests, TypeScript checks and the frontend production build.
+- Optional Git hooks to catch staged whitespace errors before commits and run the shared checks before pushes.
+- A Chinese Git workflow guide covering branches, focused commits, pull requests, versioning and mirror synchronization.
+- Weekly dependency update proposals for GitHub Actions, Go modules and Bun packages.
+
+### Changed
+
+- Windows CI now uses the same checks as local development, includes the frontend production build, and cancels superseded runs.
+- Repository defaults now specify UTF-8 and consistent line endings, and exclude local credentials, Planet backup directories and build output from new commits.
