@@ -25,3 +25,8 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` a
 - Updated the MyGo desktop framework, frontend runtime and build CLI together to 0.7.4, with the installer safety hook re-audited for that version.
 - Windows CI uses shared quality and dependency security checks with pinned action revisions, and runs automatically on pull requests and pushes to main.
 - Repository defaults now specify UTF-8 and consistent line endings, and exclude local credentials, Planet backup directories and build output from new commits.
+
+### Fixed
+
+- Platinum template verification accepts LF and CRLF stylesheets while still rejecting changed content, so clean Git checkouts can use the bundled template.
+- Service configuration accepts Windows short directory names while continuing to reject symbolic links and junctions in configuration paths.
