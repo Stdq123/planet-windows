@@ -1,0 +1,3 @@
+#!/bin/sh
+# Check exactly what will be committed, including partially staged files.
+exec git diff --cached --check

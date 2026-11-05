@@ -1,26 +1,38 @@
 name: Windows checks
 on:
   push:
+    branches:
+      - main
   pull_request:
   workflow_dispatch:
+
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: windows-latest
+    timeout-minutes: 30
     defaults:
       run:
+        shell: powershell
         working-directory: windows
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@v5
         with:
           go-version-file: windows/go.mod
           cache-dependency-path: windows/go.sum
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.5
-      - run: bun install --frozen-lockfile
-      - run: bun test
-      - run: go test ./...
-      - run: bun run typecheck
+          bun-version: '1.3.5'
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+      - name: Run shared quality checks
+        run: bun run check
