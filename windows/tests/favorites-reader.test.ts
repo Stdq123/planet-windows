@@ -1,3 +1,4 @@
+import { enterFirstSite } from "./site-workflow";
 import { expect, test } from "bun:test";
 import { Window } from "happy-dom";
 
@@ -37,7 +38,7 @@ async function fixture(options: { starred?: boolean; offline?: boolean; beforeSt
       default:throw new Error(`Unexpected call: ${method}`);
     }
   }};
-  await import(`../src/main.ts?favorite-reader-${++serial}`);
+  await import(`../src/main.ts?favorite-reader-${++serial}`); enterFirstSite(window);
   const $ = <T extends HTMLElement = HTMLElement>(selector:string) => window.document.querySelector<T>(selector)!;
   const pick = (index:number) => {
     window.document.querySelectorAll<HTMLButtonElement>("#subscriptions .site-item")[index]!.click();

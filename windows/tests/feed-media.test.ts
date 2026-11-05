@@ -1,3 +1,4 @@
+import { enterFirstSite } from "./site-workflow";
 import { expect, test } from "bun:test";
 import { Window, type Document } from "happy-dom";
 
@@ -21,7 +22,7 @@ async function openArticle(overrides: Record<string, any> = {}, subscription: Re
       default:throw new Error(`Unexpected call ${method}`);
     }
   }};
-  await import(`../src/main.ts?feed-media-${++serial}`);
+  await import(`../src/main.ts?feed-media-${++serial}`); enterFirstSite(window);
   for(let i=0;i<100 && !window.document.querySelector("#subscriptions .site-item");i++) await Bun.sleep(10);
   window.document.querySelector<HTMLButtonElement>("#subscriptions .site-item")!.click();
   window.document.querySelector<HTMLButtonElement>(".article-item")!.click();

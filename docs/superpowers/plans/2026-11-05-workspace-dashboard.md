@@ -9,7 +9,7 @@
 
 ## Global Constraints
 
-- No new dependencies; preserve existing light theme and Windows system fonts.
+- No new dependencies; use the revised navy/amber overview design and Windows system fonts.
 - Metadata only; exclude removed/deleting sites; at most six recent drafts and articles.
 - No fabricated metrics or automatic external analytics queries.
 - Preserve unsaved edits, latest-request ownership, safe text rendering and keyboard access.
@@ -25,20 +25,29 @@
 
 ## Task 1: Metadata snapshot
 
-- [ ] Add failing store tests for totals, exclusions, ordering, limits and no body serialization.
-- [ ] Implement Store.Dashboard() DashboardSnapshot in internal/store/dashboard.go; expose Library.Dashboard() (store.DashboardSnapshot, error) in dashboard.go.
-- [ ] Run go test ./internal/store -run Dashboard and regenerate MyGo bindings.
-- [ ] Commit the verified API increment.
+- [x] Add failing store tests for totals, exclusions, ordering, limits and no body serialization.
+- [x] Implement Store.Dashboard() DashboardSnapshot in internal/store/dashboard.go; expose Library.Dashboard() (store.DashboardSnapshot, error) in dashboard.go.
+- [x] Run go test ./internal/store -run Dashboard and regenerate MyGo bindings.
+- [x] Commit the verified API increment.
 
 ## Task 2: Dashboard view and navigation
 
-- [ ] Add dashboard module tests for loading/error/retry, recent row actions, analytics state and stale responses.
-- [ ] Implement src/dashboard.ts, src/dashboard.css, semantic markup and navigation wiring in main.ts/index.html. Entry defaults to overview; existing tests explicitly enter the site workflow they exercise.
-- [ ] Add integration tests for startup, cross-site draft/article entry, navigation races and unsaved-edit guards.
-- [ ] Run focused Bun suites, then bun run check. Commit the feature with CHANGELOG entry.
+- [x] Add dashboard module tests for loading/error/retry, recent row actions, analytics state and stale responses.
+- [x] Implement src/dashboard.ts, src/dashboard.css, semantic markup and navigation wiring in main.ts/index.html. Entry defaults to overview; existing tests explicitly enter the site workflow they exercise.
+- [x] Add integration tests for startup, cross-site draft/article entry, navigation races and unsaved-edit guards.
+- [x] Run focused Bun suites, then bun run check. Commit the feature with CHANGELOG entry.
 
 ## Task 3: Verification and delivery
 
-- [ ] Review the complete branch independently; address substantive findings with regression coverage.
-- [ ] Verify the native desktop empty/populated/error views and narrow layout using an isolated profile. Capture evidence.
-- [ ] Push, create PR, wait for mandatory CI, merge and sync main; confirm main CI.
+- [x] Review the complete branch independently; address substantive findings with regression coverage.
+- [x] Verify populated/empty/error states, narrow layouts, focus and increased scale in Edge; build the native app. The first native empty-state inspection passed; subsequent desktop interaction was stopped by the user. Keep that scope explicit in the verification record.
+Delivery: push the branch, open a PR, require passing CI, merge and sync main, then confirm main CI. The PR and Actions runs record delivery status.
+
+## Verification record
+
+- `bun run check`: 133 frontend tests pass; Go tests, formatting, vet, TypeScript and production build pass.
+- Independent review caught two navigation/read-status races, both reproduced in failing tests and fixed. The visual revision received a further independent review with no findings.
+- Edge rendering at 1440, 1280 and 860 CSS pixels: no horizontal overflow; draft navigation, analytics configuration feedback and empty-workspace create action pass. Static/hover clip audit reports zero clipped or hidden targets.
+- 125% and 150% browser zoom have no horizontal overflow. Keyboard focus is visible and Enter opens the selected-site editor. Actual Chinese font use was verified as Microsoft YaHei, with Segoe UI numerals.
+- `bun run build` passes the native bundle and installer payload audit. The installer was not installed as part of this feature verification.
+- Browser preview data is synthetic. Native desktop interaction beyond the initial empty view was stopped; no real account, publishing or installation acceptance is claimed.
