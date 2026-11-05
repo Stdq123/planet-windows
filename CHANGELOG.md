@@ -14,7 +14,7 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` a
 - A single `bun run check` command for Go formatting and static analysis, frontend and Go tests, TypeScript checks and the frontend production build.
 - Optional Git hooks to catch staged whitespace errors before commits and run the shared checks before pushes.
 - A Chinese Git workflow guide covering branches, focused commits, pull requests, versioning and mirror synchronization.
-- Dependency update configuration for GitHub Actions, Go modules and Bun packages, paused while cloud automation is disabled.
+- Weekly dependency update proposals for GitHub Actions, Go modules and Bun packages, with up to three open version-update PRs per ecosystem, plus security-update PRs for supported dependencies. Updates require local verification and manual merging while build CI remains paused.
 - Local release preparation with version/Changelog checks, explicit draft notes, installer SHA-256, audit results and a source-checkout record.
 - Local Bun and Go vulnerability checks, plus documented native Windows release acceptance and recovery requirements.
 - Main-branch and release-tag protection rules, maintainer routing and private security-report guidance.

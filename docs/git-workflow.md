@@ -60,7 +60,7 @@ hook 由 Git for Windows 执行，检查脚本使用 Windows PowerShell。取消
 
 完成检查后推送任务分支并在 GitHub 创建 PR。使用仓库 PR 模板说明问题、修改后的行为、检查结果和限制。新增可见行为时同步更新 [CHANGELOG](../CHANGELOG.md) 的 `Unreleased`，按 Added、Changed、Fixed、Deprecated、Removed、Security 分类。破坏兼容性的改动写出迁移方法。
 
-当前按维护者要求暂停云端 CI：工作流仅保留手动触发，远端工作流保持停用。PR 中记录本地 `bun run check` 的结果；恢复自动检查需要另行决定。Dependabot 更新提议需要正常审查及本地检查，不会自动合并；Bun 与 MyGo 相关包升级需要检查兼容性。依赖支持参见 [Dependabot 文档](https://docs.github.com/en/code-security/reference/supply-chain-security/supported-ecosystems-and-repositories)。
+当前按维护者要求暂停云端构建 CI：工作流仅保留手动触发，远端工作流保持停用。PR 中记录本地 `bun run check` 的结果；恢复自动构建检查需要另行决定。Dependabot 版本及安全更新提议已获独立授权开启：版本检查每周执行，每生态最多保留 3 个版本更新 PR；自动 rebase 和自动合并保持关闭。更新提议需要正常审查及本地检查；Bun 与 MyGo 相关包升级需要检查兼容性。依赖支持参见 [Dependabot 文档](https://docs.github.com/en/code-security/reference/supply-chain-security/supported-ecosystems-and-repositories)。
 
 GitHub ruleset 已要求 `main` 通过 PR 合并、解决审查讨论并禁止非快进推送及删除，管理员保留应急通道。当前单人维护不要求独立批准；CI 暂停时不设置必需云端检查。恢复 CI 后先验证实际运行，再添加对应必需检查。配置记录和已核验状态见 [维护标准](maintenance.md)。
 

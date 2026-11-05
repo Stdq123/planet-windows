@@ -4,7 +4,9 @@
 
 以本地验证为准，云端 CI 按维护者要求暂停。工作流文件仅保留 `workflow_dispatch`，远端 Windows checks 当前为 `disabled_manually`。不得自动恢复 push、PR、schedule 触发，也不要启用会自动运行的 CodeQL 默认配置。恢复云端 CI 需要维护者另行决定。
 
-仓库级 Actions 开关也已关闭。Dependabot 的动态更新任务独立于普通工作流开关，因此各生态的 `open-pull-requests-limit` 均设为 `0`，并禁用自动 rebase；安全更新自动 PR 也保持关闭。恢复依赖自动更新同样需要维护者决定。合并基础配置时意外启动的任务已结束，不能将此记录为从未发生过云端运行。
+仓库级 Actions 开关保持关闭。维护者已明确授权独立开启 Dependabot：GitHub Actions、Go modules 和 Bun 每周检查版本，各生态最多保留 3 个版本更新 PR；安全更新自动 PR 对受支持的依赖启用，采用独立于版本更新的数量限制。自动 rebase 保持禁用，不配置自动合并；所有依赖升级仍需本地验证和人工合并。Dependabot 的动态任务可在普通 Actions 关闭时运行，不能将其运行记录视为 Windows 构建 CI 已恢复。
+
+Dependabot 使用标准 GitHub 托管 runner 时不消耗套餐内的 Actions 分钟数，参见 [GitHub 官方说明](https://docs.github.com/en/code-security/concepts/supply-chain-security/dependabot-on-actions)。历史上合并基础配置时曾意外启动 6 个依赖更新任务，随后暂停；现按维护者新指令恢复，保留该历史记录。
 
 维护入口是 [Git 协作指南](git-workflow.md)、[本地发布流程](releasing.md) 和 [验收模板](release-acceptance-template.md)。维护人通过 [CODEOWNERS](../.github/CODEOWNERS) 路由；尚无第二名维护者时不要求无法完成的独立批准。
 
@@ -19,6 +21,9 @@
 | 密钥扫描及推送保护 | 已启用 |
 | 私密漏洞报告 | 已启用 |
 | CodeQL 默认配置 | 未启用，避免触发云端运行 |
+| Dependabot 版本更新 | 已启用，每周检查，每生态最多 3 个未关闭 PR |
+| Dependabot 安全更新 | 已启用，对受支持的依赖自动提出修复 PR |
+| 依赖 PR 自动合并 | 未启用，合并前完成本地验证 |
 
 规则配置分别保存在 [main.json](../.github/rulesets/main.json) 和 [releases.json](../.github/rulesets/releases.json)，便于审查与恢复。它们是配置记录，修改文件本身不修改远端。管理员有应急绕过能力，因此标签不可变仍是维护承诺，不是对管理员的绝对限制。
 
