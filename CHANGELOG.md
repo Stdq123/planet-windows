@@ -31,5 +31,6 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` a
 
 ### Fixed
 
+- Aligned dashboard navigation and page headings, statistic labels and values, article columns, and site/service card content across desktop window sizes.
 - Platinum template verification accepts LF and CRLF stylesheets while still rejecting changed content, so clean Git checkouts can use the bundled template.
 - Service configuration accepts Windows short directory names while continuing to reject symbolic links and junctions in configuration paths.
