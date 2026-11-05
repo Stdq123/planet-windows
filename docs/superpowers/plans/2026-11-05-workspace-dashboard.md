@@ -9,7 +9,7 @@
 
 ## Global Constraints
 
-- No new dependencies; use the revised navy/amber overview design and Windows system fonts.
+- No new dependencies; use the light sidebar and amber overview design with Windows system fonts.
 - Metadata only; exclude removed/deleting sites; at most six recent drafts and articles.
 - No fabricated metrics or automatic external analytics queries.
 - Preserve unsaved edits, latest-request ownership, safe text rendering and keyboard access.
