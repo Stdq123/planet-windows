@@ -178,7 +178,8 @@ func Verify(root string) error {
 		assetsHash = "2a252f1b8643c076b43c38b108bdae2ed95bb4d5ef19719b7fdf4bfda40c34f5"
 	case "9e2e3c5221eb22b0af3a8ec32da25c9e74f5a904883b0732e80b3c0a8ff53bbe":
 		files = platinumFiles
-		assetsHash = "7d8312640591940763ed3040ff5b3dc462cd7703e56d0f3a3e29c5bf6c048566"
+		// Normalize the pinned RSS stylesheet just like the other text assets.
+		assetsHash = "f6a58e4b6de14450e0e811c4f43712579d817b00bef5cb4cf4be41cbf8c04770"
 	case "c86d5d5047c56326478143d5ef4ce6bd9c6de79b9643b72cb394ea4accb75454":
 		files = sepiaFiles
 		assetsHash = "146e7dffea1e9fcca7b3470cbd5d1d9bc710520a4d8de16bb7cccb6544540bd1"
@@ -217,7 +218,7 @@ func verifyAssets(root, expected string) error {
 			return err
 		}
 		ext := strings.ToLower(filepath.Ext(path))
-		if ext == ".css" || ext == ".js" || ext == ".svg" || ext == ".html" || ext == ".json" {
+		if ext == ".css" || ext == ".js" || ext == ".svg" || ext == ".html" || ext == ".json" || ext == ".xsl" {
 			data = bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n"))
 		}
 		hash.Write([]byte(filepath.ToSlash(rel)))

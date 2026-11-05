@@ -7,8 +7,8 @@
 - Keep commits focused; separate mechanical formatting from behavior changes. Use the commit types documented in the workflow guide.
 - Install frontend dependencies with `bun install --frozen-lockfile` from `windows/`. Keep `bun.lock` and `go.sum` tracked.
 - Run `bun run check` from `windows/` for Go formatting, static analysis, frontend and Go tests, TypeScript checks and the frontend production build. CI uses the same entry point.
-- Cloud CI is paused by the maintainer. Keep workflows manual-only and the remote workflow disabled; do not dispatch, enable or add automatic cloud runs without a new request. Record local verification in PRs instead of requiring a missing CI status.
-- Dependabot version and security update PRs are explicitly enabled independently of the paused build CI. Keep weekly version checks capped at three open PRs per ecosystem, automatic rebasing disabled and automatic merging off. Review and verify dependency updates locally before merging.
+- Windows CI is enabled for pull requests and pushes to main, with manual dispatch available. Keep the shared quality checks and dependency security scan passing; do not bypass failures to merge. Preserve read-only permissions, pinned actions, concurrency cancellation and the 30-minute timeout.
+- Dependabot version and security update PRs are enabled. Keep weekly version checks capped at three open PRs per ecosystem, automatic rebasing disabled and automatic merging off. Review and verify dependency updates locally and in CI before merging.
 - Run `bun run security:check` for dependency changes and release preparation; online advisory/tool failures are failures, not a clean audit.
 - Follow `docs/releasing.md` for release preparation. Default output is an unapproved draft; do not bypass metadata, signature or license gates to claim a release is ready.
 - For packaging changes, also run `bun run build` and the relevant checks in `windows/docs/release-audit.md`. The shared check does not validate an installer.

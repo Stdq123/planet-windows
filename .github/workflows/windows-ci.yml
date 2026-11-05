@@ -1,6 +1,9 @@
 name: Windows checks
 on:
-  # Cloud CI is paused. Restore automatic triggers only when explicitly requested.
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -12,6 +15,7 @@ concurrency:
 
 jobs:
   test:
+    name: Windows quality checks
     runs-on: windows-latest
     timeout-minutes: 30
     defaults:
@@ -33,3 +37,5 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Run shared quality checks
         run: bun run check
+      - name: Audit dependencies
+        run: bun run security:check
