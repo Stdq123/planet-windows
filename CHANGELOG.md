@@ -15,8 +15,11 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` a
 - Optional Git hooks to catch staged whitespace errors before commits and run the shared checks before pushes.
 - A Chinese Git workflow guide covering branches, focused commits, pull requests, versioning and mirror synchronization.
 - Weekly dependency update proposals for GitHub Actions, Go modules and Bun packages.
+- Local release preparation with version/Changelog checks, explicit draft notes, installer SHA-256, audit results and a source-checkout record.
+- Local Bun and Go vulnerability checks, plus documented native Windows release acceptance and recovery requirements.
+- Main-branch and release-tag protection rules, maintainer routing and private security-report guidance.
 
 ### Changed
 
-- Windows CI now uses the same checks as local development, includes the frontend production build, and cancels superseded runs.
+- Windows CI uses the shared checks and pinned action revisions; cloud execution is paused and automatic triggers are disabled at the maintainer's request.
 - Repository defaults now specify UTF-8 and consistent line endings, and exclude local credentials, Planet backup directories and build output from new commits.
