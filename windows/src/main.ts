@@ -1,5 +1,6 @@
 import { Library, type Article, type Draft, type Site, type Subscription, type Item, type KuboStatus, type SearchResult, type Builtin } from "./mygo";
 import { initUpdates } from "./updates";
+import { createDashboard } from "./dashboard";
 import release from "../release.json";
 import { refreshDue } from "./auto-refresh";
 import { gatewayKey, planetShareURL, selectedGateway, sitePublicURL } from "./gateway";
@@ -248,6 +249,48 @@ const sepiaFields: Array<[string,string,string]> = [
 ];
 type PublicationState = { running: boolean; pending: boolean; status: "idle" | "published" | "failed"; error: string; changes: number; publishedChanges: number; generation: number };
 const publicationStates = new Map<string, PublicationState>();
+function isDashboard() { return !site && !subscription && !favoritesView && !smartView && !editing; }
+const dashboard = createDashboard($("#dashboard"), {
+  load: Library.dashboard, serviceInfo: Library.serviceInfo, stats: Library.plausibleStatsRange,
+  openSite: id => openDashboardTarget(id),
+  openEntry: (kind, id, entryID) => openDashboardTarget(id, kind, entryID),
+  compose: id => openDashboardTarget(id, "compose"),
+  createSite: () => $("#new-site").click(), importSite: () => importPlanet.click(),
+  unread: () => $("#show-unread").click(), node: () => $("#show-ipfs-status").click(),
+});
+async function openDashboardTarget(siteID: string, kind?: "draft" | "article" | "compose", entryID = "") {
+  if (!canLeave()) return;
+  const revision = ++navigationRevision;
+  try {
+    let target = sites.find(entry => entry.id === siteID);
+    if (!target) {
+      const siteRevision = ++sitesRevision;
+      const loaded = await Library.sites();
+      if (revision !== navigationRevision || siteRevision !== sitesRevision) return;
+      sites = loaded; target = sites.find(entry => entry.id === siteID);
+    }
+    if (!target) throw new Error("站点已移除");
+    const [loadedArticles, loadedDrafts] = await Promise.all([Library.articles(siteID), kind === "draft" ? Library.drafts(siteID) : Promise.resolve([] as Draft[])]);
+    if (revision !== navigationRevision) return;
+    const selectedDraft = loadedDrafts.find(entry => entry.id === entryID), selectedArticle = loadedArticles.find(entry => entry.id === entryID);
+    if (kind === "draft" && !selectedDraft || kind === "article" && !selectedArticle) throw new Error("内容已移除");
+    site = target; articles = loadedArticles; drafts = loadedDrafts; article = null; draft = null;
+    subscription = null; item = null; favoritesView = false; smartView = null; editing = false; dirty = false; draftsView = kind === "draft";
+    clearError(); updateView();
+    if (kind === "draft") { selectDraft(selectedDraft!); title.focus(); }
+    else if (kind === "article") { selectArticle(selectedArticle!); workspaceTitle.tabIndex = -1; workspaceTitle.focus(); }
+    else if (kind === "compose") startArticle();
+    else { workspaceTitle.tabIndex = -1; workspaceTitle.focus(); }
+  } catch (error) { if (revision === navigationRevision) throw error; }
+}
+$("#show-dashboard").addEventListener("click", () => {
+  if (!canLeave()) return;
+  const alreadyHome = isDashboard();
+  navigationRevision++; readerRevision++; previewRevision++;
+  site = null; subscription = null; item = null; article = null; draft = null; articles = []; drafts = [];
+  draftsView = false; favoritesView = false; smartView = null; editing = false; dirty = false;
+  clearError(); updateView(); if (alreadyHome) void dashboard.refresh(); $("#dashboard-title").focus();
+});
 function publicationState(siteID: string): PublicationState {
   let state = publicationStates.get(siteID);
   if (!state) { state = { running: false, pending: false, status: "idle", error: "", changes: 0, publishedChanges: 0, generation: 0 }; publicationStates.set(siteID, state); }
@@ -269,6 +312,7 @@ async function reloadSubscriptions(): Promise<boolean> {
   const revision=++subscriptionsRevision, loaded=await Library.subscriptions();
   if (revision!==subscriptionsRevision) return false;
   subscriptions=loaded;
+  if (isDashboard()) void dashboard.refresh();
   if (subscription) {
     const updated=loaded.find(entry=>entry.url===subscription?.url);
     if (!updated) { subscription=null; item=null; readerRevision++; }
@@ -374,12 +418,19 @@ function renderArticles() {
   }
 }
 let previousMode = "browsing";
-function layoutMode() { return editing ? "editing" : article || item ? "reading" : "browsing"; }
+function layoutMode() { return isDashboard() ? "dashboard" : editing ? "editing" : article || item ? "reading" : "browsing"; }
 window.addEventListener("resize", () => {
   setPostsCollapsed(editing || layoutMode() === "reading" && window.innerWidth < 1100);
 });
 function updateView() {
   const mode = layoutMode();
+  const overview = mode === "dashboard";
+  shell.classList.toggle("dashboard-mode", overview);
+  workspace.hidden = overview;
+  dashboard.setActive(overview);
+  dashboard.setPublicationStatus(publicationStates);
+  $("#show-dashboard").classList.toggle("active", overview);
+  $("#show-dashboard").setAttribute("aria-pressed", String(overview));
   if (mode !== previousMode) {
     setPostsCollapsed(editing || mode === "reading" && window.innerWidth < 1100);
     if (editing) { editorView = "write"; setMetadataOpen(false); }
@@ -489,6 +540,8 @@ function updateView() {
   saveState.title = publication?.error || saveState.textContent;
   $("#metadata-count").textContent = editorTags.size || (draft?.attachments?.length ?? article?.attachments?.length) ? ` · ${editorTags.size} 个标签 / ${draft?.attachments?.length ?? article?.attachments?.length ?? 0} 个附件` : "";
   const notice = $("#library-notice"), retry = $<HTMLButtonElement>("#retry-library");
+  if (overview) $(".dashboard-header").after(notice, errorEl);
+  else { $(".workspace-header").after(notice); workspace.append(errorEl); }
   notice.hidden = !libraryLoading && libraryFailed.length === 0;
   notice.dataset.state = libraryLoading ? "loading" : "error";
   $("#library-message").textContent = libraryLoading ? "正在读取本地内容…" : `${libraryFailed.join("、")}未能加载。已读取的内容仍可使用。`;
@@ -545,6 +598,7 @@ async function setSubscriptionRead(address:string,key:string,value:boolean) {
     const current=subscriptions.find(entry=>entry.url===address)?.feed.items.find(entry=>(entry.key || entry.id || entry.link)===key);
     if(current) current.read=value;
     if(subscription?.url===address && item && (item.key || item.id || item.link)===key) item.read=value;
+    if (isDashboard()) void dashboard.refresh();
   } catch(error) { showError(`保存阅读状态失败：${error instanceof Error ? error.message : String(error)}`); }
   finally {pendingRead.delete(operation);updateView();}
 }
@@ -683,7 +737,7 @@ async function queuePublication(siteID: string, manual = false) {
         if (site?.id === siteID && !state.pending) showError(state.error);
       }
     } while (state.pending);
-  } finally { state.running = false; updateView(); }
+  } finally { state.running = false; updateView(); if (isDashboard()) void dashboard.refresh(); }
 }
 $("#new-site").addEventListener("click", () => { if (canLeave()) { navigationRevision++; editingSiteID=""; form.reset(); $("#site-index-setting").hidden=true;$("#site-avatar-setting").hidden=true;$("#site-identity-settings").hidden=true;$("#site-avatar-result").textContent="";$("#site-settings-result").textContent=""; form.querySelector("h2")!.textContent="创建站点";$("#site-dialog-description").textContent="为你的新空间起个名字。"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="创建站点"; openDialog(dialog); } });
 function updateSiteAvatarPreview(value?:string) {
@@ -1349,7 +1403,6 @@ async function init() {
         if (sitesRevision!==initialSites) return;
         if (navigationRevision===initialNavigation || (!site && sites.length===0)) sites=loaded;
         if (navigationRevision===initialNavigation && !editing && !dirty) {
-          if (!site && sites[0]) site=sites[0];
           if (site && (!article || articleLoadFailures.has(site.id))) {
             const initialSite=site; updateView();
             try { const entries=await Library.articles(initialSite.id); if(navigationRevision===initialNavigation && site?.id===initialSite.id && !editing && !dirty) { articles=entries; articleLoadFailures.delete(initialSite.id); } }

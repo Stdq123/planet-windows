@@ -11,6 +11,7 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` a
 
 ### Added
 
+- An all-sites startup overview with local content totals, recent drafts and articles, publication states, and on-demand IPFS and Plausible access. The overview uses dark navigation, an amber writing area, and a guided empty workspace.
 - A single `bun run check` command for Go formatting and static analysis, frontend and Go tests, TypeScript checks and the frontend production build.
 - Optional Git hooks to catch staged whitespace errors before commits and run the shared checks before pushes.
 - A Chinese Git workflow guide covering branches, focused commits, pull requests, versioning and mirror synchronization.

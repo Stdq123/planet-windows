@@ -1,3 +1,4 @@
+import { enterFirstSite } from "./site-workflow";
 import { expect, test } from "bun:test";
 import { Window } from "happy-dom";
 
@@ -25,7 +26,7 @@ async function fixture(override: (method:string, args:any[])=>unknown = ()=>unde
       default: throw new Error(`Unexpected backend call: ${method}`);
     }
   }};
-  await import(`../src/main.ts?workspace-regression-${++serial}`);
+  await import(`../src/main.ts?workspace-regression-${++serial}`); enterFirstSite(window);
   const $=<T extends Element=HTMLElement>(selector:string)=>window.document.querySelector<T>(selector)!;
   return {window,$,calls};
 }
@@ -79,6 +80,8 @@ test("initial errors are distinct from empty data and can be retried",async()=>{
   expect($("#library-message").textContent).toContain("站点");
   expect($("#library-message").textContent).not.toContain("private path");
   $<HTMLButtonElement>("#retry-library").click();
+  await until(()=>!!$("#sites button"));
+  $<HTMLButtonElement>("#sites button").click();
   await until(()=>$("#site-title").textContent==="Site" && $("#library-notice").hidden===true);
   expect(reads).toBe(2);
 });
