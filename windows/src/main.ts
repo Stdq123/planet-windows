@@ -255,6 +255,7 @@ const dashboard = createDashboard($("#dashboard"), {
   openSite: id => openDashboardTarget(id),
   openEntry: (kind, id, entryID) => openDashboardTarget(id, kind, entryID),
   compose: id => openDashboardTarget(id, "compose"),
+  search: () => $("#show-search").click(),
   createSite: () => $("#new-site").click(), importSite: () => importPlanet.click(),
   unread: () => $("#show-unread").click(), node: () => $("#show-ipfs-status").click(),
 });

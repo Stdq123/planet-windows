@@ -8,6 +8,8 @@
   <link rel="stylesheet" href="./src/layout.css" />
   <link rel="stylesheet" href="./src/fluent.css" />
   <link rel="stylesheet" href="./src/refinement.css" />
+  <link rel="stylesheet" href="./src/design-tokens.css" />
+  <link rel="stylesheet" href="./src/navigation.css" />
   <link rel="stylesheet" href="./src/dashboard.css" />
 </head>
 <body>
@@ -35,9 +37,9 @@
         </section>
       </div>
       <div class="sidebar-bottom">
-        <button id="show-ipfs-status" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE774;</span><span class="nav-label">IPFS 节点</span><span class="nav-chevron system-icon" aria-hidden="true">&#xE76C;</span></button>
+        <button id="show-ipfs-status" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE774;</span><span class="nav-label">IPFS 节点</span></button>
         <details class="sidebar-tools">
-          <summary><span class="system-icon" aria-hidden="true">&#xE713;</span><span class="nav-label">工作区工具</span><span class="nav-chevron system-icon" aria-hidden="true">&#xE70D;</span></summary>
+          <summary><span class="system-icon" aria-hidden="true">&#xE713;</span><span class="nav-label">工作区工具</span><span class="nav-chevron system-icon" aria-hidden="true">&#xE70E;</span></summary>
           <div class="sidebar-tools-content">
             <button id="import-planet" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE8B5;</span>导入 .planet 备份</button>
             <button id="show-removed-sites" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE74D;</span>已移除的站点</button>
@@ -52,29 +54,33 @@
     <main id="dashboard" class="dashboard" hidden aria-labelledby="dashboard-title">
       <div class="dashboard-inner">
         <header class="dashboard-header">
-          <div><p class="dashboard-eyebrow">你的创作空间 / 所有站点</p><h1 id="dashboard-title" tabindex="-1">工作区概览</h1></div>
-          <div class="dashboard-actions"><button id="dashboard-refresh" class="secondary dashboard-refresh" type="button"><span class="system-icon" aria-hidden="true">&#xE72C;</span>刷新概览</button><button id="dashboard-create" class="secondary" type="button"><span aria-hidden="true">＋</span> 新建站点</button></div>
+          <h1 id="dashboard-title" tabindex="-1">工作区概览</h1>
+          <div class="dashboard-actions">
+            <button id="dashboard-search" class="secondary dashboard-search" type="button" aria-label="搜索文章" aria-keyshortcuts="Control+f"><span class="system-icon" aria-hidden="true">&#xE721;</span><span>搜索文章</span><kbd aria-hidden="true">Ctrl F</kbd></button>
+            <button id="dashboard-refresh" class="secondary dashboard-refresh" type="button" aria-label="刷新概览" title="刷新概览"><span class="system-icon" aria-hidden="true">&#xE72C;</span></button>
+            <button id="dashboard-create" class="secondary" type="button"><span class="system-icon" aria-hidden="true">&#xE710;</span>新建站点</button>
+            <span class="dashboard-identity" title="内容保存在这台电脑上"><span class="system-icon" aria-hidden="true">&#xE770;</span><span>本地工作区</span></span>
+          </div>
         </header>
         <p id="dashboard-feedback" class="dashboard-feedback" role="status" hidden></p>
         <div id="dashboard-content" hidden>
-          <section class="dashboard-welcome" aria-labelledby="dashboard-welcome-title">
-            <div class="dashboard-welcome-copy">
-              <span class="dashboard-welcome-kicker">为每一个想法，留一片空间</span>
-              <h2 id="dashboard-welcome-title">今天，写点什么？</h2>
-              <p id="dashboard-welcome-description">继续未完成的故事，或记录一个新发现。</p>
-              <div id="dashboard-compose-controls" class="dashboard-compose">
-                <label class="sr-only" for="dashboard-compose-site">写入站点</label><select id="dashboard-compose-site"></select><button id="dashboard-compose" class="primary" type="button"><span class="system-icon" aria-hidden="true">&#xE70F;</span>撰写文章</button>
-              </div>
-              <button id="dashboard-first-site" class="primary" type="button" hidden><span aria-hidden="true">＋</span> 创建第一个站点</button>
-            </div>
-            <img class="dashboard-welcome-art" src="./resources/dashboard-writing.svg" alt="" width="264" height="184" />
-          </section>
           <dl class="dashboard-metrics" aria-label="本地内容统计">
             <div class="dashboard-metric"><dt><span class="dashboard-metric-icon system-icon" aria-hidden="true">&#xE774;</span>我的站点</dt><dd data-count="sites">—</dd></div>
             <div class="dashboard-metric"><dt><span class="dashboard-metric-icon system-icon" aria-hidden="true">&#xE8A5;</span>已保存文章</dt><dd data-count="articles">—</dd></div>
             <div class="dashboard-metric"><dt><span class="dashboard-metric-icon system-icon" aria-hidden="true">&#xE70F;</span>私密草稿</dt><dd data-count="drafts">—</dd></div>
-            <div class="dashboard-metric"><dt><span class="dashboard-metric-icon system-icon" aria-hidden="true">&#xE715;</span><button id="dashboard-unread" type="button">未读文章 <span aria-hidden="true">↗</span></button></dt><dd data-count="unread">—</dd></div>
+            <div class="dashboard-metric"><dt><span class="dashboard-metric-icon system-icon" aria-hidden="true">&#xE715;</span><button id="dashboard-unread" type="button">未读文章</button></dt><dd data-count="unread">—</dd></div>
           </dl>
+          <section class="dashboard-welcome" aria-labelledby="dashboard-welcome-title">
+            <div class="dashboard-welcome-copy">
+              <h2 id="dashboard-welcome-title">开始写作</h2>
+              <p id="dashboard-welcome-description">选择站点，撰写一篇新文章。</p>
+              <div id="dashboard-compose-controls" class="dashboard-compose">
+                <label class="sr-only" for="dashboard-compose-site">写入站点</label><select id="dashboard-compose-site"></select><button id="dashboard-compose" class="primary" type="button"><span class="system-icon" aria-hidden="true">&#xE70F;</span>撰写文章</button>
+              </div>
+              <button id="dashboard-first-site" class="primary" type="button" hidden><span class="system-icon" aria-hidden="true">&#xE710;</span>创建第一个站点</button>
+            </div>
+            <img class="dashboard-welcome-art" src="./resources/dashboard-writing.svg" alt="" width="264" height="184" />
+          </section>
           <section id="dashboard-empty" class="dashboard-empty" hidden aria-labelledby="dashboard-empty-title">
             <div class="dashboard-section-heading"><h2 id="dashboard-empty-title">从这里开始</h2><span class="dashboard-caption">让内容慢慢生长</span></div>
             <ol class="dashboard-start-steps">
@@ -82,20 +88,20 @@
               <li><span aria-hidden="true">02</span><div><h3>写下第一篇文章</h3><p>想法先存为私密草稿，准备好了再分享。</p></div></li>
               <li><span aria-hidden="true">03</span><div><h3>发布到网络</h3><p>通过 IPFS 发布，让你的声音被看见。</p></div></li>
             </ol>
-            <div class="dashboard-import-row"><p>已经有 Planet 站点？接着之前的故事。</p><button id="dashboard-import" class="secondary" type="button">导入 .planet 备份 <span aria-hidden="true">↗</span></button></div>
+            <div class="dashboard-import-row"><p>已经有 Planet 站点？接着之前的故事。</p><button id="dashboard-import" class="secondary" type="button">导入 .planet 备份</button></div>
           </section>
           <div id="dashboard-columns" class="dashboard-columns">
             <div class="dashboard-primary">
               <section class="dashboard-section" aria-labelledby="dashboard-drafts-title">
-                <div class="dashboard-section-heading"><h2 id="dashboard-drafts-title">继续写作<span class="dashboard-heading-dot" aria-hidden="true"></span></h2><span class="dashboard-caption">最近的私密草稿</span></div>
+                <div class="dashboard-section-heading"><h2 id="dashboard-drafts-title">继续写作</h2><span class="dashboard-caption">最近的私密草稿</span></div>
                 <div id="dashboard-drafts" class="dashboard-list dashboard-drafts"></div>
               </section>
               <section class="dashboard-section" aria-labelledby="dashboard-articles-title"><div class="dashboard-section-heading"><h2 id="dashboard-articles-title">最近文章</h2><span class="dashboard-caption">按修改时间</span></div><div id="dashboard-articles" class="dashboard-list"></div></section>
             </div>
             <aside class="dashboard-secondary" aria-label="站点与服务">
               <section class="dashboard-section" aria-labelledby="dashboard-sites-title"><div class="dashboard-section-heading"><h2 id="dashboard-sites-title">站点发布</h2><span class="dashboard-caption">所有站点</span></div><div id="dashboard-sites" class="dashboard-list"></div></section>
-              <section class="dashboard-section dashboard-node"><span class="dashboard-node-icon system-icon" aria-hidden="true">&#xE774;</span><div><h2>IPFS 节点</h2><p class="dashboard-caption">连接、流量与存储</p></div><button id="dashboard-node" class="secondary" type="button" aria-label="查看 IPFS 节点状态"><span aria-hidden="true">↗</span><span class="sr-only">查看状态</span></button></section>
-              <details class="dashboard-section dashboard-analytics"><summary><span class="system-icon" aria-hidden="true">&#xE9D9;</span>访问统计<span class="dashboard-disclosure" aria-hidden="true">＋</span></summary><p class="dashboard-caption">按需查看站点的访问表现</p><div class="dashboard-analytics-body"><label for="dashboard-analytics-site">站点</label><select id="dashboard-analytics-site"></select><label for="dashboard-period">时间范围</label><select id="dashboard-period"><option value="day">今天</option><option value="7d" selected>最近 7 天</option><option value="30d">最近 30 天</option></select><button id="dashboard-query" type="button" class="secondary">查询 Plausible</button><p id="dashboard-analytics-result" role="status">尚未查询</p></div></details>
+              <section class="dashboard-section dashboard-node"><span class="dashboard-node-icon system-icon" aria-hidden="true">&#xE774;</span><div><h2>IPFS 节点</h2><p class="dashboard-caption">连接、流量与存储</p></div><button id="dashboard-node" class="secondary" type="button" aria-label="查看 IPFS 节点状态">查看</button></section>
+              <details class="dashboard-section dashboard-analytics"><summary><span class="system-icon" aria-hidden="true">&#xE9D9;</span>访问统计<span class="dashboard-disclosure system-icon" aria-hidden="true">&#xE70D;</span></summary><p class="dashboard-caption">按需查看站点的访问表现</p><div class="dashboard-analytics-body"><label for="dashboard-analytics-site">站点</label><select id="dashboard-analytics-site"></select><label for="dashboard-period">时间范围</label><select id="dashboard-period"><option value="day">今天</option><option value="7d" selected>最近 7 天</option><option value="30d">最近 30 天</option></select><button id="dashboard-query" type="button" class="secondary">查询 Plausible</button><p id="dashboard-analytics-result" role="status">尚未查询</p></div></details>
             </aside>
           </div>
         </div>

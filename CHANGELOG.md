@@ -22,6 +22,8 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` a
 
 ### Changed
 
+- Refined the all-sites overview with consistent light navigation, core totals before writing actions, an 8px spacing grid, accessible interaction states, and header search.
+
 - Updated RSS, Atom and JSON Feed parsing to gofeed 1.5.0, preserving feeds with long preambles and rejecting invalid null JSON items without crashing.
 - Updated the MyGo desktop framework, frontend runtime and build CLI together to 0.7.4, with the installer safety hook re-audited for that version.
 - Windows CI uses shared quality and dependency security checks with pinned action revisions, and runs automatically on pull requests and pushes to main.

@@ -1,0 +1,19 @@
+/* Shared visual contract for navigation, overview and its entry dialogs. */
+:root {
+  --pw-brand: #f2c94c;
+  --pw-brand-hover: #e6ba35;
+  --pw-brand-active: #d5a728;
+  --pw-accent: #8a641b;
+  --pw-selection: #fff3cc;
+  --pw-canvas: #f4f6f8;
+  --pw-sidebar: #fafbfc;
+  --pw-card: #fff;
+  --pw-ink: #202536;
+  --pw-muted: #616b7d;
+  --pw-line: #e0e5ec;
+  --pw-control-line: #a8b2c2;
+  --pw-hover: #f2f5f8;
+  --pw-active: #e8edf3;
+  --pw-font: "Segoe UI", "Microsoft YaHei", sans-serif;
+  --pw-popover-shadow: 0 8px 16px #20253614;
+}

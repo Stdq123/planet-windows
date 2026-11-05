@@ -16,76 +16,7 @@
 body { color: var(--ink); }
 .shell { min-height: 0; grid-template-columns: 232px 280px minmax(0, 1fr); }
 .shell.posts-collapsed { grid-template-columns: 232px minmax(0, 1fr); }
-.sidebar {
-  --nav-text: #44434b;
-  --nav-muted: #77747e;
-  --nav-line: rgba(116, 111, 125, .16);
-  --focus: #7b6c9e;
-  padding: 26px 14px 12px; border-right: .5px solid var(--nav-line); color: var(--nav-text);
-  overflow: hidden; background: var(--surface-sidebar);
-}
-.brand { gap: 12px; padding: 0 10px 26px; font-size: 20px; font-weight: 600; letter-spacing: -.4px; color: #2e2c34; }
-.planet-mark { width: 34px; height: 34px; }
-.sidebar-scroll { padding: 0 2px 16px; margin: 0 -2px; scrollbar-width: thin; scrollbar-color: #c5c2ca transparent; }
 .articles, .dialog-body { scrollbar-gutter: stable; }
-.nav-section + .nav-section { margin-top: 24px; }
-.sidebar .section-label { min-height: 28px; margin: 0 0 6px; padding: 0 10px; color: var(--nav-muted); }
-.section-label h2 { margin: 0; font-size: 12px; font-weight: 400; line-height: 20px; }
-.sidebar .section-label .icon-button { width: 28px; height: 28px; margin-right: -5px; color: var(--nav-muted); }
-.sidebar .section-label .icon-button:hover { color: #34313c; background: #e9e7ed; }
-.sidebar .section-label .system-icon { font-size: 12px; }
-.sidebar .smart-action, .sidebar .site-item {
-  display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; min-height: 40px;
-  margin: 2px 0; padding: 9px 10px; border: .5px solid transparent; border-radius: 7px;
-  background: transparent; color: var(--nav-text); font-size: 14px; font-weight: 400; line-height: 20px;
-}
-.sidebar .smart-action:hover, .sidebar .site-item:hover { background: #eceae7; color: #29272e; }
-.sidebar .smart-action.active, .sidebar .site-item.active { background: #eeebf3; border-color: #ded8e9; color: #53466f; }
-.smart-action.active::before, .site-item.active::before { content: none; }
-.sidebar .smart-action span { color: inherit; margin: 0; }
-.sidebar .system-icon, .sidebar #show-unread > .system-icon { width: 20px; height: 20px; color: var(--nav-muted); font-size: 16px; margin: 0; }
-.sidebar .active .system-icon { color: #76628d; }
-.sidebar .nav-label { flex: 1; min-width: 0; text-align: left; }
-.sidebar .smart-count, .sidebar .subscription-count {
-  flex: none; min-width: 22px; padding: 0 5px; border-radius: 4px; text-align: center; font-size: 12px;
-  line-height: 20px; color: #77737e; background: #eae8e5; font-variant-numeric: tabular-nums;
-}
-.sidebar .smart-count { margin-left: auto; }
-.sidebar .active .smart-count, .sidebar .active .subscription-count { background: #e2dceb; color: #5a4c74; }
-.sidebar #show-search { margin: 0 0 24px; min-height: 40px; padding: 9px 10px; background: #fff; border: .5px solid #dedbd5; color: #67636d; font-size: 12px; }
-.sidebar #show-search:hover { border-color: #bcb4c6; background: #fff; }
-#show-search kbd { flex: none; border: .5px solid #e3dfda; border-radius: 4px; padding: 0 4px; color: #827b88; font-family: inherit; font-size: 12px; line-height: 20px; }
-.sidebar .site-item { min-height: 48px; }
-.sidebar .site-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 400; line-height: 22px; color: inherit; }
-.sidebar .site-icon, .sidebar .sites .site-item:nth-child(n) .site-icon {
-  width: 28px; height: 28px; border-radius: 6px; background: #e8e5df; color: #78716b; font-size: 12px; font-weight: 400;
-}
-.sidebar .sites .site-item.active .site-icon { background: #dfd7eb; color: #65517f; }
-.sidebar .site-avatar { object-fit: cover; }
-.sidebar .site-error { color: #a36425; font-size: 12px; }
-.sidebar .sites:empty::after { display: block; padding: 10px; color: var(--nav-muted); font-size: 12px; line-height: 20px; }
-#sites:empty::after { content: "点 + 创建第一个站点"; }
-#subscriptions:empty::after { content: "点 + 添加常读的订阅"; }
-.sidebar-bottom { padding-top: 10px; border-top: .5px solid var(--nav-line); }
-.sidebar-bottom #show-ipfs-status, .sidebar-tools summary, .sidebar-tools .sidebar-action {
-  display: flex; align-items: center; gap: 10px; margin: 0; width: 100%; min-height: 38px;
-  padding: 8px 10px; border: 0; border-radius: 7px; color: var(--nav-text); font-size: 12px; font-weight: 400; line-height: 20px;
-}
-.sidebar-bottom #show-ipfs-status:hover, .sidebar-tools summary:hover, .sidebar-tools .sidebar-action:hover { background: #eceae7; color: #29272e; }
-.sidebar-bottom .sidebar-tools { margin: 0; position: relative; }
-.sidebar-tools summary::after, .sidebar-tools[open] summary::after { content: none; }
-.sidebar .nav-chevron { margin-left: auto; font-size: 12px; width: 12px; }
-.sidebar-tools[open] summary .nav-chevron { transform: rotate(180deg); }
-.sidebar-tools-content { position: absolute; z-index: 30; bottom: calc(100% + 6px); left: 0; width: 100%; margin: 0; padding: 4px; border: .5px solid var(--nav-line); border-radius: 11px; background: #fff; max-height: min(380px, 60vh); overflow-y: auto; scrollbar-width: thin; scrollbar-color: #c5c2ca transparent; }
-.sidebar-tools .gateway-setting { margin: 12px 6px 8px; color: var(--nav-muted); }
-.sidebar .gateway-setting legend { color: var(--nav-muted); font-size: 12px; }
-.sidebar .gateway-setting .choice-group { display: grid; grid-template-columns: 1fr; }
-.sidebar .gateway-setting .choice-group label { color: var(--nav-text); background: transparent; border-color: transparent; font-size: 12px; padding: 5px; }
-.sidebar .gateway-setting .choice-group label:has(:checked) { background: #eeebf3; border-color: #ded8e9; color: #53466f; }
-.sidebar .gateway-setting input { accent-color: #65558f; }
-.sidebar-footer { display: flex; align-items: center; gap: 10px; border-top: .5px solid var(--nav-line); margin: 10px 0 0; padding: 14px 10px 2px; color: var(--nav-muted); font-size: 12px; line-height: 20px; }
-.sidebar-footer .version { margin-left: auto; color: var(--nav-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-.sidebar :is(button, summary):focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .posts-panel { min-height: 0; border-right: 1px solid var(--line); }
 .posts-header { min-height: 76px; align-items: center; padding: 22px 20px 14px; }
 .posts-header h1 { margin: 0; font-size: 18px; line-height: 1.4; font-weight: 650; letter-spacing: 0; }
