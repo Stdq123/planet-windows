@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability privately
+    url: https://github.com/Stdq123/planet-windows/security/advisories/new
+    about: Do not disclose vulnerabilities, keys or private backups in public issues.
+  - name: Usage and supported workflows
+    url: https://github.com/Stdq123/planet-windows/blob/main/windows/README.md
+    about: Check installation instructions, supported features and known limitations.
