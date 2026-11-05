@@ -35,22 +35,38 @@ func TestTurningOffNodePersistsAndPreventsAutomaticRestart(t *testing.T) {
 }
 
 func TestNodeControlStartsStopsAndReopensOwnedKubo(t *testing.T) {
-	if os.Getenv("PLANET_TEST_ONLINE") != "1" { t.Skip("online Kubo required") }
+	if os.Getenv("PLANET_TEST_ONLINE") != "1" {
+		t.Skip("online Kubo required")
+	}
 	exe := os.Getenv("PLANET_TEST_KUBO")
-	if exe == "" { t.Skip("Kubo required") }
+	if exe == "" {
+		t.Skip("Kubo required")
+	}
 	root := t.TempDir()
 	mygo.App.SetPath(mygo.PathUserData, root)
 	mygo.App.SetPath(mygo.PathResources, filepath.Dir(exe))
-	t.Cleanup(func(){mygo.App.SetPath(mygo.PathUserData, ""); mygo.App.SetPath(mygo.PathResources, "")})
+	t.Cleanup(func() { mygo.App.SetPath(mygo.PathUserData, ""); mygo.App.SetPath(mygo.PathResources, "") })
 	lib := &Library{}
 	t.Cleanup(lib.closeNode)
-	if err := lib.SetIPFSEnabled(true); err != nil { t.Fatal(err) }
+	if err := lib.SetIPFSEnabled(true); err != nil {
+		t.Fatal(err)
+	}
 	status, err := lib.IPFSStatus()
-	if err != nil || !status.Running || !status.Online || status.Gateway == "" { t.Fatalf("started: %+v %v", status, err) }
-	if err := lib.SetIPFSEnabled(false); err != nil { t.Fatal(err) }
+	if err != nil || !status.Running || !status.Online || status.Gateway == "" {
+		t.Fatalf("started: %+v %v", status, err)
+	}
+	if err := lib.SetIPFSEnabled(false); err != nil {
+		t.Fatal(err)
+	}
 	status, err = lib.IPFSStatus()
-	if err != nil || status.Running || !status.Disabled { t.Fatalf("stopped: %+v %v", status, err) }
-	if err := lib.SetIPFSEnabled(true); err != nil { t.Fatal(err) }
+	if err != nil || status.Running || !status.Disabled {
+		t.Fatalf("stopped: %+v %v", status, err)
+	}
+	if err := lib.SetIPFSEnabled(true); err != nil {
+		t.Fatal(err)
+	}
 	status, err = lib.IPFSStatus()
-	if err != nil || !status.Running || status.Disabled { t.Fatalf("restarted: %+v %v", status, err) }
+	if err != nil || !status.Running || status.Disabled {
+		t.Fatalf("restarted: %+v %v", status, err)
+	}
 }
