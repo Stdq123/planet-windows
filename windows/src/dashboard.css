@@ -1,25 +1,25 @@
-/* Shared dark navigation, with a warm and quiet overview canvas. */
-.shell > .sidebar { --nav-text:#d4d6e0; --nav-muted:#9c9fb1; --nav-line:#ffffff14; --focus:#f2c94c; background:#1a1d2d; border-right:0; padding:32px 16px 16px; font-family:"Segoe UI","Microsoft YaHei",sans-serif; }
-.sidebar .brand { color:#fff; padding:0 8px 32px; gap:12px; font-size:24px; letter-spacing:-.5px; }
+/* Light navigation keeps the amber writing area as the main visual accent. */
+.shell > .sidebar { --nav-text:#414b5b; --nav-muted:#687284; --nav-line:#e4e8ef; --focus:#8a641b; background:#fafbfc; border-right:1px solid var(--nav-line); padding:32px 16px 16px; font-family:"Segoe UI","Microsoft YaHei",sans-serif; }
+.sidebar .brand { color:#252a38; padding:0 8px 32px; gap:12px; font-size:24px; letter-spacing:-.5px; }
 .sidebar .planet-mark { width:32px; height:32px; }
 .sidebar .smart-action,.sidebar .site-item { border:0; border-radius:8px; padding:12px; gap:12px; }
-.sidebar .smart-action:hover,.sidebar .site-item:hover,.sidebar-bottom #show-ipfs-status:hover,.sidebar-tools summary:hover,.sidebar-tools .sidebar-action:hover { color:#fff; background:#ffffff0a; }
-.sidebar .smart-action.active,.sidebar .site-item.active { color:#f2c94c; background:#f2c94c24; }
-.sidebar .active .system-icon { color:#f2c94c; }
-.sidebar .section-label .icon-button:hover { color:#fff; background:#ffffff14; }
+.sidebar .smart-action:hover,.sidebar .site-item:hover,.sidebar-bottom #show-ipfs-status:hover,.sidebar-tools summary:hover,.sidebar-tools .sidebar-action:hover { color:#252a38; background:#eef1f5; }
+.sidebar .smart-action.active,.sidebar .site-item.active { color:#795b15; background:#f9edca; }
+.sidebar .active .system-icon { color:#876215; }
+.sidebar .section-label .icon-button:hover { color:#252a38; background:#eef1f5; }
 .sidebar .section-label { padding:0 12px; }
-.sidebar .smart-count,.sidebar .subscription-count { background:#ffffff0d; color:#b7b9c7; }
-.sidebar .active .smart-count,.sidebar .active .subscription-count { color:#f2c94c; background:#f2c94c14; }
-.sidebar #show-search { margin:8px 0 24px; color:#b7bacb; background:#ffffff08; border-color:#ffffff12; }
-.sidebar #show-search:hover { color:#fff; background:#ffffff0e; border-color:#ffffff26; }
-.sidebar #show-search kbd { color:#a2a5b8; border-color:#ffffff1c; font-size:12px; }
-.sidebar .sites .site-item:nth-child(n) .site-icon { background:#ffffff0d; color:#c5c8d6; }
-.sidebar .sites .site-item.active .site-icon { background:#f2c94c1f; color:#f2c94c; }
-.sidebar .sidebar-scroll { scrollbar-color:#44485b transparent; }
-.sidebar .sidebar-tools-content { background:#24283b; border-color:#ffffff24; }
-.sidebar .gateway-setting .choice-group label:has(:checked) { color:#f2c94c; background:#f2c94c14; border-color:#f2c94c38; }
-.sidebar .gateway-setting input { accent-color:#f2c94c; }
-.sidebar .site-error { color:#ecc27b; }
+.sidebar .smart-count,.sidebar .subscription-count { background:#e9edf2; color:#626c7d; }
+.sidebar .active .smart-count,.sidebar .active .subscription-count { color:#795b15; background:#efe0b6; }
+.sidebar #show-search { margin:8px 0 24px; color:#626c7d; background:#fff; border-color:#dde2e9; }
+.sidebar #show-search:hover { color:#252a38; background:#fff; border-color:#b8c1cf; }
+.sidebar #show-search kbd { color:#687284; border-color:#dfe4eb; font-size:12px; }
+.sidebar .sites .site-item:nth-child(n) .site-icon { background:#e9edf3; color:#607086; }
+.sidebar .sites .site-item.active .site-icon { background:#efe0b6; color:#795b15; }
+.sidebar .sidebar-scroll { scrollbar-color:#c3cad4 transparent; }
+.sidebar .sidebar-tools-content { background:#fff; border-color:#dfe4eb; }
+.sidebar .gateway-setting .choice-group label:has(:checked) { color:#795b15; background:#f9edca; border-color:#e4cc8d; }
+.sidebar .gateway-setting input { accent-color:#8a641b; }
+.sidebar .site-error { color:#9b5e10; }
 .sidebar-footer { padding-top:16px; }
 #show-dashboard { margin-bottom:4px; }
 .shell.dashboard-mode { grid-template-columns:232px minmax(0,1fr); }
