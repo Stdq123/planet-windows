@@ -10,7 +10,7 @@ require (
 	github.com/flosch/pongo2/v6 v6.0.0
 	github.com/ipfs/go-cid v0.4.1
 	github.com/mmcdole/gofeed v1.3.0
-	github.com/yuin/goldmark v1.7.17
+	github.com/yuin/goldmark v1.8.7
 	golang.org/x/net v0.62.0
 	golang.org/x/sys v0.49.0
 )
