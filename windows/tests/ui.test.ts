@@ -34,7 +34,7 @@ test("live article preview includes the current title as text and renders the bo
   expect(frame.srcdoc).not.toContain("<img src=x onerror=alert(1)>");
 });
 
-test("writing mode can hide the article list and restores it when leaving the editor", async () => {
+test("writing mode collapses the article list and allows manual expansion before restoring browsing", async () => {
   const window = new Window({url:"http://localhost/"});
   window.document.write(await Bun.file("index.html").text());
   Object.assign(globalThis, {window, document:window.document});
@@ -52,12 +52,11 @@ test("writing mode can hide the article list and restores it when leaving the ed
   window.document.querySelector<HTMLButtonElement>("#new-article")!.click();
   const toggle = window.document.querySelector<HTMLButtonElement>("#toggle-posts")!;
   const panel = window.document.querySelector<HTMLElement>("#posts-panel")!;
-  expect(toggle.getAttribute("aria-expanded")).toBe("true");
-  toggle.click();
   expect(panel.hidden).toBe(true);
   expect(toggle.getAttribute("aria-expanded")).toBe("false");
   toggle.click();
   expect(panel.hidden).toBe(false);
+  expect(toggle.getAttribute("aria-expanded")).toBe("true");
   toggle.click();
   window.document.querySelector<HTMLButtonElement>("#show-favorites")!.click();
   expect(panel.hidden).toBe(false);
@@ -79,6 +78,7 @@ test("article list presents a safe content summary and guides selection", async 
 
 test("reading layout identifies the real source and header compose opens the existing editor", async () => {
   const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());
+  window.happyDOM.setWindowSize({width:1280,height:800});
   Object.assign(globalThis,{window,document:window.document});
   const site={id:"s",name:"我的真实站点",about:"",created:"2026-01-01T00:00:00Z"};
   const article={id:"a",siteId:"s",title:"真实标题",content:"正文",created:"2026-01-01T00:00:00Z",modified:"2026-01-02T00:00:00Z",tags:{}};
@@ -734,7 +734,7 @@ test("restored site can reload its articles after a temporary read failure", asy
   expect(reads).toBe(2);
 });
 
-test("late create-site list cannot bring a removed site back", async () => {
+test("creating a site locks cancellation and destructive navigation until its list refresh completes", async () => {
   const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});
   const a={id:"a",name:"Old",about:"",created:"2026-01-01T00:00:00Z"},b={id:"b",name:"New",about:"",created:"2026-01-01T00:00:00Z"};
   let removed=false,calls=0,release:(()=>void)|undefined;
@@ -742,8 +742,12 @@ test("late create-site list cannot bring a removed site back", async () => {
     case "Library.Subscriptions":case "Library.Articles":return [];case "Library.CreateSite":return b;case "Library.RemoveSite":removed=true;return;default:throw new Error(method);}}};
   window.confirm=()=>true;await import("../src/main.ts?removed-sites-stale");await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Old");
   window.document.querySelector<HTMLButtonElement>("#new-site")!.click();const form=window.document.querySelector<HTMLFormElement>("#site-form")!;form.querySelector<HTMLInputElement>('input[name="name"]')!.value="New";form.dispatchEvent(new window.Event("submit",{bubbles:true,cancelable:true}));await waitFor(()=>!!release);
-  window.document.querySelector<HTMLButtonElement>("#cancel-site")!.click();window.document.querySelector<HTMLButtonElement>("#remove-site")!.click();await waitFor(()=>removed);
-  release!();await new Promise(r=>setTimeout(r,40));expect(window.document.querySelector("#sites")?.textContent).not.toContain("Old");
+  const dialog=window.document.querySelector<HTMLDialogElement>("#site-dialog")!;
+  expect(window.document.querySelector<HTMLButtonElement>("#cancel-site")!.disabled).toBe(true);
+  window.document.querySelector<HTMLButtonElement>("#cancel-site")!.click();window.document.querySelector<HTMLButtonElement>("#remove-site")!.click();
+  const escape=new window.Event("cancel",{cancelable:true});dialog.dispatchEvent(escape);
+  expect(escape.defaultPrevented).toBe(true);expect(dialog.open).toBe(true);expect(removed).toBe(false);
+  release!();await waitFor(()=>!dialog.open);expect(window.document.querySelector("#sites")?.textContent).toContain("New");
 });
 
 test("new site remains selectable if another site's publication finishes during its list refresh", async () => {

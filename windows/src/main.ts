@@ -4,6 +4,10 @@ import release from "../release.json";
 import { refreshDue } from "./auto-refresh";
 import { gatewayKey, planetShareURL, selectedGateway, sitePublicURL } from "./gateway";
 import { localGatewayResource } from "./local-gateway";
+import { hasDialogChanges, openDialog, prepareChoices, prepareDialogs, readingStyles, rememberDialog } from "./ui";
+
+prepareChoices(document);
+prepareDialogs(document);
 
 const $ = <T extends HTMLElement>(selector: string): T => {
   const element = document.querySelector<T>(selector);
@@ -41,20 +45,48 @@ const copyStatus = $("#copy-status");
 const publicGateway = $<HTMLSelectElement>("#public-gateway"), copyPublishedURL = $<HTMLButtonElement>("#copy-published-url");
 const workspaceMenu = $<HTMLDetailsElement>("#workspace-menu");
 const postsPanel = $("#posts-panel"), shell = $(".shell"), togglePosts = $<HTMLButtonElement>("#toggle-posts");
+const workspace = $(".workspace"), metadata = $("#editor-metadata"), metadataToggle = $("#toggle-metadata");
+let editorView: "write" | "preview" | "split" = "write";
+function syncEditorView() {
+  const canSplit = workspace.clientWidth >= 960;
+  const view = editorView === "split" && !canSplit ? "write" : editorView;
+  editor.dataset.view = view;
+  $("#writing-pane").hidden = view === "preview";
+  $("#preview-pane").hidden = view === "write";
+  $("#view-split").hidden = !canSplit;
+  for (const choice of ["write", "preview", "split"]) $("#view-" + choice).setAttribute("aria-pressed", String(view === choice));
+}
+for (const choice of ["write", "preview", "split"] as const) $("#view-" + choice).addEventListener("click", () => { editorView = choice; syncEditorView(); });
+function setMetadataOpen(open: boolean) {
+  metadata.hidden = !open; metadataToggle.setAttribute("aria-expanded", String(open));
+}
+metadataToggle.addEventListener("click", () => setMetadataOpen(!!metadata.hidden));
+new window.ResizeObserver(syncEditorView).observe(workspace);
 function setPostsCollapsed(collapsed: boolean) {
   postsPanel.hidden = collapsed;
   shell.classList.toggle("posts-collapsed", collapsed);
   togglePosts.setAttribute("aria-expanded", String(!collapsed));
   const label = collapsed ? "展开文章列表" : "收起文章列表";
   togglePosts.setAttribute("aria-label", label); togglePosts.title = label;
+  syncEditorView();
 }
 togglePosts.addEventListener("click", () => setPostsCollapsed(!postsPanel.hidden));
-workspaceMenu.addEventListener("click", event => {
-  if (event.target instanceof window.HTMLButtonElement && !event.target.disabled) workspaceMenu.open = false;
-});
-document.addEventListener("click", event => {
-  if (!workspaceMenu.contains(event.target as Node)) workspaceMenu.open = false;
-});
+for (const menu of [workspaceMenu, $<HTMLDetailsElement>(".sidebar-tools")]) {
+  menu.addEventListener("click", event => {
+    if (event.target instanceof window.HTMLButtonElement && !event.target.disabled) menu.open = false;
+  });
+  document.addEventListener("click", event => {
+    if (!menu.contains(event.target as Node)) menu.open = false;
+  });
+  window.addEventListener("keydown", event => {
+    if (event.key === "Escape" && menu.open && !document.querySelector("dialog[open]")) {
+      menu.open = false; menu.querySelector("summary")!.focus();
+    }
+  });
+}
+const publicationDialog = $<HTMLDialogElement>("#publication-dialog");
+$("#show-publication").addEventListener("click", () => openDialog(publicationDialog));
+$("#close-publication").addEventListener("click", () => publicationDialog.close());
 
 const ipfsDialog = $<HTMLDialogElement>("#ipfs-status-dialog"), ipfsRefresh = $<HTMLButtonElement>("#refresh-ipfs-status");
 const ipfsToggle = $<HTMLButtonElement>("#toggle-ipfs"), ipfsOpenSite = $<HTMLAnchorElement>("#ipfs-open-site");
@@ -127,7 +159,7 @@ async function refreshIPFSStatus(includeRepo = false) {
     if (revision === ipfsStatusRevision && ipfsDialog.open) { ipfsStatus=null; updateIPFSResource(); $("#ipfs-gateway").textContent="—"; ipfsOpenSite.hidden=true; ipfsOpenSite.removeAttribute("href"); $("#ipfs-status-message").textContent = `读取失败：${error instanceof Error ? error.message : String(error)}`; }
   } finally { if (revision === ipfsStatusRevision) { ipfsRefresh.disabled = false; ipfsToggle.disabled = !ipfsStatus; ipfsGC.disabled=!ipfsStatus?.running; if(ipfsDialog.open) ipfsTimer=setTimeout(()=>void refreshIPFSStatus(),5000); } }
 }
-$("#show-ipfs-status").addEventListener("click", () => { ipfsDialog.showModal(); void refreshIPFSStatus(true); });
+$("#show-ipfs-status").addEventListener("click", () => { openDialog(ipfsDialog); void refreshIPFSStatus(true); });
 ipfsRefresh.addEventListener("click", () => void refreshIPFSStatus(true));
 ipfsGC.addEventListener("click",async()=>{
   if(ipfsGC.disabled || !ipfsStatus?.running)return;
@@ -171,6 +203,8 @@ let drafts: Draft[] = [], draft: Draft | null = null, draftsView = false;
 let subscriptions: Subscription[] = [], subscription: Subscription | null = null, item: Item | null = null;
 let subscriptionsRevision = 0;
 let editing = false, dirty = false, saving = false, previewRevision = 0, previewTimer: ReturnType<typeof setTimeout> | undefined;
+let libraryLoading = false, libraryFailed: string[] = [];
+let refreshTimer: ReturnType<typeof setInterval> | undefined;
 let editorTags=new Map<string,string>(), savedTagSignature="[]";
 
 function tagSignature(): string { return JSON.stringify([...editorTags.entries()].sort(([a],[b])=>a.localeCompare(b))); }
@@ -187,11 +221,11 @@ function addEditorTag() {
   editorTags.set(key,value);tagInput.value="";dirty=true;navigationRevision++;clearError();updateView();
 }
 addTag.addEventListener("click",addEditorTag);
-tagInput.addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();addEditorTag();}});
+tagInput.addEventListener("keydown",event=>{if(event.key==="Enter" && !event.isComposing && event.keyCode!==229){event.preventDefault();addEditorTag();}});
 tagInput.addEventListener("input",()=>{dirty=true;navigationRevision++;updateView();});
 function pendingTagBlocksSave(): boolean {
   if (!tagInput.value.trim()) return false;
-  showError("请先添加标签，或清空标签输入框后再保存。");tagInput.focus();return true;
+  setMetadataOpen(true); showError("请先添加标签，或清空标签输入框后再保存。");tagInput.focus();return true;
 }
 let navigationRevision = 0, favoritesView = false, readerRevision = 0;
 let smartView: "today" | "unread" | null = null;
@@ -268,6 +302,8 @@ function renderSites() {
   sitesEl.replaceChildren();
   for (const item of sites) {
     const button = document.createElement("button"); button.className = `site-item${item.id === site?.id ? " active" : ""}`;
+    button.setAttribute("aria-pressed", String(item.id === site?.id));
+    button.title = item.name;
     if(item.avatarPng){const avatar=document.createElement("img");avatar.className="site-icon site-avatar";avatar.alt="";avatar.src=`data:image/png;base64,${item.avatarPng}`;button.append(avatar);}else { const icon=label("span", Array.from(item.name.trim())[0] || "P", "site-icon"); icon.setAttribute("aria-hidden","true"); button.append(icon); }
     button.append(label("span", item.name, "site-name"));
     button.addEventListener("click", () => void selectSite(item)); sitesEl.append(button);
@@ -277,9 +313,12 @@ function renderSubscriptions() {
   subscriptionsEl.replaceChildren();
   for (const entry of subscriptions) {
     const button = document.createElement("button"); button.className = `site-item${!favoritesView && !smartView && entry.url === subscription?.url ? " active" : ""}`;
+    button.setAttribute("aria-pressed", String(!favoritesView && !smartView && entry.url === subscription?.url));
     const sourceName=entry.feed.title || entry.url;
     const icon=label("span", Array.from(sourceName.trim())[0] || "P", "site-icon"); icon.setAttribute("aria-hidden","true");
     button.append(icon, label("span", sourceName, "site-name"));
+    const unread = entry.feed.items.filter(item => !item.read).length;
+    if (unread) { const badge = label("span", String(unread), "subscription-count"); badge.setAttribute("aria-label", `${unread} 篇未读`); button.append(badge); }
     if (entry.lastError) { const warning=label("span", "!", "site-error"); warning.setAttribute("aria-label", "更新失败"); button.append(warning); }
     button.title = entry.lastError ? `更新失败：${entry.lastError}` : entry.pinnedCid ? "已固定到本机" : entry.url;
     button.addEventListener("click", () => selectSubscription(entry)); subscriptionsEl.append(button);
@@ -328,14 +367,25 @@ function renderArticles() {
   articlesEl.replaceChildren(); count.textContent = String(articles.length);
   if (!articles.length) { articlesEl.append(label("p", site ? "还没有文章" : "选择一个站点开始", "list-empty")); return; }
   for (const item of [...articles].sort((a, b) => b.modified.localeCompare(a.modified))) {
-    const button = articleRow(item.title, `${item.articleType===1 ? "页面 · " : ""}${new Date(item.modified).toLocaleDateString("zh-CN")}`, item.content, item.id === article?.id, site?.name || "我的站点");
+    const button = articleRow(item.title, `${item.articleType===1 ? "页面  " : ""}${new Date(item.modified).toLocaleDateString("zh-CN")}`, item.content, item.id === article?.id, site?.name || "我的站点");
     button.addEventListener("click", () => selectArticle(item)); articlesEl.append(button);
   }
 }
-let previousEditing = false;
+let previousMode = "browsing";
+function layoutMode() { return editing ? "editing" : article || item ? "reading" : "browsing"; }
+window.addEventListener("resize", () => {
+  setPostsCollapsed(editing || layoutMode() === "reading" && window.innerWidth < 1100);
+});
 function updateView() {
-  if (previousEditing && !editing && postsPanel.hidden) setPostsCollapsed(false);
-  previousEditing = editing;
+  const mode = layoutMode();
+  if (mode !== previousMode) {
+    setPostsCollapsed(editing || mode === "reading" && window.innerWidth < 1100);
+    if (editing) { editorView = "write"; setMetadataOpen(false); }
+    previousMode = mode;
+  }
+  shell.classList.toggle("editing-mode", editing);
+  shell.classList.toggle("local-site", !!site && !subscription && !smartView && !favoritesView);
+  syncEditorView();
   const publication = site ? publicationStates.get(site.id) : undefined;
   renderSites(); renderSubscriptions(); renderArticles(); siteTitle.textContent = smartView === "today" ? "今天" : smartView === "unread" ? "未读文章" : favoritesView ? "收藏的文章" : subscription?.feed.title || site?.name || "我的站点";
   $("#show-favorites").classList.toggle("active",favoritesView);
@@ -344,6 +394,7 @@ function updateView() {
   const allItems=subscriptions.flatMap(sub=>sub.feed.items);
   $("#today-count").textContent=String(allItems.filter(entry=>isToday(entry.published)).length);
   $("#unread-count").textContent=String(allItems.filter(entry=>!entry.read).length);
+  $("#favorites-count").textContent=String(allItems.filter(entry=>entry.starred).length);
   workspaceMenu.hidden = !site && !subscription;
   newArticle.disabled = !site || !!subscription || saving;
   const headerCompose=$<HTMLButtonElement>("#new-article-header"); headerCompose.hidden=!site || !!subscription || editing; headerCompose.disabled=newArticle.disabled;
@@ -423,14 +474,27 @@ function updateView() {
   if (publishedURL.value !== address) { publishedURL.value = address; copyStatus.textContent = ""; }
   copyPublishedURL.disabled = !address;
   if (gatewayError) copyStatus.textContent = gatewayError;
+  $("#show-publication").hidden = !site || !!subscription;
+  $("#publication-status").textContent = publishedAddress.hidden ? "站点尚未公开发布。发布完成后，可在这里复制访问地址。" : "站点已公开发布。网络传播可能需要时间。";
   emptyAction.textContent = site ? "撰写文章" : "创建站点";
   emptyAction.hidden = !!subscription || favoritesView || !!smartView;
   empty.querySelector("h2")!.textContent = smartView ? "选择一篇文章阅读" : favoritesView ? "选择一篇收藏文章" : subscription ? "选择一篇文章阅读" : site && articles.length ? "选择一篇文章" : site ? "开始记录你的故事" : "让想法有一个地方安放";
   empty.querySelector("p")!.textContent = smartView || favoritesView || subscription ? "从左侧列表选择文章。" : site && articles.length ? "从左侧列表选择文章，或新建一篇。" : site ? "新建文章，在这里写作与预览。" : "创建站点，开始撰写你的第一篇文章。";
-  const current = dirty ? "有未保存更改" : draft ? "草稿已保存（未发布）" : editing ? "已保存" : "";
+  const current = dirty ? "有未保存更改" : draft ? "草稿已保存（未发布）" : editing ? article ? "已保存" : "新文章" : "";
   const unpublished = !!site && ((site.contentRevision ?? 0) > (site.publishedRevision ?? 0) || !!site.publishPending || !!publication && publication.changes > publication.publishedChanges);
-  saveState.textContent = saving ? busyMessage || "正在处理…" : publication?.running ? `${current}${current ? " · " : ""}正在发布已保存内容…` : publication?.status === "failed" ? `${current}${current ? " · " : ""}发布未确认` : unpublished ? `${current}${current ? " · " : ""}站点更改尚未发布` : publication?.status === "published" ? `${current}${current ? " · " : ""}${dirty ? "已发布上次保存的内容" : "已发布"}` : current;
-  saveState.title = publication?.error ?? "";
+  saveState.textContent = saving ? busyMessage || "正在处理…" : publication?.running ? `${current}${current ? "，" : ""}正在发布已保存内容…` : publication?.status === "failed" ? `${current}${current ? "，" : ""}发布未确认` : unpublished ? `${current}${current ? "，" : ""}站点更改尚未发布` : publication?.status === "published" ? `${current}${current ? "，" : ""}${dirty ? "已发布上次保存的内容" : "已发布"}` : current;
+  saveState.title = publication?.error || saveState.textContent;
+  $("#metadata-count").textContent = editorTags.size || (draft?.attachments?.length ?? article?.attachments?.length) ? ` · ${editorTags.size} 个标签 / ${draft?.attachments?.length ?? article?.attachments?.length ?? 0} 个附件` : "";
+  const notice = $("#library-notice"), retry = $<HTMLButtonElement>("#retry-library");
+  notice.hidden = !libraryLoading && libraryFailed.length === 0;
+  notice.dataset.state = libraryLoading ? "loading" : "error";
+  $("#library-message").textContent = libraryLoading ? "正在读取本地内容…" : `${libraryFailed.join("、")}未能加载。已读取的内容仍可使用。`;
+  retry.hidden = libraryLoading; retry.disabled = libraryLoading;
+  if (!site && !subscription && !item && !editing && !favoritesView && !smartView && (libraryLoading || libraryFailed.includes("站点"))) {
+    empty.querySelector("h2")!.textContent = libraryLoading ? "正在打开工作区" : "暂时无法读取站点";
+    empty.querySelector("p")!.textContent = libraryLoading ? "你的站点和订阅正在加载。" : "请重新加载；已有内容不会被更改。";
+    emptyAction.hidden = true;
+  }
 }
 async function selectSite(item: Site) {
   if (item.id === site?.id && !articleLoadFailures.has(item.id)) return;
@@ -451,7 +515,7 @@ function selectSubscription(entry: Subscription) {
 }
 function readerHTML(html: string, localImages: boolean) {
   const images = localImages ? "img-src data:; " : "";
-  readerPreview.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; ${images}style-src 'unsafe-inline'"><style>body{font:16px/1.8 'Segoe UI',sans-serif;color:#303239;margin:28px;overflow-wrap:anywhere}img{max-width:100%}pre{overflow:auto}</style></head><body>${html}</body></html>`;
+  readerPreview.srcdoc = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; ${images}style-src 'unsafe-inline'"><style>${readingStyles}</style></head><body>${html}</body></html>`;
 }
 function selectFeedItem(entry: Item) {
   const revision=++readerRevision, address=subscription?.url ?? "", key=entry.key || entry.id || entry.link;
@@ -495,7 +559,7 @@ $("#article-settings").addEventListener("click",()=>{
   articleSettingsForm.querySelector<HTMLInputElement>('[name="externalLink"]')!.value=article.externalLink || "";
   articleSettingsForm.querySelector<HTMLInputElement>('[name="inNavigation"]')!.checked=!!article.isIncludedInNavigation;
   articleSettingsForm.querySelector<HTMLInputElement>('[name="weight"]')!.value=String(article.navigationWeight ?? 1);
-  $("#article-settings-result").textContent="";articleSettingsDialog.showModal();
+  $("#article-settings-result").textContent="";openDialog(articleSettingsDialog);
 });
 $("#close-article-settings").addEventListener("click",()=>{if(!saving)articleSettingsDialog.close();});
 articleSettingsDialog.addEventListener("cancel",event=>{if(saving)event.preventDefault();});
@@ -528,11 +592,13 @@ $("#share-own-article").addEventListener("click",async()=>{
 $("#play-own-audio").addEventListener("click",()=>playArticleAudio.click());
 function selectDraft(item: Draft) {
   if (!canLeave()) return;
+  editorView="write"; setMetadataOpen(false);
   navigationRevision++; draft=item; article=articles.find(entry=>entry.id===item.articleId) ?? null;
   editing=true; dirty=false; title.value=item.title; content.value=item.content; setEditorTags(item.tags); clearError(); updateView(); void renderPreview();
 }
 function startArticle() {
   if (!site || !canLeave()) return;
+  editorView="write"; setMetadataOpen(false);
   navigationRevision++;
   article = null; draft=null; draftsView=false; editing = true; dirty = false; title.value = ""; content.value = ""; setEditorTags(); clearError(); updateView(); void renderPreview(); title.focus();
 }
@@ -542,7 +608,7 @@ async function renderPreview() {
     const html = site && draft ? await Library.previewDraft(site.id, draft.id, content.value) : site && article ? await Library.previewArticle(site.id, article.id, content.value) : await Library.preview(content.value);
     if (revision !== previewRevision) return;
     const safeTitle=title.value.replace(/[&<>]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[char]!));
-    preview.srcdoc = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><style>body{font:14px/1.8 'Segoe UI Variable','Segoe UI','Microsoft YaHei UI',sans-serif;color:#424242;margin:24px;overflow-wrap:anywhere}.preview-title{font-size:22px;line-height:1.4;margin:0 0 20px;color:#242424}h1,h2,h3{line-height:1.4;color:#242424}a{color:#0f6cbd}pre{background:#f5f5f5;padding:16px;overflow:auto;border-radius:4px}code{font-family:Consolas,monospace}blockquote{border-left:3px solid #9ebddd;margin-left:0;padding-left:16px;color:#596573}img{max-width:100%}</style></head><body>${safeTitle ? `<h1 class="preview-title">${safeTitle}</h1>` : ""}${html}</body></html>`;
+    preview.srcdoc = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><style>${readingStyles}body{max-width:none;padding:12px 0 24px}.preview-title{font-size:24px;margin:0 0 20px}</style></head><body>${safeTitle ? `<h1 class="preview-title">${safeTitle}</h1>` : ""}${html}</body></html>`;
   } catch (e) { showError(e); }
 }
 async function renderOwnArticle() {
@@ -551,7 +617,7 @@ async function renderOwnArticle() {
   try {
     const html=await Library.previewArticle(siteID,articleID,article.content);
     if(revision!==previewRevision || site?.id!==siteID || article?.id!==articleID || editing)return;
-    ownReaderPreview.srcdoc=`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><style>body{max-width:760px;font:16px/1.8 'Segoe UI',sans-serif;color:#303239;margin:28px auto;padding:0 28px;overflow-wrap:anywhere}h1,h2,h3{line-height:1.3}a{color:#4e5cbb}pre{background:#f1f2f5;padding:16px;overflow:auto;border-radius:8px}img{max-width:100%}</style></head><body>${html}</body></html>`;
+    ownReaderPreview.srcdoc=`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><style>${readingStyles}</style></head><body>${html}</body></html>`;
   } catch(error){if(revision===previewRevision)showError(error);}
 }
 async function save() {
@@ -615,7 +681,7 @@ async function queuePublication(siteID: string, manual = false) {
     } while (state.pending);
   } finally { state.running = false; updateView(); }
 }
-$("#new-site").addEventListener("click", () => { if (canLeave()) { navigationRevision++; editingSiteID=""; form.reset(); $("#site-index-setting").hidden=true;$("#site-avatar-setting").hidden=true;$("#site-identity-settings").hidden=true;$("#site-avatar-result").textContent="";$("#site-settings-result").textContent=""; form.querySelector("h2")!.textContent="创建站点";form.querySelector("h2 + p")!.textContent="为你的新空间起个名字。"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="创建站点"; dialog.showModal(); } });
+$("#new-site").addEventListener("click", () => { if (canLeave()) { navigationRevision++; editingSiteID=""; form.reset(); $("#site-index-setting").hidden=true;$("#site-avatar-setting").hidden=true;$("#site-identity-settings").hidden=true;$("#site-avatar-result").textContent="";$("#site-settings-result").textContent=""; form.querySelector("h2")!.textContent="创建站点";$("#site-dialog-description").textContent="为你的新空间起个名字。"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="创建站点"; openDialog(dialog); } });
 function updateSiteAvatarPreview(value?:string) {
   const image=$<HTMLImageElement>("#site-avatar-preview");image.hidden=!value;$("#site-avatar-placeholder").hidden=!!value;
   if(value)image.src=`data:image/png;base64,${value}`;else image.removeAttribute("src");
@@ -632,8 +698,8 @@ editSite.addEventListener("click", () => {
   $("#site-index-setting").hidden=!!site.imported;
   $("#site-identity-settings").hidden=!!site.imported;
   $("#site-avatar-setting").hidden=!!site.imported;$("#site-avatar-result").textContent="";updateSiteAvatarPreview(site.avatarPng);
-  form.querySelector("h2")!.textContent="站点设置";form.querySelector("h2 + p")!.textContent="站点信息保存后需重新发布；头像选择后会自动发布。"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="保存设置";
-  dialog.showModal();
+  form.querySelector("h2")!.textContent="站点设置";$("#site-dialog-description").textContent="站点信息保存后需重新发布；头像选择后会自动发布。"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="保存设置";
+  openDialog(dialog);
 });
 async function changeSiteAvatar(remove:boolean) {
   if(!editingSiteID || !site || site.id!==editingSiteID || site.imported || saving)return;
@@ -657,7 +723,7 @@ const profileFields=["domain","twitterUsername","githubUsername","telegramUserna
 $("#site-profile").addEventListener("click",()=>{
   if(!site || site.imported || saving)return;
   for(const name of profileFields)siteProfileForm.querySelector<HTMLInputElement>(`[name="${name}"]`)!.value=site[name] || "";
-  $("#site-profile-result").textContent="";siteProfileDialog.showModal();
+  $("#site-profile-result").textContent="";openDialog(siteProfileDialog);
 });
 $("#close-site-profile").addEventListener("click",()=>{if(!saving)siteProfileDialog.close();});
 siteProfileDialog.addEventListener("cancel",event=>{if(saving)event.preventDefault();});
@@ -673,7 +739,7 @@ const podcastDialog=$<HTMLDialogElement>("#podcast-settings-dialog"),podcastForm
 const podcastCategories=["Arts","Business","Comedy","Education","Fiction","Government","History","Health & Fitness","Kids & Family","Leisure","Music","News","Religion & Spirituality","Science","Society & Culture","Sports","Technology","True Crime","TV & Film"];
 for(const category of podcastCategories){const item=document.createElement("label"),input=document.createElement("input");input.type="checkbox";input.value=category;input.name="category";item.append(input,document.createTextNode(category));$("#podcast-categories").append(item);}
 function updatePodcastCover(value?:string){const preview=$<HTMLImageElement>("#podcast-cover-preview");preview.hidden=!value;$("#podcast-cover-placeholder").hidden=!!value;if(value)preview.src=`data:image/png;base64,${value}`;else preview.removeAttribute("src");$<HTMLButtonElement>("#remove-podcast-cover").disabled=!value || saving;}
-$("#podcast-settings").addEventListener("click",()=>{if(!site || site.imported || saving)return;podcastForm.querySelector<HTMLInputElement>('[name="language"]')!.value=site.podcastLanguage || "en";podcastForm.querySelector<HTMLInputElement>('[name="explicit"]')!.checked=!!site.podcastExplicit;for(const input of podcastForm.querySelectorAll<HTMLInputElement>('[name="category"]'))input.checked=!!site.podcastCategories?.includes(input.value);updatePodcastCover(site.podcastCoverPng);$("#podcast-settings-result").textContent="";$("#podcast-cover-result").textContent="";podcastDialog.showModal();});
+$("#podcast-settings").addEventListener("click",()=>{if(!site || site.imported || saving)return;podcastForm.querySelector<HTMLInputElement>('[name="language"]')!.value=site.podcastLanguage || "en";podcastForm.querySelector<HTMLInputElement>('[name="explicit"]')!.checked=!!site.podcastExplicit;for(const input of podcastForm.querySelectorAll<HTMLInputElement>('[name="category"]'))input.checked=!!site.podcastCategories?.includes(input.value);updatePodcastCover(site.podcastCoverPng);$("#podcast-settings-result").textContent="";$("#podcast-cover-result").textContent="";openDialog(podcastDialog);});
 $("#close-podcast-settings").addEventListener("click",()=>{if(!saving)podcastDialog.close();});podcastDialog.addEventListener("cancel",event=>{if(saving)event.preventDefault();});
 podcastForm.addEventListener("submit",async event=>{
   event.preventDefault();if(!site || site.imported || saving)return;const siteID=site.id,generation=publicationState(siteID).generation;
@@ -706,16 +772,16 @@ async function loadDeployment(){
   const id=deploymentSiteID,kind=deploymentKind.value,revision=++deploymentRevision;deploymentCurrent=null;deploymentBusy=true;updateDeploymentControls();$("#deployment-result").textContent="正在读取配置…";
   try{const info=await Library.deploymentInfo(id,kind);if(revision!==deploymentRevision || !deploymentDialog.open)return;deploymentCurrent=info;deploymentField("name").value=info.name || "";deploymentField("server").value=info.server || "";deploymentField("token").value="";deploymentField("autoDeploy").checked=info.autoDeploy;deploymentField("deleteRemote").checked=info.deleteRemote;$("#deployment-result").textContent=info.pending ? "上次发布结果不确定，请检查目标后手动重试。" : info.lastUrl ? `最近部署：${info.lastUrl}` : info.configured ? "已保存配置。" : "尚未配置。";}
   catch(error){if(revision===deploymentRevision)$("#deployment-result").textContent=`读取失败：${error instanceof Error ? error.message : String(error)}`;}
-  finally{if(revision===deploymentRevision){deploymentBusy=false;updateDeploymentControls();}}
+  finally{if(revision===deploymentRevision){deploymentBusy=false;updateDeploymentControls();rememberDialog(deploymentDialog);}}
 }
-$("#deployment-settings").addEventListener("click",()=>{if(!site || site.imported || saving)return;deploymentSiteID=site.id;deploymentKind.value="ssh";deploymentDialog.showModal();void loadDeployment();});
+$("#deployment-settings").addEventListener("click",()=>{if(!site || site.imported || saving)return;deploymentSiteID=site.id;deploymentKind.value="ssh";openDialog(deploymentDialog);void loadDeployment();});
 deploymentKind.addEventListener("change",()=>void loadDeployment());
 $("#deployment-close").addEventListener("click",()=>{if(!deploymentBusy)deploymentDialog.close();});deploymentDialog.addEventListener("cancel",event=>{if(deploymentBusy)event.preventDefault();});deploymentDialog.addEventListener("close",()=>{deploymentRevision++;deploymentField("token").value="";});
 $("#select-ssh-key").addEventListener("click",async()=>{if(deploymentBusy)return;deploymentBusy=true;updateDeploymentControls();try{const path=await Library.selectSSHKey();if(path)deploymentField("server").value=path;}catch(error){$("#deployment-result").textContent=String(error);}finally{deploymentBusy=false;updateDeploymentControls();}});
 deploymentForm.addEventListener("submit",async event=>{
   event.preventDefault();if(deploymentBusy || !deploymentCurrent)return;const kind=deploymentKind.value,id=deploymentSiteID;
   const name=deploymentField("name").value.trim(),server=deploymentField("server").value.trim(),token=deploymentField("token").value,auto=deploymentField("autoDeploy").checked,remove=kind==="ssh" && deploymentField("deleteRemote").checked;
-  deploymentBusy=true;updateDeploymentControls();try{await Library.configureDeployment(id,kind,name,server,token,auto,remove);deploymentField("token").value="";await loadDeployment();}
+  deploymentBusy=true;updateDeploymentControls();try{await Library.configureDeployment(id,kind,name,server,token,auto,remove);deploymentField("token").value="";await loadDeployment();rememberDialog(deploymentDialog);}
   catch(error){$("#deployment-result").textContent=`保存失败：${error instanceof Error ? error.message : String(error)}`;}finally{deploymentBusy=false;updateDeploymentControls();}
 });
 $("#deployment-run").addEventListener("click",async()=>{
@@ -741,7 +807,7 @@ removeSite.addEventListener("click", async () => {
 });
 $("#show-removed-sites").addEventListener("click", async () => {
   if (saving) return;
-  removedSiteList.textContent="正在读取…"; removedSitesDialog.showModal();
+  removedSiteList.textContent="正在读取…"; openDialog(removedSitesDialog);
   try {
     const entries=await Library.removedSites(); removedSiteList.replaceChildren();
     if (!entries.length) removedSiteList.append(label("p","没有已移除的站点","list-empty"));
@@ -790,16 +856,19 @@ $("#show-removed-sites").addEventListener("click", async () => {
 });
 $("#close-removed-sites").addEventListener("click",()=>{if(!saving)removedSitesDialog.close();});
 removedSitesDialog.addEventListener("cancel",event=>{if(saving)event.preventDefault();});
-$("#cancel-site").addEventListener("click", () => dialog.close());
+$("#cancel-site").addEventListener("click", () => { if (!saving) dialog.close(); });
 dialog.addEventListener("cancel", event => { if (saving) event.preventDefault(); });
 dialog.addEventListener("close", () => { navigationRevision++; });
 form.addEventListener("submit", async (event) => {
-  event.preventDefault(); $("#site-settings-result").textContent="";const button = form.querySelector<HTMLButtonElement>('button[type="submit"]')!; button.disabled = true;
+  event.preventDefault(); if (saving) return;
+  $("#site-settings-result").textContent="";const button = form.querySelector<HTMLButtonElement>('button[type="submit"]')!; button.disabled = true;
   const revision = ++navigationRevision;
   const isUpdate=!!editingSiteID, cancel=$<HTMLButtonElement>("#cancel-site");
-  if(isUpdate) { saving=true; cancel.disabled=true; busyMessage="正在保存站点设置…"; updateView(); }
+  saving=true; cancel.disabled=true; busyMessage=isUpdate ? "正在保存站点设置…" : "正在创建站点…"; updateView();
+  const submitLabel = button.textContent; button.textContent = isUpdate ? "正在保存…" : "正在创建…";
   try {
     const values = new window.FormData(form); const name=String(values.get("name") ?? ""), about=String(values.get("about") ?? "");
+    for (const field of form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input,textarea")) field.disabled = true;
     if (editingSiteID) {
       form.querySelector<HTMLInputElement>('input[name="name"]')!.disabled=true; form.querySelector<HTMLTextAreaElement>('textarea[name="about"]')!.disabled=true; form.querySelector<HTMLInputElement>('input[name="doNotIndex"]')!.disabled=true;
       form.querySelector<HTMLInputElement>('input[name="siteSlug"]')!.disabled=true;form.querySelector<HTMLInputElement>('input[name="authorName"]')!.disabled=true;
@@ -819,10 +888,16 @@ form.addEventListener("submit", async (event) => {
     if (revision !== navigationRevision) { if(refreshError) showError(`站点已创建，但站点列表刷新失败：${String(refreshError)}`); updateView(); return; }
     site = created; favoritesView = false; smartView=null; subscription = null; item = null; articles = []; article = null; draft=null; drafts=[]; draftsView=false; editing = false; dirty = false; dialog.close();
     if (refreshError) showError(`站点已创建，但站点列表刷新失败：${String(refreshError)}`); else clearError(); updateView();
-  } catch (e) { if(isUpdate)$("#site-settings-result").textContent=`保存失败：${e instanceof Error ? e.message : String(e)}`;else {showError(e);dialog.close();} } finally { button.disabled = false; if(isUpdate) {saving=false;cancel.disabled=false;form.querySelector<HTMLInputElement>('input[name="name"]')!.disabled=false;form.querySelector<HTMLTextAreaElement>('textarea[name="about"]')!.disabled=false;form.querySelector<HTMLInputElement>('input[name="doNotIndex"]')!.disabled=false;form.querySelector<HTMLInputElement>('input[name="siteSlug"]')!.disabled=false;form.querySelector<HTMLInputElement>('input[name="authorName"]')!.disabled=false;busyMessage="";updateView();} }
+  } catch (e) { $("#site-settings-result").textContent=`${isUpdate ? "保存" : "创建"}失败：${e instanceof Error ? e.message : String(e)}。请检查后重试。`; }
+  finally {
+    button.disabled = false; button.textContent = submitLabel; saving=false; cancel.disabled=false;
+    for (const field of form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input,textarea")) field.disabled = false;
+    busyMessage=""; updateView();
+  }
 });
-$("#new-feed").addEventListener("click", () => { if (canLeave()) { navigationRevision++; feedForm.reset(); feedDialog.showModal(); } });
-$("#cancel-feed").addEventListener("click", () => feedDialog.close());
+$("#new-feed").addEventListener("click", () => { if (canLeave()) { navigationRevision++; feedForm.reset(); $("#feed-result").textContent=""; openDialog(feedDialog); } });
+$("#cancel-feed").addEventListener("click", () => { if (!saving) feedDialog.close(); });
+feedDialog.addEventListener("cancel", event => { if (saving) event.preventDefault(); });
 feedDialog.addEventListener("close", () => { navigationRevision++; });
 async function refreshSubscription(address: string): Promise<void> {
   if (refreshingSubscriptions.has(address)) return;
@@ -860,8 +935,8 @@ pinSubscription.addEventListener("click", async () => {
 const storageDialog = $<HTMLDialogElement>("#offline-storage-dialog");
 const cleanupOffline = $<HTMLButtonElement>("#cleanup-offline");
 function formatBytes(value:number):string { const units=["B","KiB","MiB","GiB","TiB"];let n=value,i=0;while(n>=1024 && i<units.length-1){n/=1024;i++;}return `${i===0 ? n.toFixed(0) : n.toFixed(1)} ${units[i]}`; }
-async function updateOfflineUsage() {const usage=await Library.offlineMediaUsage();$("#offline-storage-usage").textContent=`已管理媒体 ${formatBytes(usage.totalBytes)} · 可清理 ${formatBytes(usage.reclaimableBytes)}（${usage.reclaimableFiles} 个文件）`;cleanupOffline.disabled=usage.reclaimableFiles===0;}
-$("#offline-storage").addEventListener("click",async()=>{storageDialog.showModal();$("#offline-storage-result").textContent="";cleanupOffline.disabled=true;try{await updateOfflineUsage();}catch(e){$("#offline-storage-usage").textContent=`无法计算空间：${String(e)}`;}});
+async function updateOfflineUsage() {const usage=await Library.offlineMediaUsage();$("#offline-storage-usage").textContent=`已管理媒体 ${formatBytes(usage.totalBytes)}，可清理 ${formatBytes(usage.reclaimableBytes)}（${usage.reclaimableFiles} 个文件）`;cleanupOffline.disabled=usage.reclaimableFiles===0;}
+$("#offline-storage").addEventListener("click",async()=>{openDialog(storageDialog);$("#offline-storage-result").textContent="";cleanupOffline.disabled=true;try{await updateOfflineUsage();}catch(e){$("#offline-storage-usage").textContent=`无法计算空间：${String(e)}`;}});
 $("#close-offline-storage").addEventListener("click",()=>storageDialog.close());
 cleanupOffline.addEventListener("click",async()=>{cleanupOffline.disabled=true;try{const result=await Library.cleanupOfflineMedia();await updateOfflineUsage();$("#offline-storage-result").textContent=`已清理 ${formatBytes(result.reclaimedBytes)}（${result.reclaimedFiles} 个文件）`;}catch(e){$("#offline-storage-result").textContent=`清理未完成，部分文件可能已清理：${String(e)}`;try{await updateOfflineUsage();}catch{}}});
 $("#show-favorites").addEventListener("click",()=>{ if(!canLeave()) return; navigationRevision++; site=null; subscription=null; item=null; article=null; draft=null; draftsView=false; editing=false; dirty=false; favoritesView=true; smartView=null; clearError();updateView(); });
@@ -915,7 +990,7 @@ async function performSearch() {
     for(const result of results){const button=articleRow(result.title,"",result.snippet,false,result.sourceName);button.addEventListener("click",()=>void openSearchResult(result));searchResults.append(button);}
   } catch(error){if(revision===searchRevision && searchDialog.open)searchStatus.textContent=`搜索失败：${error instanceof Error ? error.message : String(error)}`;}
 }
-$("#show-search").addEventListener("click",()=>{searchDialog.showModal();searchInput.focus();if(searchInput.value.trim())void performSearch();});
+$("#show-search").addEventListener("click",()=>{openDialog(searchDialog);searchInput.focus();if(searchInput.value.trim())void performSearch();});
 searchInput.addEventListener("input",()=>{searchRevision++;clearTimeout(searchTimer);searchResults.replaceChildren();searchStatus.textContent=searchInput.value.trim() ? "正在搜索…" : "输入关键词开始搜索。";searchTimer=setTimeout(()=>void performSearch(),180);});
 $("#close-search").addEventListener("click",()=>searchDialog.close());
 searchDialog.addEventListener("close",()=>{searchRevision++;clearTimeout(searchTimer);});
@@ -969,13 +1044,13 @@ let gallerySiteID="", gallerySelected="", galleryRevision=0, galleryItems:Builti
 async function showTemplatePreview(item:Builtin) {
   gallerySelected=item.id; const revision=++galleryRevision;
   for(const button of templateList.querySelectorAll<HTMLButtonElement>(".template-choice")) button.setAttribute("aria-selected",String(button.dataset.templateId===item.id));
-  $("#template-preview-name").textContent=item.name; $("#template-preview-description").textContent=`${item.description} · build ${item.build}`;
+  $("#template-preview-name").textContent=item.name; $("#template-preview-description").textContent=`${item.description}，build ${item.build}`;
   $("#template-gallery-result").textContent="正在生成预览…";templateFrame.srcdoc="";templateApply.disabled=true;
   try { const html=await Library.builtinTemplatePreview(item.id); if(revision!==galleryRevision || !templateGallery.open)return; templateFrame.srcdoc=html;$("#template-gallery-result").textContent="";templateApply.disabled=false; }
   catch(e) { if(revision===galleryRevision && templateGallery.open) $("#template-gallery-result").textContent=`预览失败：${String(e)}`; }
 }
 selectTemplate.addEventListener("click", async () => {
-  if (!site || saving) return; gallerySiteID=site.id; gallerySelected="";templateList.replaceChildren();templateFrame.srcdoc="";templateApply.disabled=true;$("#template-gallery-result").textContent="正在读取模板…";templateGallery.showModal();
+  if (!site || saving) return; gallerySiteID=site.id; gallerySelected="";templateList.replaceChildren();templateFrame.srcdoc="";templateApply.disabled=true;$("#template-gallery-result").textContent="正在读取模板…";openDialog(templateGallery);
   const revision=++galleryRevision;
   try { galleryItems=await Library.builtinTemplates();if(revision!==galleryRevision || !templateGallery.open)return;
     for(const item of galleryItems) { const button=document.createElement("button");button.type="button";button.className="template-choice";button.dataset.templateId=item.id;button.setAttribute("aria-selected","false");const name=document.createElement("strong"),description=document.createElement("small");name.textContent=item.name;description.textContent=item.description;button.append(name,description);button.addEventListener("click",()=>void showTemplatePreview(item));templateList.append(button); }
@@ -1014,7 +1089,7 @@ templateSettingsButton.addEventListener("click", async () => {
       field.append(input); fields.append(field);
     }
     templateSettingsForm.querySelector<HTMLInputElement>('[name="showRef"]')!.checked=settings.showRef==="true";
-    editingTemplateSiteID=siteID; templateSettingsDialog.showModal();
+    editingTemplateSiteID=siteID; openDialog(templateSettingsDialog);
   } catch(e) { showError(e); } finally { saving=false; title.disabled=false; content.disabled=false; busyMessage=""; updateView(); }
 });
 $("#cancel-template-settings").addEventListener("click",()=>{if(!saving)templateSettingsDialog.close();});
@@ -1049,7 +1124,7 @@ pinnableButton.addEventListener("click",async()=>{
   if(!site || saving)return;const siteID=site.id;navigationRevision++;saving=true;title.disabled=true;content.disabled=true;updateView();clearError();
   try {
     const configured=await Library.pinnableConfigured(siteID);if(site?.id!==siteID)return;
-    pinnableSiteID=siteID;pinnableConfigured=configured;pinnableForm.reset();pinnableResult.textContent=configured ? "已配置固定服务地址。" : "尚未配置固定服务。";pinnableDialog.showModal();
+    pinnableSiteID=siteID;pinnableConfigured=configured;pinnableForm.reset();pinnableResult.textContent=configured ? "已配置固定服务地址。" : "尚未配置固定服务。";openDialog(pinnableDialog);
   } catch(e){showError(e);} finally {saving=false;title.disabled=false;content.disabled=false;updatePinnableControls();updateView();}
 });
 $("#pinnable-close").addEventListener("click",()=>{if(!saving)pinnableDialog.close();});
@@ -1058,7 +1133,7 @@ pinnableDialog.addEventListener("close",()=>{pinnableForm.reset();pinnableSiteID
 pinnableForm.addEventListener("submit",event=>{
   event.preventDefault();const input=pinnableForm.querySelector<HTMLInputElement>('[name="endpoint"]')!,endpoint=input.value.trim();
   if(!endpoint){pinnableResult.textContent="请输入固定服务地址。";return;}
-  void withPinnableOperation(async()=>{await Library.configurePinnable(pinnableSiteID,endpoint);input.value="";pinnableConfigured=true;pinnableResult.textContent="已保存地址；下次站点发布成功后会请求固定。";});
+  void withPinnableOperation(async()=>{await Library.configurePinnable(pinnableSiteID,endpoint);input.value="";pinnableConfigured=true;rememberDialog(pinnableDialog);pinnableResult.textContent="已保存地址；下次站点发布成功后会请求固定。";});
 });
 $("#pinnable-disable").addEventListener("click",()=>{
   if(!pinnableConfigured || saving || !window.confirm("停用 Pinnable 固定服务并删除本机保存的地址？已固定的内容不会自动取消固定。"))return;
@@ -1073,7 +1148,7 @@ $("#pinnable-status").addEventListener("click",()=>{
     const status=await Library.pinnableStatus(pinnableSiteID), reported=status.last_known_ipns?.replace(/^\/ipns\//,"").replace(/\/$/,"") ?? "";
     const identity=reported && site?.ipns ? (reported===site.ipns ? "IPNS 一致" : "IPNS 与当前站点不一致") : "尚无法核对站点 IPNS";
     const version=status.last_known_cid && site?.lastPublishedCID ? (status.last_known_cid===site.lastPublishedCID ? (reported && reported===site.ipns && status.status.toLowerCase()==="pinned" ? "当前版本已固定" : "服务报告了相同 CID，尚未确认当前站点已固定") : "服务报告的不是当前发布版本") : "尚无法确认当前版本";
-    pinnableResult.textContent=`状态：${status.status} · ${identity} · ${version}${status.last_known_cid ? ` · CID：${status.last_known_cid}` : ""}`;
+    pinnableResult.textContent=`状态：${status.status}，${identity}，${version}${status.last_known_cid ? `，CID：${status.last_known_cid}` : ""}`;
   });
 });
 let serviceSiteID="", serviceConfigured=false, serviceGeneration=0;
@@ -1099,20 +1174,20 @@ async function loadService(){
  saving=true;updateServiceControls();updateView();
  try {const info=await Library.serviceInfo(id,kind);if(generation!==serviceGeneration || site?.id!==id)return;serviceConfigured=info.configured;serviceName.value=info.name ?? "";serviceScript.value=kind==="plausible" ? info.scriptId ?? "" : "";serviceServer.value=kind==="plausible" ? info.server ?? (info.trackingWarning ? "" : "https://plausible.io") : "";serviceSavedName=serviceName.value.trim();serviceSavedServer=serviceServer.value.trim();serviceSavedScript=serviceScript.value.trim();serviceToken.value="";serviceResult.textContent=info.trackingWarning || (info.pendingCid ? `上次请求结果不确定，请先在 Filebase 检查 CID：${info.pendingCid}。` : info.configured ? `已配置${info.lastCid ? `，最近提交 CID：${info.lastCid}` : ""}。` : info.trackingEnabled ? "跟踪已配置；统计查询需要 API 令牌。" : "尚未配置。");}
  catch(e){serviceResult.textContent=`读取失败：${e instanceof Error?e.message:String(e)}`;}
- finally{saving=false;updateServiceControls();updateView();}
+ finally{saving=false;updateServiceControls();updateView();rememberDialog(serviceDialog);}
 }
-serviceButton.addEventListener("click",()=>{if(!site || saving)return;serviceSiteID=site.id;serviceForm.reset();serviceDialog.showModal();void loadService();});
+serviceButton.addEventListener("click",()=>{if(!site || saving)return;serviceSiteID=site.id;serviceForm.reset();openDialog(serviceDialog);void loadService();});
 serviceKind.addEventListener("change",()=>void loadService());
 for(const control of [serviceName,serviceServer,serviceScript,serviceToken])control.addEventListener("input",()=>{updateServiceControls();if(serviceKind.value==="plausible" && serviceHasUnsavedChanges())serviceResult.textContent="配置有未保存的更改，请先保存后再查询。";});
 $("#service-close").addEventListener("click",()=>{if(!saving)serviceDialog.close();});
 serviceDialog.addEventListener("cancel",e=>{if(saving)e.preventDefault();});
 serviceDialog.addEventListener("close",()=>{serviceGeneration++;serviceSiteID="";serviceForm.reset();});
 async function serviceOperation(action:()=>Promise<void>){if(saving || !serviceSiteID || site?.id!==serviceSiteID)return;navigationRevision++;saving=true;title.disabled=true;content.disabled=true;updateServiceControls();updateView();try{await action();}catch(e){serviceResult.textContent=`操作失败：${e instanceof Error?e.message:String(e)}`;}finally{saving=false;title.disabled=false;content.disabled=false;updateServiceControls();updateView();}}
-serviceForm.addEventListener("submit",e=>{e.preventDefault();const name=serviceName.value.trim(),token=serviceToken.value.trim();if(!name || (!token && serviceKind.value==="filebase")){serviceResult.textContent="请输入名称；Filebase 需要令牌。";return;}if(serviceKind.value==="filebase" && serviceConfigured && !window.confirm("修改 Filebase 名称或令牌会清除本机请求记录，可能导致重复固定及费用。请确认服务端状态后继续。"))return;void serviceOperation(async()=>{if(serviceKind.value==="plausible")await Library.configurePlausibleAt(serviceSiteID,name,token,serviceScript.value.trim(),serviceServer.value.trim());else await Library.configureService(serviceSiteID,serviceKind.value,name,token);serviceSavedName=name;serviceSavedServer=serviceServer.value.trim();serviceSavedScript=serviceScript.value.trim();serviceToken.value="";serviceConfigured=serviceConfigured || !!token;if(serviceKind.value==="plausible")markLocalChange(serviceSiteID);serviceResult.textContent=serviceKind.value==="filebase"?"已保存；下次发布后提交固定请求。":"已保存统计配置；重新发布站点后跟踪脚本生效。";});});
+serviceForm.addEventListener("submit",e=>{e.preventDefault();const name=serviceName.value.trim(),token=serviceToken.value.trim();if(!name || (!token && serviceKind.value==="filebase")){serviceResult.textContent="请输入名称；Filebase 需要令牌。";return;}if(serviceKind.value==="filebase" && serviceConfigured && !window.confirm("修改 Filebase 名称或令牌会清除本机请求记录，可能导致重复固定及费用。请确认服务端状态后继续。"))return;void serviceOperation(async()=>{if(serviceKind.value==="plausible")await Library.configurePlausibleAt(serviceSiteID,name,token,serviceScript.value.trim(),serviceServer.value.trim());else await Library.configureService(serviceSiteID,serviceKind.value,name,token);serviceSavedName=name;serviceSavedServer=serviceServer.value.trim();serviceSavedScript=serviceScript.value.trim();serviceToken.value="";serviceConfigured=serviceConfigured || !!token;rememberDialog(serviceDialog);if(serviceKind.value==="plausible")markLocalChange(serviceSiteID);serviceResult.textContent=serviceKind.value==="filebase"?"已保存；下次发布后提交固定请求。":"已保存统计配置；重新发布站点后跟踪脚本生效。";});});
 $("#service-disable").addEventListener("click",()=>{if((!serviceConfigured && serviceKind.value!=="plausible") || !window.confirm("删除当前服务的本机配置？远程内容不会删除；停用 Plausible 后需重新发布站点。"))return;void serviceOperation(async()=>{if(serviceKind.value==="plausible")markLocalChange(serviceSiteID);await Library.configureService(serviceSiteID,serviceKind.value,"","");serviceConfigured=false;serviceName.value="";serviceToken.value="";serviceResult.textContent="已停用；如更改了跟踪脚本，请重新发布站点。";});});
 $("#service-stats").addEventListener("click",()=>{if(!serviceConfigured || serviceKind.value!=="plausible" || serviceHasUnsavedChanges())return;const period=serviceRange.value;void serviceOperation(async()=>{const stats=await Library.plausibleStatsRange(serviceSiteID,period);const label=period==="day"?"今天":period==="30d"?"最近 30 天":"最近 7 天";serviceResult.textContent=`${label}：访客 ${stats.visitors}，浏览量 ${stats.pageviews}。`;});});
 $("#service-pin").addEventListener("click",()=>{if(!serviceConfigured || serviceKind.value!=="filebase" || serviceHasUnsavedChanges() || !window.confirm("将为当前版本提交新的 Filebase 固定请求。若此前请求已被接受，可能产生重复固定和费用；请先检查 Filebase。继续吗？"))return;void serviceOperation(async()=>{await Library.requestFilebasePin(serviceSiteID);serviceResult.textContent="请求已提交；请查询固定状态。";});});
-$("#service-pin-status").addEventListener("click",()=>{if(!serviceConfigured || serviceKind.value!=="filebase" || serviceHasUnsavedChanges())return;void serviceOperation(async()=>{const status=await Library.filebaseStatus(serviceSiteID);serviceResult.textContent=`状态：${status.status} · CID：${status.pin.cid}${status.pin.cid===site?.lastPublishedCID ? "（当前发布版本）" : "（不是当前发布版本）"}`;});});
+$("#service-pin-status").addEventListener("click",()=>{if(!serviceConfigured || serviceKind.value!=="filebase" || serviceHasUnsavedChanges())return;void serviceOperation(async()=>{const status=await Library.filebaseStatus(serviceSiteID);serviceResult.textContent=`状态：${status.status}，CID：${status.pin.cid}${status.pin.cid===site?.lastPublishedCID ? "（当前发布版本）" : "（不是当前发布版本）"}`;});});
 deleteArticle.addEventListener("click", async () => {
   if (!site || (!article && !draft) || saving || !window.confirm(draft ? "确定删除这份草稿？此操作无法撤销。" : "确定删除这篇文章？此操作无法撤销。")) return;
   const siteID = site.id; navigationRevision++; saving = true; deleteArticle.disabled = true; title.disabled = true; content.disabled = true; clearError();
@@ -1124,14 +1199,17 @@ deleteArticle.addEventListener("click", async () => {
   catch (e) { showError(e); } finally { saving = false; deleteArticle.disabled = false; title.disabled = false; content.disabled = false; updateView(); }
 });
 feedForm.addEventListener("submit", async (event) => {
-  event.preventDefault(); const button = feedForm.querySelector<HTMLButtonElement>('button[type="submit"]')!; button.disabled = true;
+  event.preventDefault(); if (saving) return;
+  const button = feedForm.querySelector<HTMLButtonElement>('button[type="submit"]')!, cancel = $<HTMLButtonElement>("#cancel-feed"), input = feedForm.querySelector<HTMLInputElement>('[name="url"]')!;
+  const address = input.value; button.disabled = true; cancel.disabled = true; input.disabled = true;
+  saving=true; busyMessage="正在添加订阅…"; button.textContent="正在添加…"; $("#feed-result").textContent=""; updateView();
   const revision = ++navigationRevision;
   try {
-    const address = String(new FormData(feedForm).get("url") ?? "");
     const entry = await Library.follow(address); await reloadSubscriptions();
     if (revision !== navigationRevision) { updateView(); return; }
     site = null; favoritesView = false; smartView=null; subscription = entry; item = null; article = null; draft=null; draftsView=false; editing = false; dirty = false; feedDialog.close(); clearError(); updateView();
-  } catch (e) { feedDialog.close(); showError(e); } finally { button.disabled = false; }
+  } catch (e) { $("#feed-result").textContent=`添加失败：${e instanceof Error ? e.message : String(e)}。请检查地址后重试。`; }
+  finally { button.disabled = false; cancel.disabled=false; input.disabled=false; saving=false; busyMessage=""; button.textContent="添加订阅"; updateView(); }
 });
 newArticle.addEventListener("click", startArticle);
 $("#new-article-header").addEventListener("click", startArticle);
@@ -1237,26 +1315,48 @@ copyPublishedURL.addEventListener("click", async () => {
 emptyAction.addEventListener("click", () => site ? startArticle() : $("#new-site").click());
 saveButton.addEventListener("click", () => void save());
 for (const input of [title, content]) input.addEventListener("input", () => { navigationRevision++; dirty = true; updateView(); clearTimeout(previewTimer); previewTimer = setTimeout(() => void renderPreview(), 180); });
-window.addEventListener("keydown", (event) => { if (event.ctrlKey || event.metaKey) { if(event.key.toLowerCase() === "s") { event.preventDefault(); void save(); } else if(event.key.toLowerCase()==="f" && !document.querySelector("dialog[open]")){event.preventDefault();$("#show-search").click();} } });
-window.addEventListener("beforeunload", (event) => { if (dirty) event.preventDefault(); });
+window.addEventListener("keydown", event => {
+  if (event.isComposing || !(event.ctrlKey || event.metaKey)) return;
+  const key = event.key.toLowerCase();
+  if (key === "s") {
+    event.preventDefault();
+    if (!document.querySelector("dialog[open]") && editing) saveDraft.click();
+  } else if (key === "f" && !document.querySelector("dialog[open]")) { event.preventDefault(); $("#show-search").click(); }
+});
+window.addEventListener("beforeunload", (event) => { if (dirty || hasDialogChanges(document)) event.preventDefault(); });
 async function init() {
+  if (libraryLoading) return;
+  libraryLoading=true; libraryFailed=[]; updateView();
   const initialNavigation=navigationRevision, initialSites=++sitesRevision, initialSubscriptions=++subscriptionsRevision;
-  const [loadedSites, loadedSubscriptions] = await Promise.allSettled([Library.sites(), Library.subscriptions()]);
-  if (loadedSites.status === "fulfilled") {
-    if (sitesRevision===initialSites && (navigationRevision===initialNavigation || (!site && sites.length===0))) sites=loadedSites.value;
-  } else showError(loadedSites.reason);
-  if (loadedSubscriptions.status === "fulfilled") {
-    if (subscriptionsRevision===initialSubscriptions) subscriptions=loadedSubscriptions.value;
-  } else showError(loadedSubscriptions.reason);
-  if (navigationRevision===initialNavigation && !site && sites[0]) {
-    const initialSite=sites[0]; site=initialSite;
-    try { const loaded=await Library.articles(initialSite.id); if (navigationRevision===initialNavigation && site?.id===initialSite.id && !editing && !dirty) articles=loaded; }
-    catch (e) { if(navigationRevision===initialNavigation) { articleLoadFailures.add(initialSite.id); showError(e); } }
-  }
+  await Promise.allSettled([
+    (async () => {
+      try {
+        const loaded = await Library.sites();
+        if (sitesRevision!==initialSites) return;
+        if (navigationRevision===initialNavigation || (!site && sites.length===0)) sites=loaded;
+        if (navigationRevision===initialNavigation && !editing && !dirty) {
+          if (!site && sites[0]) site=sites[0];
+          if (site && (!article || articleLoadFailures.has(site.id))) {
+            const initialSite=site; updateView();
+            try { const entries=await Library.articles(initialSite.id); if(navigationRevision===initialNavigation && site?.id===initialSite.id && !editing && !dirty) { articles=entries; articleLoadFailures.delete(initialSite.id); } }
+            catch { if(navigationRevision===initialNavigation) { articleLoadFailures.add(initialSite.id); libraryFailed.push("文章"); } }
+          }
+        }
+      } catch { if(sitesRevision===initialSites) libraryFailed.push("站点"); }
+      finally { updateView(); }
+    })(),
+    (async () => {
+      try { const loaded=await Library.subscriptions(); if(subscriptionsRevision===initialSubscriptions) subscriptions=loaded; }
+      catch { if(subscriptionsRevision===initialSubscriptions) libraryFailed.push("订阅"); }
+      finally { updateView(); }
+    })()
+  ]);
+  libraryLoading=false;
   updateView();
-  for (const entry of sites) if (entry.publishPending) void queuePublication(entry.id);
-  void refreshAutomatically(); window.setInterval(() => void refreshAutomatically(), 15 * 60 * 1000);
+  for (const entry of sites) if (entry.publishPending && !publicationStates.get(entry.id)?.running) void queuePublication(entry.id);
+  if (!refreshTimer) { void refreshAutomatically(); refreshTimer=window.setInterval(() => void refreshAutomatically(), 15 * 60 * 1000); }
 }
+$("#retry-library").addEventListener("click", () => void init());
 initUpdates();
 document.querySelector(".version")!.textContent=release.version;
 void init();
