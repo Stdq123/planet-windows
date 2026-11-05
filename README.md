@@ -10,16 +10,35 @@ A work-in-progress Windows application for publishing websites with IPFS and fol
 
 Reading olivida.eth in Planet Windows.
 
-## What works
+## Implemented capabilities
+
+The following features are available in the development version; see the limitations and validation status below before relying on them.
 
 - Create local sites, edit Markdown posts and private drafts, manage attachments, and export static HTML.
 - Publish supported sites to IPFS and IPNS with a bundled Kubo node. Saving an article triggers background publication of the saved site and attachments.
-- Follow and refresh RSS, Atom, JSON Feed, IPNS and supported ENS sites, and keep selected content available offline.
+- Follow and refresh RSS, Atom, JSON Feed, IPNS and supported ENS sites. Discover feeds from supported website homepages, read inline media, and keep selected content available offline.
 - Import selected Planet backups and export backups containing IPNS keys. Compatible sites can be rebuilt using verified versions of Plain, 8-bit, Grid, Platinum and Sepia.
 - Configure Filebase or Pinnable for remote pinning, and Plausible for site analytics.
 - Check for signed updates through a configured HTTPS feed, download a verified installer, and run it to upgrade a compatible installation.
 
 Published content is public. Long-term availability depends on other nodes or pinning services. Exported backups contain unencrypted IPNS private keys; store them securely. For supported import scenarios, restrictions and known gaps, read [windows/README.md](windows/README.md).
+
+## Incomplete and awaiting validation
+
+- **Mac compatibility:** Real Mac backups and round trips have not been verified. Some imported-site settings cannot be edited, and unsupported backup contents can prevent rebuilding or export. Keep the original backup.
+- **Templates and integrations:** Only the listed template versions and supported settings are implemented. Other original Planet features and integrations remain incomplete.
+- **External services:** The Filebase, Pinnable and Plausible integrations and SSH/Cloudflare deployments have been tested with local simulations; they have not been verified with real accounts or servers.
+- **ENS and media:** Non-IPFS/IPNS ENS content is unsupported. Live end-to-end testing of ENS/IPNS content with a subpath remains outstanding; media format support depends on available Windows components.
+- **Distribution:** Native Windows installer and uninstaller end-to-end validation, executable signing, a preconfigured update source and parts of the third-party license review remain outstanding. See the [release audit](windows/docs/release-audit.md).
+
+## Follow a site
+
+1. Select **+** next to **订阅** (Subscriptions) in the sidebar.
+2. Enter a feed URL, a supported website URL such as `https://olivida.eth.limo`, an IPNS address, or an ENS name such as `olivida.eth`, then select **添加** (Add).
+3. Select the subscription and an article to read it. Use **刷新订阅** (Refresh subscription) to check for updates, or the star in the article view to save a favorite.
+4. To keep supported content offline, select **更多操作 → 固定离线** (More actions → Pin offline) while viewing a subscription.
+
+Website URLs are followed as web feeds when their pages declare a supported feed; a bare `.eth` name uses the ENS/IPFS subscription path. If a website does not declare a feed, enter its feed URL directly. Online web-feed articles can display images and inline audio or video. Pinned subscriptions use locally saved media for offline reading; availability and size limits depend on the subscription type. See the [Windows guide](windows/README.md) for details.
 
 ## Build and test
 
