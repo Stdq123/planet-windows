@@ -18,7 +18,7 @@ try {
         $goRoot = & go env GOROOT
         if ($LASTEXITCODE -ne 0 -or -not $goRoot) { throw 'go env GOROOT failed.' }
         $mygoVersion = & go list -m -f '{{.Version}}' github.com/egoist/mygo
-        if ($LASTEXITCODE -ne 0 -or $mygoVersion -ne 'v0.7.3') { throw 'The MyGo version changed; re-audit the installer hook before building.' }
+        if ($LASTEXITCODE -ne 0 -or $mygoVersion -ne 'v0.7.4') { throw 'The MyGo version changed; re-audit the installer hook before building.' }
     } finally { Pop-Location }
 } finally {
     foreach ($name in $previous.Keys) { [Environment]::SetEnvironmentVariable($name, $previous[$name], 'Process') }
@@ -32,7 +32,7 @@ if ($runtimeNames.Count -ne 1 -or $runtimeNames[0] -ne 'mygo-runtime') {
 $runtimeDir = Join-Path $projectRoot 'node_modules/mygo-runtime'
 $runtimePackage = Get-Content -Raw -Encoding UTF8 (Join-Path $runtimeDir 'package.json') | ConvertFrom-Json
 $cliPackage = Get-Content -Raw -Encoding UTF8 (Join-Path $projectRoot 'node_modules/mygo-cli/package.json') | ConvertFrom-Json
-if ($cliPackage.version -ne '0.7.3') { throw 'The MyGo CLI version changed; re-audit the installer hook before building.' }
+if ($cliPackage.version -ne '0.7.4') { throw 'The MyGo CLI version changed; re-audit the installer hook before building.' }
 $runtimeLicense = Join-Path $runtimeDir 'LICENSE'
 if (-not (Test-Path -LiteralPath $runtimeLicense -PathType Leaf)) { throw 'mygo-runtime LICENSE is missing.' }
 $goLicense = Join-Path $goRoot 'LICENSE'
