@@ -40,6 +40,15 @@ const publishedAddress = $("#published-address"), publishedURL = $<HTMLInputElem
 const copyStatus = $("#copy-status");
 const publicGateway = $<HTMLSelectElement>("#public-gateway"), copyPublishedURL = $<HTMLButtonElement>("#copy-published-url");
 const workspaceMenu = $<HTMLDetailsElement>("#workspace-menu");
+const postsPanel = $("#posts-panel"), shell = $(".shell"), togglePosts = $<HTMLButtonElement>("#toggle-posts");
+function setPostsCollapsed(collapsed: boolean) {
+  postsPanel.hidden = collapsed;
+  shell.classList.toggle("posts-collapsed", collapsed);
+  togglePosts.setAttribute("aria-expanded", String(!collapsed));
+  const label = collapsed ? "展开文章列表" : "收起文章列表";
+  togglePosts.setAttribute("aria-label", label); togglePosts.title = label;
+}
+togglePosts.addEventListener("click", () => setPostsCollapsed(!postsPanel.hidden));
 workspaceMenu.addEventListener("click", event => {
   if (event.target instanceof window.HTMLButtonElement && !event.target.disabled) workspaceMenu.open = false;
 });
@@ -244,13 +253,14 @@ function canLeave() { return !saving && (!dirty || window.confirm("当前文章�
 function label(tag: string, value: string, className: string) {
   const el = document.createElement(tag); el.className = className; el.textContent = value; return el;
 }
-function articleRow(title: string, date: string, content: string, selected = false): HTMLButtonElement {
+function articleRow(title: string, date: string, content: string, selected = false, source = ""): HTMLButtonElement {
   const button=document.createElement("button"); button.className=`article-item${selected ? " active" : ""}`;
   button.setAttribute("aria-pressed", String(selected));
   const heading=document.createElement("span"); heading.className="article-row-heading";
-  heading.append(label("span",title || "无标题","article-title"),label("span",date,"article-date"));
+  if (source) { const icon=label("span",Array.from(source.trim())[0] || "P","article-source-icon"); icon.setAttribute("aria-hidden","true"); heading.append(icon,label("span",source,"article-source")); }
+  heading.append(label("span",date,"article-date"));
   const excerpt=content.slice(0,2000).replace(/<[^>]*>/g," ").replace(/!?\[([^\]]*)\]\([^)]*\)/g,"$1").replace(/(^|\s)[#>*_`~-]+/g,"$1").replace(/\s+/g," ").trim();
-  button.append(heading);
+  button.append(heading, label("span",title || "无标题","article-title"));
   if (excerpt) button.append(label("span",excerpt.slice(0,280),"article-excerpt"));
   return button;
 }
@@ -258,7 +268,7 @@ function renderSites() {
   sitesEl.replaceChildren();
   for (const item of sites) {
     const button = document.createElement("button"); button.className = `site-item${item.id === site?.id ? " active" : ""}`;
-    if(item.avatarPng){const avatar=document.createElement("img");avatar.className="site-icon site-avatar";avatar.alt="";avatar.src=`data:image/png;base64,${item.avatarPng}`;button.append(avatar);}else button.append(label("span", "◉", "site-icon"));
+    if(item.avatarPng){const avatar=document.createElement("img");avatar.className="site-icon site-avatar";avatar.alt="";avatar.src=`data:image/png;base64,${item.avatarPng}`;button.append(avatar);}else { const icon=label("span", Array.from(item.name.trim())[0] || "P", "site-icon"); icon.setAttribute("aria-hidden","true"); button.append(icon); }
     button.append(label("span", item.name, "site-name"));
     button.addEventListener("click", () => void selectSite(item)); sitesEl.append(button);
   }
@@ -267,7 +277,10 @@ function renderSubscriptions() {
   subscriptionsEl.replaceChildren();
   for (const entry of subscriptions) {
     const button = document.createElement("button"); button.className = `site-item${!favoritesView && !smartView && entry.url === subscription?.url ? " active" : ""}`;
-    button.append(label("span", entry.lastError ? "⚠" : "◌", "site-icon"), label("span", entry.feed.title || entry.url, "site-name"));
+    const sourceName=entry.feed.title || entry.url;
+    const icon=label("span", Array.from(sourceName.trim())[0] || "P", "site-icon"); icon.setAttribute("aria-hidden","true");
+    button.append(icon, label("span", sourceName, "site-name"));
+    if (entry.lastError) { const warning=label("span", "!", "site-error"); warning.setAttribute("aria-label", "更新失败"); button.append(warning); }
     button.title = entry.lastError ? `更新失败：${entry.lastError}` : entry.pinnedCid ? "已固定到本机" : entry.url;
     button.addEventListener("click", () => selectSubscription(entry)); subscriptionsEl.append(button);
   }
@@ -280,7 +293,7 @@ function renderArticles() {
     count.textContent=String(entries.length);
     if(!entries.length) articlesEl.append(label("p",smartView==="unread" ? "没有未读文章" : "今天没有文章","list-empty"));
     for(const {source,entry} of entries) {
-      const button=articleRow(entry.title,source.feed.title || source.url,entry.description || entry.content || "",source.url===subscription?.url && (entry.key || entry.id || entry.link)===(item?.key || item?.id || item?.link));
+      const button=articleRow(entry.title,entry.published || "",entry.description || entry.content || "",source.url===subscription?.url && (entry.key || entry.id || entry.link)===(item?.key || item?.id || item?.link),source.feed.title || source.url);
       button.classList.toggle("unread",!entry.read);
       button.addEventListener("click",()=>{subscription=source;site=null;selectFeedItem(entry);});articlesEl.append(button);
     }
@@ -290,14 +303,14 @@ function renderArticles() {
     articlesEl.replaceChildren(); const favorites = subscriptions.flatMap(source => source.feed.items.filter(entry => entry.starred).map(entry => ({source,entry})));
     count.textContent = String(favorites.length);
     if (!favorites.length) articlesEl.append(label("p", "还没有收藏的文章", "list-empty"));
-    for (const favorite of favorites) { const button=articleRow(favorite.entry.title, favorite.source.feed.title || favorite.source.url, favorite.entry.description || favorite.entry.content || ""); button.addEventListener("click",()=>{subscription=favorite.source; site=null; selectFeedItem(favorite.entry);}); articlesEl.append(button); }
+    for (const favorite of favorites) { const button=articleRow(favorite.entry.title, favorite.entry.published || "", favorite.entry.description || favorite.entry.content || "", favorite.source.url===subscription?.url && favorite.entry===item, favorite.source.feed.title || favorite.source.url); button.addEventListener("click",()=>{subscription=favorite.source; site=null; selectFeedItem(favorite.entry);}); articlesEl.append(button); }
     return;
   }
   if (subscription) {
     articlesEl.replaceChildren(); count.textContent = String(subscription.feed.items.length);
     if (!subscription.feed.items.length) articlesEl.append(label("p", "订阅暂时没有文章", "list-empty"));
     for (const entry of subscription.feed.items) {
-      const button = articleRow(entry.title, entry.published || "", entry.description || entry.content || "", entry === item);
+      const button = articleRow(entry.title, entry.published || "", entry.description || entry.content || "", entry === item, subscription.feed.title || subscription.url);
       button.classList.toggle("unread",!entry.read);
       button.addEventListener("click", () => selectFeedItem(entry)); articlesEl.append(button);
     }
@@ -307,7 +320,7 @@ function renderArticles() {
     articlesEl.replaceChildren(); count.textContent=String(drafts.length);
     if (!drafts.length) articlesEl.append(label("p","还没有草稿","list-empty"));
     for (const entry of drafts) {
-      const button=articleRow(entry.title || "未命名草稿",new Date(entry.modified).toLocaleDateString("zh-CN"),entry.content,entry.id===draft?.id);
+      const button=articleRow(entry.title || "未命名草稿",new Date(entry.modified).toLocaleDateString("zh-CN"),entry.content,entry.id===draft?.id,site?.name || "草稿");
       button.addEventListener("click",()=>selectDraft(entry)); articlesEl.append(button);
     }
     return;
@@ -315,11 +328,14 @@ function renderArticles() {
   articlesEl.replaceChildren(); count.textContent = String(articles.length);
   if (!articles.length) { articlesEl.append(label("p", site ? "还没有文章" : "选择一个站点开始", "list-empty")); return; }
   for (const item of [...articles].sort((a, b) => b.modified.localeCompare(a.modified))) {
-    const button = articleRow(item.title, `${item.articleType===1 ? "页面 · " : ""}${new Date(item.modified).toLocaleDateString("zh-CN")}`, item.content, item.id === article?.id);
+    const button = articleRow(item.title, `${item.articleType===1 ? "页面 · " : ""}${new Date(item.modified).toLocaleDateString("zh-CN")}`, item.content, item.id === article?.id, site?.name || "我的站点");
     button.addEventListener("click", () => selectArticle(item)); articlesEl.append(button);
   }
 }
+let previousEditing = false;
 function updateView() {
+  if (previousEditing && !editing && postsPanel.hidden) setPostsCollapsed(false);
+  previousEditing = editing;
   const publication = site ? publicationStates.get(site.id) : undefined;
   renderSites(); renderSubscriptions(); renderArticles(); siteTitle.textContent = smartView === "today" ? "今天" : smartView === "unread" ? "未读文章" : favoritesView ? "收藏的文章" : subscription?.feed.title || site?.name || "我的站点";
   $("#show-favorites").classList.toggle("active",favoritesView);
@@ -329,7 +345,9 @@ function updateView() {
   $("#today-count").textContent=String(allItems.filter(entry=>isToday(entry.published)).length);
   $("#unread-count").textContent=String(allItems.filter(entry=>!entry.read).length);
   workspaceMenu.hidden = !site && !subscription;
-  newArticle.disabled = !site || !!subscription || saving; saveButton.disabled = !site || !editing || !!subscription || saving;
+  newArticle.disabled = !site || !!subscription || saving;
+  const headerCompose=$<HTMLButtonElement>("#new-article-header"); headerCompose.hidden=!site || !!subscription || editing; headerCompose.disabled=newArticle.disabled;
+  saveButton.disabled = !site || !editing || !!subscription || saving;
   showDrafts.hidden=!!subscription || favoritesView || !!smartView; showDrafts.disabled=!site || saving; showDrafts.textContent=draftsView ? "返回文章" : "草稿";
   $("#posts-kind").textContent = smartView === "unread" ? "未读" : smartView === "today" ? "今天" : favoritesView ? "收藏" : draftsView ? "草稿" : "文章";
   saveDraft.hidden=!editing || !!subscription; saveDraft.disabled=!site || !editing || saving;
@@ -352,9 +370,9 @@ function updateView() {
   pinSubscription.hidden = !subscription; pinSubscription.disabled = saving || !!subscription && ((fixed && !!subscription.cid) || refreshingSubscriptions.has(subscription.url));
   pinSubscription.textContent = fixed ? (subscription?.cid ? "已固定离线" : "重新固定离线") : "固定离线";
   $("#subscription-status").textContent = subscription && refreshingSubscriptions.has(subscription.url) ? "正在刷新订阅…" : subscription?.lastError ? `更新失败，正在显示已缓存内容：${subscription.lastError}` : subscription?.offlinePinned ? "已固定订阅媒体到本机" : subscription?.pinnedCid ? (subscription.pinnedCid === subscription.cid ? "已固定当前版本到本机" : "仅旧版本已固定") : "";
-  starItem.textContent = item?.starred ? "取消收藏" : "收藏"; starItem.disabled = !item || !subscription; shareItem.disabled = !item?.link;
+  starItem.textContent = item?.starred ? "取消收藏" : "收藏"; starItem.title=starItem.textContent; starItem.setAttribute("aria-label",starItem.textContent); starItem.disabled = !item || !subscription; shareItem.disabled = !item?.link;
   const readButton=$<HTMLButtonElement>("#toggle-read"), readKey=subscription && item ? `${subscription.url}\u0000${item.key || item.id || item.link}` : "";
-  readButton.textContent=item?.read ? "标为未读" : "标为已读";readButton.disabled=!item || !subscription || pendingRead.has(readKey) || bulkReading.has(subscription.url);
+  readButton.textContent=item?.read ? "标为未读" : "标为已读";readButton.title=readButton.textContent;readButton.setAttribute("aria-label",readButton.textContent);readButton.disabled=!item || !subscription || pendingRead.has(readKey) || bulkReading.has(subscription.url);
   const markFeed=$<HTMLButtonElement>("#mark-feed-read");markFeed.hidden=!subscription;markFeed.disabled=!subscription || bulkReading.has(subscription.url) || [...pendingRead].some(key=>key.startsWith(`${subscription!.url}\u0000`)) || !subscription.feed.items.some(entry=>!entry.read);
   deleteArticle.hidden = (!article && !draft) || !!subscription; deleteArticle.textContent=draft ? "删除草稿" : "删除文章";
   addAttachment.disabled = (!article && !draft) || !site || saving;
@@ -387,7 +405,13 @@ function updateView() {
 	 if(site?.tagsUnsupported) importedWarning.textContent += " 原备份标签格式不受支持，已保留原始数据；当前不能编辑标签或重建该站点。";
   const ownReading=!!site && !!article && !editing && !subscription && !draftsView;
   empty.hidden = editing || !!item || ownReading; editor.hidden = !editing; reader.hidden = !item; ownReader.hidden=!ownReading;
-  if(ownReading && article){$("#own-reader-title").textContent=article.title || "无标题";$("#own-reader-date").textContent=new Date(article.modified).toLocaleDateString("zh-CN");}
+  if(ownReading && article){$("#own-reader-title").textContent=article.title || "无标题";$("#own-reader-date").textContent=new Date(article.modified).toLocaleDateString("zh-CN");$("#own-reader-source").textContent=site?.name || "我的站点";$("#own-reader-author").textContent=site?.authorName || site?.name || "我的站点";}
+  if(subscription){$("#reader-source").textContent=subscription.feed.title || subscription.url;$("#reader-author").textContent=subscription.feed.title || subscription.url;}
+  for (const container of [ownReader, reader]) {
+    const source=container.querySelector<HTMLElement>(".reader-category > span:last-child")?.textContent || "P";
+    const initial=Array.from(source.trim())[0] || "P";
+    container.querySelectorAll<HTMLElement>(".reader-source-icon, .reader-author-avatar").forEach(icon=>{icon.textContent=initial;});
+  }
   workspaceTitle.textContent = subscription ? "阅读订阅" : smartView === "today" ? "今天" : smartView === "unread" ? "未读文章" : favoritesView ? "收藏的文章" : editing ? "撰写文章" : ownReading ? "阅读文章" : site?.name ?? "欢迎来到 Planet";
   siteAddress.hidden = !site?.ipns || !!subscription; siteAddress.textContent = site?.ipns ? `IPNS: ${site.ipns}` : ""; siteAddress.title = site?.ipns ?? "";
   publishedAddress.hidden = !site?.ipns || !site?.lastPublishedCID || !!subscription;
@@ -517,7 +541,8 @@ async function renderPreview() {
   try {
     const html = site && draft ? await Library.previewDraft(site.id, draft.id, content.value) : site && article ? await Library.previewArticle(site.id, article.id, content.value) : await Library.preview(content.value);
     if (revision !== previewRevision) return;
-    preview.srcdoc = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><style>body{font:16px/1.8 'Segoe UI',sans-serif;color:#303239;margin:28px;overflow-wrap:anywhere}h1,h2,h3{line-height:1.3;color:#20252d}a{color:#4e5cbb}pre{background:#f1f2f5;padding:16px;overflow:auto;border-radius:8px}code{font-family:Consolas,monospace}blockquote{border-left:3px solid #a9b1ca;margin-left:0;padding-left:16px;color:#69707c}img{max-width:100%}</style></head><body>${html}</body></html>`;
+    const safeTitle=title.value.replace(/[&<>]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[char]!));
+    preview.srcdoc = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><style>body{font:14px/1.8 'Segoe UI Variable','Segoe UI','Microsoft YaHei UI',sans-serif;color:#424242;margin:24px;overflow-wrap:anywhere}.preview-title{font-size:22px;line-height:1.4;margin:0 0 20px;color:#242424}h1,h2,h3{line-height:1.4;color:#242424}a{color:#0f6cbd}pre{background:#f5f5f5;padding:16px;overflow:auto;border-radius:4px}code{font-family:Consolas,monospace}blockquote{border-left:3px solid #9ebddd;margin-left:0;padding-left:16px;color:#596573}img{max-width:100%}</style></head><body>${safeTitle ? `<h1 class="preview-title">${safeTitle}</h1>` : ""}${html}</body></html>`;
   } catch (e) { showError(e); }
 }
 async function renderOwnArticle() {
@@ -887,7 +912,7 @@ async function performSearch() {
     const results=await Library.searchArticles(query);
     if(revision!==searchRevision || !searchDialog.open)return;
     searchStatus.textContent=results.length ? `找到 ${results.length} 篇文章${results.length>=200 ? "（最多显示 200 篇）" : ""}` : "没有找到匹配的文章。";
-    for(const result of results){const button=articleRow(result.title,result.sourceName,result.snippet);button.addEventListener("click",()=>void openSearchResult(result));searchResults.append(button);}
+    for(const result of results){const button=articleRow(result.title,"",result.snippet,false,result.sourceName);button.addEventListener("click",()=>void openSearchResult(result));searchResults.append(button);}
   } catch(error){if(revision===searchRevision && searchDialog.open)searchStatus.textContent=`搜索失败：${error instanceof Error ? error.message : String(error)}`;}
 }
 $("#show-search").addEventListener("click",()=>{searchDialog.showModal();searchInput.focus();if(searchInput.value.trim())void performSearch();});
@@ -1109,6 +1134,7 @@ feedForm.addEventListener("submit", async (event) => {
   } catch (e) { feedDialog.close(); showError(e); } finally { button.disabled = false; }
 });
 newArticle.addEventListener("click", startArticle);
+$("#new-article-header").addEventListener("click", startArticle);
 playArticleAudio.addEventListener("click", () => {
   if (!site || !article?.audioFilename) return;
   const siteID = site.id, articleID = article.id, label = article.title || article.audioFilename, revision = ++audioRevision;

@@ -2139,6 +2139,15 @@ func (l *Library) ExportWebsite(ctx context.Context, siteID string) (string, err
 }
 
 func main() {
+	// MyGo invokes the executable only to generate bindings. It must not
+	// acquire the application or installer locks held by a running instance.
+	if os.Getenv("MYGO_GENERATE") != "" {
+		mygo.Bind(&Library{})
+		if err := mygo.App.Run(); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	if len(os.Args) == 2 && os.Args[1] == "--planet-version" {
 		fmt.Println(appVersion)
 		return

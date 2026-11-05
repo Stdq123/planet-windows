@@ -9,6 +9,60 @@ const waitFor = async (condition: () => boolean) => {
   throw new Error("Timed out waiting for the interface");
 };
 
+test("live article preview includes the current title as text and renders the body", async () => {
+  const window = new Window({url:"http://localhost/"});
+  window.document.write(await Bun.file("index.html").text());
+  Object.assign(globalThis, {window, document:window.document});
+  const site = {id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z"};
+  (globalThis as any).mygo = {call:async(method:string)=>{
+    switch (method) {
+      case "Library.Sites": return [site];
+      case "Library.Subscriptions": case "Library.Articles": return [];
+      case "Library.Preview": return "<p>正文预览</p>";
+      default: throw new Error(method);
+    }
+  }};
+  await import("../src/main.ts?live-preview-title");
+  await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#new-article")!.disabled);
+  window.document.querySelector<HTMLButtonElement>("#new-article")!.click();
+  const title = window.document.querySelector<HTMLInputElement>("#title")!;
+  title.value = '<img src=x onerror=alert(1)> & 正文';
+  title.dispatchEvent(new window.Event("input"));
+  const frame = window.document.querySelector<HTMLIFrameElement>("#preview")!;
+  await waitFor(()=>frame.srcdoc.includes("&lt;img src=x onerror=alert(1)&gt; &amp; 正文"));
+  expect(frame.srcdoc).toContain("<p>正文预览</p>");
+  expect(frame.srcdoc).not.toContain("<img src=x onerror=alert(1)>");
+});
+
+test("writing mode can hide the article list and restores it when leaving the editor", async () => {
+  const window = new Window({url:"http://localhost/"});
+  window.document.write(await Bun.file("index.html").text());
+  Object.assign(globalThis, {window, document:window.document});
+  const site = {id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z"};
+  (globalThis as any).mygo = {call:async(method:string)=>{
+    switch (method) {
+      case "Library.Sites": return [site];
+      case "Library.Subscriptions": case "Library.Articles": return [];
+      case "Library.Preview": return "";
+      default: throw new Error(method);
+    }
+  }};
+  await import("../src/main.ts?writing-list-toggle");
+  await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#new-article")!.disabled);
+  window.document.querySelector<HTMLButtonElement>("#new-article")!.click();
+  const toggle = window.document.querySelector<HTMLButtonElement>("#toggle-posts")!;
+  const panel = window.document.querySelector<HTMLElement>("#posts-panel")!;
+  expect(toggle.getAttribute("aria-expanded")).toBe("true");
+  toggle.click();
+  expect(panel.hidden).toBe(true);
+  expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  toggle.click();
+  expect(panel.hidden).toBe(false);
+  toggle.click();
+  window.document.querySelector<HTMLButtonElement>("#show-favorites")!.click();
+  expect(panel.hidden).toBe(false);
+});
+
 test("article list presents a safe content summary and guides selection", async () => {
   const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());
   Object.assign(globalThis,{window,document:window.document});
@@ -21,6 +75,26 @@ test("article list presents a safe content summary and guides selection", async 
   expect(window.document.querySelector("#empty h2")?.textContent).toContain("选择");
   window.document.querySelector<HTMLButtonElement>(".article-item")!.click();
   expect(window.document.querySelector<HTMLInputElement>("#title")!.value).toBe("文章标题");
+});
+
+test("reading layout identifies the real source and header compose opens the existing editor", async () => {
+  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());
+  Object.assign(globalThis,{window,document:window.document});
+  const site={id:"s",name:"我的真实站点",about:"",created:"2026-01-01T00:00:00Z"};
+  const article={id:"a",siteId:"s",title:"真实标题",content:"正文",created:"2026-01-01T00:00:00Z",modified:"2026-01-02T00:00:00Z",tags:{}};
+  (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":return [];case "Library.Articles":return [article];case "Library.Preview":return "";default:throw new Error(method);}}};
+  await import("../src/main.ts?reading-layout-source");
+  await waitFor(()=>!!window.document.querySelector(".article-item"));
+  expect(window.document.querySelector(".article-item .article-source")?.textContent).toBe("我的真实站点");
+  window.document.querySelector<HTMLButtonElement>(".article-item")!.click();
+  expect(window.document.querySelector("#own-reader-source")?.textContent).toBe("我的真实站点");
+  const toggle=window.document.querySelector<HTMLButtonElement>("#toggle-posts")!;
+  toggle.click();expect(window.document.querySelector<HTMLElement>("#posts-panel")!.hidden).toBe(true);
+  toggle.click();expect(window.document.querySelector<HTMLElement>("#posts-panel")!.hidden).toBe(false);
+  const compose=window.document.querySelector<HTMLButtonElement>("#new-article-header")!;
+  expect(compose.hidden).toBe(false);compose.click();
+  expect(window.document.querySelector<HTMLElement>("#editor")!.hidden).toBe(false);
+  expect(window.document.querySelector<HTMLElement>("#preview")).not.toBeNull();
 });
 
 test("favorites view identifies itself and has a persistent selection indicator", async () => {
