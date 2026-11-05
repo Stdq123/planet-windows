@@ -20,7 +20,7 @@ async function fixture(overrides: Record<string, unknown> = {}) {
     openSite: async (id: string) => { calls.push(["site", id]); },
     openEntry: async (kind: string, site: string, id: string) => { calls.push([kind, site, id]); },
     compose: async (id: string) => { calls.push(["compose", id]); },
-    createSite: () => {}, importSite: () => {}, unread: () => {}, node: () => {}, ...overrides,
+    search: () => {}, createSite: () => {}, importSite: () => {}, unread: () => {}, node: () => {}, ...overrides,
   });
   return { root, controller, calls, window, $: <T extends Element = HTMLElement>(s: string) => root.querySelector<T>(s)! };
 }

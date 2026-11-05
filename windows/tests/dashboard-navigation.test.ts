@@ -77,3 +77,13 @@ test("dashboard navigation during slow startup fills navigation with the newest 
   resolve([]); await until(() => $("#library-notice").hidden === true);
   expect($("#sites").children.length).toBe(2);
 });
+
+test("overview search opens the existing dialog and focuses its query field", async () => {
+  const { $, window } = await fixture(); await until(() => !!$("#dashboard-drafts button"));
+  $<HTMLButtonElement>("#dashboard-search").click();
+  expect($<HTMLDialogElement>("#search-dialog").open).toBe(true);
+  expect(window.document.activeElement).toBe($("#search-input"));
+  $<HTMLButtonElement>("#close-search").click();
+  expect($<HTMLDialogElement>("#search-dialog").open).toBe(false);
+  expect($("#dashboard").hidden).toBe(false);
+});

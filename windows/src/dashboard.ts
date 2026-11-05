@@ -7,6 +7,7 @@ interface DashboardActions {
   openSite(id: string): Promise<void>;
   openEntry(kind: "draft" | "article", siteID: string, id: string): Promise<void>;
   compose(siteID: string): Promise<void>;
+  search(): void;
   createSite(): void;
   importSite(): void;
   unread(): void;
@@ -54,7 +55,7 @@ export function createDashboard(root: HTMLElement, actions: DashboardActions) {
       const title = entry.title || "无标题";
       details.append(text("strong", title, "dashboard-row-title"), text("span", entry.siteName, "dashboard-caption"));
       const time = text("time", date(entry.modified), "dashboard-row-date"); time.setAttribute("datetime", entry.modified);
-      const arrow = text("span", "↗", "dashboard-row-arrow"); arrow.setAttribute("aria-hidden", "true");
+      const arrow = text("span", "\uE76C", "dashboard-row-arrow system-icon"); arrow.setAttribute("aria-hidden", "true");
       row.title = `${title} / ${entry.siteName}`; row.append(icon, details, time, arrow);
       row.addEventListener("click", () => void act(() => actions.openEntry(kind, entry.siteId, entry.id))); list.append(row);
     }
@@ -68,8 +69,8 @@ export function createDashboard(root: HTMLElement, actions: DashboardActions) {
     $("#dashboard-columns").hidden = data.siteCount === 0;
     $("#dashboard-compose-controls").hidden = data.siteCount === 0;
     $("#dashboard-first-site").hidden = data.siteCount !== 0;
-    $("#dashboard-welcome-title").textContent = data.siteCount ? "今天，写点什么？" : "你的故事，从这里开始。";
-    $("#dashboard-welcome-description").textContent = data.siteCount ? "继续未完成的故事，或记录一个新发现。" : "建一个属于自己的站点，让日常、灵感与热爱有处安放。";
+    $("#dashboard-welcome-title").textContent = data.siteCount ? "开始写作" : "创建第一个站点";
+    $("#dashboard-welcome-description").textContent = data.siteCount ? "选择站点，撰写一篇新文章。" : "创建站点后，即可保存草稿和发布文章。";
     for (const select of [composeSite, analyticsSite]) {
       const selected = select.value; select.replaceChildren();
       for (const site of data.sites) { const option = doc.createElement("option"); option.value = site.id; option.textContent = site.name; select.append(option); }
@@ -86,7 +87,9 @@ export function createDashboard(root: HTMLElement, actions: DashboardActions) {
       status.dataset.defaultTone = !site.hasPublished ? "unpublished" : site.publishPending ? "pending" : "published";
       const icon = text("span", Array.from(site.name.trim())[0] || "P", "dashboard-site-icon"); icon.setAttribute("aria-hidden", "true");
       const details = text("span", "", "dashboard-site-body");
-      details.append(text("strong", site.name), status, text("span", `${site.articleCount} 篇文章 · ${site.draftCount} 份草稿`, "dashboard-caption"));
+      const counts = text("span", "", "dashboard-site-counts dashboard-caption");
+      counts.append(text("span", `${site.articleCount} 篇文章`), text("span", `${site.draftCount} 份草稿`));
+      details.append(text("strong", site.name), status, counts);
       if (site.lastPublished) details.append(text("span", `最近发布 ${date(site.lastPublished)}`, "dashboard-caption"));
       row.append(icon, details);
       row.addEventListener("click", () => void act(() => actions.openSite(site.id))); list.append(row);
@@ -109,7 +112,7 @@ export function createDashboard(root: HTMLElement, actions: DashboardActions) {
     }
   }
   refreshButton.addEventListener("click", () => void refresh());
-  for (const [id, action] of [["create", actions.createSite], ["import", actions.importSite], ["unread", actions.unread], ["node", actions.node]] as const) $("#dashboard-" + id).addEventListener("click", action);
+  for (const [id, action] of [["search", actions.search], ["create", actions.createSite], ["import", actions.importSite], ["unread", actions.unread], ["node", actions.node]] as const) $("#dashboard-" + id).addEventListener("click", action);
   $("#dashboard-first-site").addEventListener("click", actions.createSite);
   $("#dashboard-compose").addEventListener("click", () => { if (composeSite.value) void act(() => actions.compose(composeSite.value)); });
   analyticsSite.addEventListener("change", resetAnalytics); period.addEventListener("change", resetAnalytics);
