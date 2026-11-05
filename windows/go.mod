@@ -4,7 +4,7 @@ go 1.27.3
 
 require (
 	github.com/adraffy/go-ens-normalize v0.1.1
-	github.com/egoist/mygo v0.7.3
+	github.com/egoist/mygo v0.7.4
 	github.com/ensdomains/go-ens/v4 v4.0.0
 	github.com/ethereum/go-ethereum v1.17.5
 	github.com/flosch/pongo2/v6 v6.0.0
