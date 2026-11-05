@@ -8,6 +8,7 @@
 - Install frontend dependencies with `bun install --frozen-lockfile` from `windows/`. Keep `bun.lock` and `go.sum` tracked.
 - Run `bun run check` from `windows/` for Go formatting, static analysis, frontend and Go tests, TypeScript checks and the frontend production build. CI uses the same entry point.
 - Cloud CI is paused by the maintainer. Keep workflows manual-only and the remote workflow disabled; do not dispatch, enable or add automatic cloud runs without a new request. Record local verification in PRs instead of requiring a missing CI status.
+- Dependabot can run despite ordinary Actions being disabled. Keep version-update limits at zero, automatic rebasing disabled and security-update automation off until explicitly requested.
 - Run `bun run security:check` for dependency changes and release preparation; online advisory/tool failures are failures, not a clean audit.
 - Follow `docs/releasing.md` for release preparation. Default output is an unapproved draft; do not bypass metadata, signature or license gates to claim a release is ready.
 - For packaging changes, also run `bun run build` and the relevant checks in `windows/docs/release-audit.md`. The shared check does not validate an installer.
