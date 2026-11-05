@@ -2,6 +2,7 @@
 package feeds
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -17,6 +18,9 @@ import (
 	"time"
 
 	"github.com/mmcdole/gofeed"
+	"github.com/mmcdole/gofeed/atom"
+	feedjson "github.com/mmcdole/gofeed/json"
+	"github.com/mmcdole/gofeed/rss"
 )
 
 type Feed struct {
@@ -139,7 +143,7 @@ func fetchDocument(ctx context.Context, client *http.Client, u *url.URL) (feedDo
 }
 
 func parseFeed(body []byte, base *url.URL) (Feed, error) {
-	parsed, err := gofeed.NewParser().Parse(strings.NewReader(string(body)))
+	parsed, err := parseDocument(body)
 	if err != nil {
 		return Feed{}, fmt.Errorf("无法解析订阅：%w", err)
 	}
@@ -201,6 +205,37 @@ func parseFeed(body []byte, base *url.URL) (Feed, error) {
 		out.Items = append(out.Items, Item{ID: entry.GUID, Title: entry.Title, Link: entry.Link, Description: entry.Description, Content: content, Published: entry.Published, AudioURL: audioURL, VideoURL: videoURL, Media: media})
 	}
 	return out, nil
+}
+
+func parseDocument(body []byte) (*gofeed.Feed, error) {
+	parsed, err := gofeed.NewParser().Parse(bytes.NewReader(body))
+	if !errors.Is(err, gofeed.ErrFeedTypeNotDetected) {
+		return parsed, err
+	}
+	// Fetch already bounds this body to 5 MiB. Inspect the original bytes so
+	// XML prologs and JSON whitespace beyond gofeed's 4 KiB sniff window work.
+	switch gofeed.DetectFeedType(bytes.NewReader(body)) {
+	case gofeed.FeedTypeRSS:
+		feed, parseErr := (&rss.Parser{}).Parse(bytes.NewReader(body))
+		if parseErr != nil {
+			return nil, parseErr
+		}
+		return (&gofeed.DefaultRSSTranslator{}).Translate(feed)
+	case gofeed.FeedTypeAtom:
+		feed, parseErr := (&atom.Parser{}).Parse(bytes.NewReader(body))
+		if parseErr != nil {
+			return nil, parseErr
+		}
+		return (&gofeed.DefaultAtomTranslator{}).Translate(feed)
+	case gofeed.FeedTypeJSON:
+		feed, parseErr := (&feedjson.Parser{}).Parse(bytes.NewReader(body))
+		if parseErr != nil {
+			return nil, parseErr
+		}
+		return (&gofeed.DefaultJSONTranslator{}).Translate(feed)
+	default:
+		return nil, err
+	}
 }
 
 // ItemKey is stable across refreshes and scoped to a subscription.
