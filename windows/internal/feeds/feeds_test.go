@@ -13,6 +13,7 @@ func TestFetchPreservesLargeFeedCompatibility(t *testing.T) {
 		"rss long prolog":  prolog + `<rss version="2.0"><channel><title>Site</title><item><title>Post</title><guid>one</guid></item></channel></rss>`,
 		"atom long prolog": prolog + `<feed xmlns="http://www.w3.org/2005/Atom"><title>Site</title><entry><title>Post</title><id>one</id></entry></feed>`,
 		"large json":       `{"version":"https://jsonfeed.org/version/1.1","title":"Site","items":[{"id":"one","title":"Post","content_text":"` + strings.Repeat("x", 5000) + `"}]}`,
+		"json long prefix": strings.Repeat(" ", 5000) + `{"version":"https://jsonfeed.org/version/1.1","title":"Site","items":[{"id":"one","title":"Post","content_text":"Hello"}]}`,
 	}
 	for name, body := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -48,11 +49,15 @@ func TestFetchRejectsUnknownXMLAndOversizedFeed(t *testing.T) {
 }
 
 func TestFetchRejectsNullJSONItem(t *testing.T) {
-	body := `{"version":"https://jsonfeed.org/version/1.1","title":"Site","items":[null]}`
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(body)) }))
-	defer server.Close()
-	if _, err := Fetch(server.URL); err == nil {
-		t.Fatal("accepted null JSON feed item")
+	for name, prefix := range map[string]string{"normal": "", "long prefix": strings.Repeat(" ", 5000)} {
+		t.Run(name, func(t *testing.T) {
+			body := prefix + `{"version":"https://jsonfeed.org/version/1.1","title":"Site","items":[null]}`
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte(body)) }))
+			defer server.Close()
+			if _, err := Fetch(server.URL); err == nil {
+				t.Fatal("accepted null JSON feed item")
+			}
+		})
 	}
 }
 

@@ -19,6 +19,7 @@ import (
 
 	"github.com/mmcdole/gofeed"
 	"github.com/mmcdole/gofeed/atom"
+	feedjson "github.com/mmcdole/gofeed/json"
 	"github.com/mmcdole/gofeed/rss"
 )
 
@@ -212,7 +213,7 @@ func parseDocument(body []byte) (*gofeed.Feed, error) {
 		return parsed, err
 	}
 	// Fetch already bounds this body to 5 MiB. Inspect the original bytes so
-	// valid XML prologs beyond gofeed's 4 KiB sniff window remain supported.
+	// XML prologs and JSON whitespace beyond gofeed's 4 KiB sniff window work.
 	switch gofeed.DetectFeedType(bytes.NewReader(body)) {
 	case gofeed.FeedTypeRSS:
 		feed, parseErr := (&rss.Parser{}).Parse(bytes.NewReader(body))
@@ -226,6 +227,12 @@ func parseDocument(body []byte) (*gofeed.Feed, error) {
 			return nil, parseErr
 		}
 		return (&gofeed.DefaultAtomTranslator{}).Translate(feed)
+	case gofeed.FeedTypeJSON:
+		feed, parseErr := (&feedjson.Parser{}).Parse(bytes.NewReader(body))
+		if parseErr != nil {
+			return nil, parseErr
+		}
+		return (&gofeed.DefaultJSONTranslator{}).Translate(feed)
 	default:
 		return nil, err
 	}
