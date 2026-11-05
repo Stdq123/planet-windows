@@ -2,6 +2,7 @@
 package feeds
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -9,6 +10,7 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"strings"
@@ -71,27 +73,72 @@ func Fetch(address string) (Feed, error) {
 		}
 		return nil
 	}}
-	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	// Discovery and all candidate requests share a deadline, so a page with
+	// many broken feed links cannot multiply the subscription wait time.
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	doc, err := fetchDocument(ctx, client, u)
 	if err != nil {
 		return Feed{}, err
+	}
+	feed, err := parseFeed(doc.body, doc.url)
+	if err == nil || !doc.isHTML {
+		return feed, err
+	}
+	candidates := discoverFeeds(doc.body, doc.url)
+	if len(candidates) == 0 {
+		return Feed{}, errors.New("此网页没有提供可识别的 RSS、Atom 或 JSON Feed 地址，请填写订阅源地址")
+	}
+	for _, candidate := range candidates {
+		var next feedDocument
+		next, err = fetchDocument(ctx, client, candidate)
+		if err == nil {
+			feed, err = parseFeed(next.body, next.url)
+			if err == nil {
+				return feed, nil
+			}
+		}
+		if ctx.Err() != nil {
+			break
+		}
+	}
+	return Feed{}, fmt.Errorf("网页提供的订阅源均无法读取：%w", err)
+}
+
+type feedDocument struct {
+	body   []byte
+	url    *url.URL
+	isHTML bool
+}
+
+func fetchDocument(ctx context.Context, client *http.Client, u *url.URL) (feedDocument, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return feedDocument{}, err
 	}
 	req.Header.Set("User-Agent", "Planet-Windows/0.1")
 	resp, err := client.Do(req)
 	if err != nil {
-		return Feed{}, err
+		return feedDocument{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return Feed{}, fmt.Errorf("订阅请求失败：HTTP %d", resp.StatusCode)
+		return feedDocument{}, fmt.Errorf("订阅请求失败：HTTP %d", resp.StatusCode)
 	}
 	const limit = 5 << 20
 	body, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
 	if err != nil {
-		return Feed{}, err
+		return feedDocument{}, err
 	}
 	if len(body) > limit {
-		return Feed{}, errors.New("订阅内容超过 5 MB")
+		return feedDocument{}, errors.New("订阅内容超过 5 MB")
 	}
+	contentType, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+	isHTML := contentType == "text/html" || contentType == "application/xhtml+xml" || strings.HasPrefix(http.DetectContentType(body), "text/html")
+	return feedDocument{body: body, url: resp.Request.URL, isHTML: isHTML}, nil
+}
+
+func parseFeed(body []byte, base *url.URL) (Feed, error) {
 	parsed, err := gofeed.NewParser().Parse(strings.NewReader(string(body)))
 	if err != nil {
 		return Feed{}, fmt.Errorf("无法解析订阅：%w", err)
@@ -138,7 +185,7 @@ func Fetch(address string) (Feed, error) {
 			if err != nil {
 				continue
 			}
-			address = resp.Request.URL.ResolveReference(address)
+			address = base.ResolveReference(address)
 			if (address.Scheme == "http" || address.Scheme == "https") && address.Host != "" && address.User == nil {
 				address.Fragment = ""
 				value := address.String()

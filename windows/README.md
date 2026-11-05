@@ -2,6 +2,12 @@
 
 这是 Planet 的独立 Windows 移植，使用 Go、MyGo、WebView2 和 TypeScript，不使用 Electron 或 Swift。当前为开发版本，尚不具备原版的完整功能；原版数据兼容性仍需要真实 Mac 备份验证。
 
+## 界面示例
+
+![Planet Windows 的订阅列表、文章列表和含图片的文章阅读界面](../docs/screenshots/subscription-reader.png)
+
+在 Planet Windows 中阅读 olivida.eth 的订阅文章。
+
 ## 当前能力
 
 - 创建多个本地站点，创建、编辑、保存和删除 Markdown 文章，预览文章。
@@ -20,7 +26,9 @@
 - 本地及导入站点均可为已保存的文章添加或删除附件；附件立即保存或删除，系统插入的 Markdown 引用需要保存文章，删除附件时须自行删除不再需要的引用。发布、网页导出及备份会携带已保存附件。发布期间的附件操作可能需要等待发布结束，等待时不能保存或切换站点。编辑器的隔离预览可显示当前文章已登记的 PNG、JPEG、GIF 和 WebP 附件（单文件最多 8 MiB，总计最多 16 MiB）；外部图片和 SVG 不在预览中加载，发布后的页面仍可引用附件。
 - 将已保存的站点导出为基础静态 HTML 网站。该输出使用简化模板，不等同于原版 Planet 网站及模板格式。
 - 关注 RSS、Atom、JSON Feed，以及 Planet/IPNS 和经 ENSIP-15 规范化的 Unicode `.eth` ENS 名称；启动时及运行期间每 15 分钟自动刷新过期订阅，也可手动刷新。刷新失败时保留本机缓存并显示错误；文章可收藏、在收藏列表中查看和复制分享链接。可取消订阅，取消会删除该订阅及其收藏记录，不会自动取消共享的 IPFS 固定或直接删除缓存文件。
-- Planet/IPNS/ENS 订阅可将当前 CID 固定到本机 Kubo；固定后断网可读取缓存文章、已登记图片和音频（图片单张不超过 8 MiB，音频临时播放文件不超过 1 GiB）。刷新已固定订阅时会先固定新版本；为避免误删其他内容，旧 CID 不会自动取消固定。RSS/Atom/JSON Feed 可手动固定图片及音视频；固定后的刷新先准备完整快照，失败保留旧版本，未变化的媒体会复用原文件。单张图片上限 8 MiB，单个音视频 256 MiB，每次快照最多 256 个资源及 1 GiB；可在“离线媒体空间”查看占用与可回收大小，手动清理不再被任何保存文章或当前播放器引用的文件；未知文件、链接及其他目录不会清理。历史文章和收藏引用的媒体会保留，播放关闭后旧文件才可回收。阅读器隔离外部脚本与未固定的图片。ENS 使用 Ethereum Universal Resolver 查询 IPFS/IPNS contenthash（默认 `https://ethereum-rpc.publicnode.com`，可用 `PLANET_ENS_RPC_URL` 指定 RPC），IPNS 解析支持指向子目录。侧栏可选择 `ipfs.io`、`eth.sucks`、`dweb.link` 或 Aleph Cloud 作为公共网关；站点复制地址和 Planet 订阅文章的分享链接使用所选网关，普通订阅网页链接保持原样。选择保存在本机，公网可达性取决于节点和网关。
+- HTTP(S) 订阅支持直接输入网页地址，自动发现页面头部声明的 RSS、Atom 或 JSON Feed（包括 Planet 模板的 `preload` 声明）。支持跳转、相对地址和 HTML `base`；没有订阅声明的网页需填写订阅源地址。通过网关网址添加的站点保存为普通网页订阅；使用裸 `.eth` 名称可走原有 ENS/IPFS 订阅流程。
+- 普通网页订阅在阅读时加载在线图片和正文中的音视频，相对地址以文章链接（缺失时为站点或订阅地址）为基准；音视频使用播放控件，不自动播放。阅读器仍禁用外部脚本、嵌入网页和表单提交。已固定的订阅继续使用本机媒体，不回退到在线请求。
+- Planet/IPNS/ENS 订阅可将当前 CID 固定到本机 Kubo；固定后断网可读取缓存文章、已登记图片和音频（图片单张不超过 8 MiB，音频临时播放文件不超过 1 GiB）。刷新已固定订阅时会先固定新版本；为避免误删其他内容，旧 CID 不会自动取消固定。RSS/Atom/JSON Feed 可手动固定图片及音视频；固定后的刷新先准备完整快照，失败保留旧版本，未变化的媒体会复用原文件。单张图片上限 8 MiB，单个音视频 256 MiB，每次快照最多 256 个资源及 1 GiB；可在“离线媒体空间”查看占用与可回收大小，手动清理不再被任何保存文章或当前播放器引用的文件；未知文件、链接及其他目录不会清理。历史文章和收藏引用的媒体会保留，播放关闭后旧文件才可回收。阅读器隔离外部脚本，已固定订阅的图片从本机读取。ENS 使用 Ethereum Universal Resolver 查询 IPFS/IPNS contenthash（默认 `https://ethereum-rpc.publicnode.com`，可用 `PLANET_ENS_RPC_URL` 指定 RPC），IPNS 解析支持指向子目录。侧栏可选择 `ipfs.io`、`eth.sucks`、`dweb.link` 或 Aleph Cloud 作为公共网关；站点复制地址和 Planet 订阅文章的分享链接使用所选网关，普通订阅网页链接保持原样。选择保存在本机，公网可达性取决于节点和网关。
 - 订阅中声明为音频的附件可在全局播放器中播放。
 - 本地和导入站点的已登记音频可通过全局播放器播放，支持切换站点时继续播放和拖动进度；播放依赖 WebView2 支持的格式。文章保存音视频文件名，公开元数据包含音频字节数及可识别的时长；WAV 时长可直接读取，其他格式优先使用 Windows 媒体属性处理器，本机 PATH 中的 `ffprobe` 可作为备用；视频缩略图由可用的 Windows 缩略图处理器生成。
 - 新建的本地站点可以使用随安装包提供的 Kubo 发布到 IPFS 和 IPNS；发布成功后可在站点界面复制完整的网关访问地址。应用运行时提供已发布内容，并定期尝试续期 IPNS。节点离线后内容的持续可用性取决于其他节点或固定服务，公网网关可访问性也取决于网络环境。
@@ -54,6 +62,8 @@ bun test
 go test ./...
 bun run build
 ```
+
+可设置 `PLANET_TEST_FEEDS_LIVE=1` 后运行 `go test . -run TestLiveFollowOlividaHomepage -count=1 -v`，验证从 `https://olivida.eth.limo` 首页发现 RSS、读取文章并保存订阅。该测试只读取公网内容，使用临时资料库，不修改现有订阅；默认测试不访问此站点。
 
 构建并检查成功后，最新版程序、Kubo 和独立安装包位于固定目录 `build/windows-amd64/`，同时保留一份在 `.mygo/releases/<构建ID>/windows-amd64/`。原 `build/windows-amd64/` 会移至 `build/.previous-<ID>/` 保存；构建前请先关闭正在运行的 Planet 和 Kubo，避免绑定生成或目录替换被占用。终端会打印两个输出路径；目录同步失败时独立发行目录仍会保留。可运行 `powershell -NoProfile -File scripts/test-publish-build.ps1` 检查最新目录更新逻辑。`go test ./...` 默认跳过真实 Kubo 集成测试；如已有可信的 Kubo Windows 程序，可设置 `PLANET_TEST_KUBO` 指向该程序，再运行 `go test -count=1 ./internal/ipfs`。测试只使用临时仓库和测试密钥执行离线操作。要验证真实 Ethereum ENS 解析，可设置 `PLANET_TEST_ENS_LIVE=1` 并运行 `go test ./internal/ipfs -run TestLiveENS -count=1 -v`；该测试访问主网 RPC，链上记录可能随时间改变。可通过 `PLANET_ENS_RPC_URL` 选择 RPC，或通过 `PLANET_TEST_ENS_NAMES` 指定候选名称。
 

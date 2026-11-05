@@ -4,6 +4,12 @@ A work-in-progress Windows application for publishing websites with IPFS and fol
 
 **Status:** early development. This project does not yet implement all Planet features, and compatibility with real macOS backups has not been verified. Keep the original backups and test recovery before relying on them. See the [detailed Chinese guide](windows/README.md) for supported workflows and limitations.
 
+## Screenshot
+
+![Planet Windows showing the subscription list, article list and an article with inline images](docs/screenshots/subscription-reader.png)
+
+Reading olivida.eth in Planet Windows.
+
 ## What works
 
 - Create local sites, edit Markdown posts and private drafts, manage attachments, and export static HTML.

@@ -20,15 +20,6 @@ export function openDialog(dialog: HTMLDialogElement) {
   syncChoices(dialog);
   rememberDialog(dialog);
   dialog.showModal();
-  positionDialog(dialog);
-}
-
-function positionDialog(dialog: HTMLDialogElement) {
-  if (!dialog.open) return;
-  const view = dialog.ownerDocument.defaultView!, height = dialog.getBoundingClientRect().height;
-  if (!height) return;
-  const top = Math.max(24, Math.min(view.innerHeight - height - 24, view.innerHeight * .382 - height / 2));
-  dialog.style.marginTop = `${top}px`;
 }
 
 function mayDismiss(dialog: HTMLDialogElement): boolean {
@@ -38,9 +29,6 @@ function mayDismiss(dialog: HTMLDialogElement): boolean {
 }
 
 export function prepareDialogs(document: Document) {
-  const observer = new document.defaultView!.ResizeObserver(entries => {
-    for (const entry of entries) positionDialog(entry.target as HTMLDialogElement);
-  });
   for (const dialog of document.querySelectorAll<HTMLDialogElement>("dialog")) {
     const host = dialog.querySelector<HTMLFormElement>(":scope > form") ?? dialog;
     const footer = host.querySelector<HTMLElement>(":scope > .dialog-actions");
@@ -51,7 +39,6 @@ export function prepareDialogs(document: Document) {
     header.append(heading);
     for (const child of Array.from(host.childNodes)) if (child !== footer) body.append(child);
     host.classList.add("dialog-layout"); host.append(header, body, footer);
-    observer.observe(dialog);
     const h2 = header.querySelector("h2");
     if (h2) { h2.id ||= `${dialog.id}-heading`; dialog.setAttribute("aria-labelledby", h2.id); }
     dialog.addEventListener("cancel", event => { if (!mayDismiss(dialog)) event.preventDefault(); });
@@ -63,9 +50,6 @@ export function prepareDialogs(document: Document) {
       }
     }, true);
   }
-  document.defaultView!.addEventListener("resize", () => {
-    for (const dialog of document.querySelectorAll<HTMLDialogElement>("dialog[open]")) positionDialog(dialog);
-  });
 }
 
 // Preserve the existing select values/API while exposing small option sets inline.

@@ -4,6 +4,7 @@ import release from "../release.json";
 import { refreshDue } from "./auto-refresh";
 import { gatewayKey, planetShareURL, selectedGateway, sitePublicURL } from "./gateway";
 import { localGatewayResource } from "./local-gateway";
+import { feedArticleBase, feedReaderDocument } from "./feed-reader";
 import { hasDialogChanges, openDialog, prepareChoices, prepareDialogs, readingStyles, rememberDialog } from "./ui";
 
 prepareChoices(document);
@@ -230,6 +231,7 @@ function pendingTagBlocksSave(): boolean {
 let navigationRevision = 0, favoritesView = false, readerRevision = 0;
 let smartView: "today" | "unread" | null = null;
 const pendingRead = new Set<string>();
+const pendingStars = new Set<string>();
 const bulkReading = new Set<string>();
 function isToday(value:string): boolean { const date=new Date(value); return Number.isFinite(date.getTime()) && date.toDateString()===new Date().toDateString(); }
 const refreshingSubscriptions = new Set<string>();
@@ -421,7 +423,8 @@ function updateView() {
   pinSubscription.hidden = !subscription; pinSubscription.disabled = saving || !!subscription && ((fixed && !!subscription.cid) || refreshingSubscriptions.has(subscription.url));
   pinSubscription.textContent = fixed ? (subscription?.cid ? "已固定离线" : "重新固定离线") : "固定离线";
   $("#subscription-status").textContent = subscription && refreshingSubscriptions.has(subscription.url) ? "正在刷新订阅…" : subscription?.lastError ? `更新失败，正在显示已缓存内容：${subscription.lastError}` : subscription?.offlinePinned ? "已固定订阅媒体到本机" : subscription?.pinnedCid ? (subscription.pinnedCid === subscription.cid ? "已固定当前版本到本机" : "仅旧版本已固定") : "";
-  starItem.textContent = item?.starred ? "取消收藏" : "收藏"; starItem.title=starItem.textContent; starItem.setAttribute("aria-label",starItem.textContent); starItem.disabled = !item || !subscription; shareItem.disabled = !item?.link;
+  const favoriteKey=subscription && item ? `${subscription.url}\u0000${item.key || item.id || item.link}` : "";
+  starItem.textContent = item?.starred ? "取消收藏" : "收藏"; starItem.title=starItem.textContent; starItem.setAttribute("aria-label",starItem.textContent); starItem.disabled = !item || !subscription || pendingStars.has(favoriteKey); shareItem.disabled = !item?.link;
   const readButton=$<HTMLButtonElement>("#toggle-read"), readKey=subscription && item ? `${subscription.url}\u0000${item.key || item.id || item.link}` : "";
   readButton.textContent=item?.read ? "标为未读" : "标为已读";readButton.title=readButton.textContent;readButton.setAttribute("aria-label",readButton.textContent);readButton.disabled=!item || !subscription || pendingRead.has(readKey) || bulkReading.has(subscription.url);
   const markFeed=$<HTMLButtonElement>("#mark-feed-read");markFeed.hidden=!subscription;markFeed.disabled=!subscription || bulkReading.has(subscription.url) || [...pendingRead].some(key=>key.startsWith(`${subscription!.url}\u0000`)) || !subscription.feed.items.some(entry=>!entry.read);
@@ -513,16 +516,17 @@ function selectSubscription(entry: Subscription) {
   navigationRevision++;
   site = null; favoritesView = false; smartView=null; subscription = entry; item = null; article = null; draft=null; draftsView=false; editing = false; dirty = false; clearError(); updateView();
 }
-function readerHTML(html: string, localImages: boolean) {
-  const images = localImages ? "img-src data:; " : "";
-  readerPreview.srcdoc = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; ${images}style-src 'unsafe-inline'"><style>${readingStyles}</style></head><body>${html}</body></html>`;
+function readerHTML(html: string, localImages: boolean, remoteBase = "") {
+  readerPreview.srcdoc = feedReaderDocument(html, localImages, remoteBase);
 }
 function selectFeedItem(entry: Item) {
   const revision=++readerRevision, address=subscription?.url ?? "", key=entry.key || entry.id || entry.link;
   item = entry; shareURL.hidden = true; shareStatus.textContent = ""; readerTitle.textContent = entry.title || "无标题"; readerDate.textContent = entry.published;
   $("#play-feed-audio").hidden = !entry.audioUrl && !(entry.audioFilename && entry.contentCid);
   $("#play-feed-video").hidden = !entry.videoUrl;
-  readerHTML(entry.content || entry.description,false);
+  const localPreview = !!(entry.contentCid || entry.offlineBase || subscription?.offlinePinned);
+  const remoteBase = localPreview ? "" : feedArticleBase(entry.link, subscription?.feed.link ?? "", address);
+  readerHTML(entry.content || entry.description,false,remoteBase);
   if((entry.contentCid || entry.offlineBase) && address && key) {
     void Library.subscriptionPreview(address,key).then(html=>{
       if(revision===readerRevision && subscription?.url===address && (item?.key || item?.id || item?.link)===key) readerHTML(html,true);
@@ -996,9 +1000,19 @@ $("#close-search").addEventListener("click",()=>searchDialog.close());
 searchDialog.addEventListener("close",()=>{searchRevision++;clearTimeout(searchTimer);});
 starItem.addEventListener("click",async()=>{
   if(!subscription || !item) return; const address=subscription.url, key=item.key || item.id || item.link; if(!key) { showError("文章缺少可用标识"); return; } const starred=!item.starred;
-  starItem.disabled=true; clearError();
-  try { await Library.starSubscription(address,key,starred); await reloadSubscriptions(); if(subscription?.url===address) { subscription=subscriptions.find(entry=>entry.url===address) ?? subscription; if(item && (item.key || item.id || item.link)===key) item=subscription.feed.items.find(entry=>(entry.key || entry.id || entry.link)===key) ?? item; } }
-  catch(e) { showError(e); } finally {updateView();}
+  const operation=`${address}\u0000${key}`;
+  if(pendingStars.has(operation)) return;
+  pendingStars.add(operation); clearError(); updateView();
+  try {
+    await Library.starSubscription(address,key,starred);
+    subscriptionsRevision++;
+    // A favorite only changes local reading state. Reloading the subscription
+    // would reopen its iframe, losing scroll position and media playback.
+    const current=subscriptions.find(entry=>entry.url===address)?.feed.items.find(entry=>(entry.key || entry.id || entry.link)===key);
+    if(current) current.starred=starred;
+    if(subscription?.url===address && item && (item.key || item.id || item.link)===key) item.starred=starred;
+  }
+  catch(e) { showError(e); } finally {pendingStars.delete(operation);updateView();}
 });
 shareItem.addEventListener("click",async()=>{
   if(!item?.link) return; try { const url=planetShareURL(selectedGateway(publicGateway.value),item.link,!!item.contentCid); shareURL.value=url; try {await window.navigator.clipboard.writeText(url);shareStatus.textContent="链接已复制";} catch {shareURL.hidden=false;shareURL.focus();shareURL.select();shareStatus.textContent="请按 Ctrl+C 复制";} } catch(e) {showError(e);}

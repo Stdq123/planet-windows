@@ -174,10 +174,11 @@ body { color: var(--ink); }
 #reader-preview, #own-reader-preview { flex: 1; min-height: 0; border: 0; }
 .subscription-status { font-size: 12px; color: var(--muted); }
 .subscription-status:empty { display: none; }
-/* Native modal: fixed title/actions, one scrolling body, raised placement. */
-dialog { inset: 0; width: 520px; max-width: calc(100vw - 48px); max-height: calc(100vh - 64px); height: fit-content; padding: 0; margin: max(32px, 12vh) auto auto; overflow: hidden; border: 1px solid var(--line); border-radius: var(--dialog-radius); box-shadow: 0 20px 60px #182d4626; color: var(--ink); }
+/* Native modal: centered in the viewport, fixed title/actions, one scrolling body. */
+dialog { inset: 0; width: 520px; max-width: calc(100vw - 48px); max-height: calc(100vh - 64px); height: fit-content; padding: 0; margin: auto; overflow: hidden; border: 1px solid var(--line); border-radius: var(--dialog-radius); box-shadow: 0 20px 60px #182d4626; color: var(--ink); }
 dialog::backdrop { background: #1b2b4340; backdrop-filter: blur(2px); }
-dialog[open].dialog-layout, dialog[open] > .dialog-layout { display: flex; flex-direction: column; max-height: min(76vh, calc(100vh - 64px)); min-height: 0; margin: 0; }
+dialog[open].dialog-layout, dialog[open] > .dialog-layout { display: flex; flex-direction: column; max-height: min(76vh, calc(100vh - 64px)); min-height: 0; }
+dialog[open] > .dialog-layout { margin: 0; }
 .dialog-header { flex: none; padding: 22px 24px 16px; }
 dialog .dialog-header h2 { margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; }
 .dialog-body { min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 0 24px 20px; }
