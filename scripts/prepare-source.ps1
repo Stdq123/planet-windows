@@ -12,7 +12,9 @@ $taskUtf8 = [Text.UTF8Encoding]::new($false)
 [Console]::OutputEncoding = $taskUtf8
 $OutputEncoding = $taskUtf8
 if (-not $RepositoryRoot) { $RepositoryRoot = Split-Path -Parent $PSScriptRoot }
-$taskRoot = (Resolve-Path -LiteralPath $RepositoryRoot).Path
+# Resolve-Path preserves 8.3 aliases, but FileInfo.FullName expands them. Keep
+# directory roots in that same canonical form before computing relative paths.
+$taskRoot = (Get-Item -LiteralPath $RepositoryRoot).FullName
 
 function Invoke-SourceGit([string[]]$Arguments) {
     $result = @(& git -C $taskRoot @Arguments)
@@ -21,6 +23,13 @@ function Invoke-SourceGit([string[]]$Arguments) {
 }
 function Get-SourceHash([string]$Path) {
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+function Get-SourceRelativePath([string]$Root, [IO.FileInfo]$File) {
+    $prefix = $Root.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+    if (-not $File.FullName.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Source file is outside its canonical directory root.'
+    }
+    return $File.FullName.Substring($prefix.Length).Replace('\', '/')
 }
 function Assert-CleanSource {
     if (@(Invoke-SourceGit @('status', '--porcelain=v1', '--untracked-files=all')).Count -gt 0) {
@@ -36,7 +45,7 @@ function Assert-SafeTrackedPath([string]$Path) {
 }
 
 $taskGitRoot = (Invoke-SourceGit @('rev-parse', '--show-toplevel')) -join ''
-if ([IO.Path]::GetFullPath($taskGitRoot) -ine $taskRoot) { throw 'RepositoryRoot must be the Git top-level directory.' }
+if ((Get-Item -LiteralPath $taskGitRoot).FullName -ine $taskRoot) { throw 'RepositoryRoot must be the Git top-level directory.' }
 Assert-CleanSource
 $taskCommit = (Invoke-SourceGit @('rev-parse', 'HEAD')) -join ''
 $taskTree = (Invoke-SourceGit @('rev-parse', 'HEAD^{tree}')) -join ''
@@ -60,10 +69,12 @@ if (-not $OutputDirectory) { $OutputDirectory = Join-Path $taskRoot ('windows/.m
 $taskOutput = [IO.Path]::GetFullPath($OutputDirectory)
 if (Test-Path -LiteralPath $taskOutput) { throw 'Source output directory must not already exist.' }
 [IO.Directory]::CreateDirectory($taskOutput) | Out-Null
+$taskOutput = (Get-Item -LiteralPath $taskOutput).FullName
 $taskStage = Join-Path $taskOutput 'source'
 $taskGitArchive = Join-Path $taskOutput 'tracked-source.zip'
 Invoke-SourceGit @('-c', 'core.autocrlf=false', '-c', 'core.eol=lf', 'archive', '--format=zip', ('--output=' + $taskGitArchive), $taskCommit) | Out-Null
 [IO.Compression.ZipFile]::ExtractToDirectory($taskGitArchive, $taskStage)
+$taskStage = (Get-Item -LiteralPath $taskStage).FullName
 foreach ($taskPath in $taskPaths) {
     if (-not (Test-Path -LiteralPath (Join-Path $taskStage $taskPath) -PathType Leaf)) {
         throw "Tracked source excluded by archive attributes: $taskPath"
@@ -97,12 +108,12 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Cannot vendor locked Go source.' }
         # go mod vendor omits dependency tests and unused directories. Preserve
         # the complete go-ethereum module source as well, including its licenses.
-        $taskLibraryRoot = (Resolve-Path -LiteralPath $taskLibrary.Dir).Path
+        $taskLibraryRoot = (Get-Item -LiteralPath $taskLibrary.Dir).FullName
         $taskLibraryTarget = Join-Path $taskApp 'vendor/github.com/ethereum/go-ethereum'
         $taskOmissions = @()
         foreach ($taskFile in Get-ChildItem -LiteralPath $taskLibraryRoot -Recurse -File -Force) {
             if ($taskFile.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Linked dependency source is not permitted.' }
-            $taskRelative = $taskFile.FullName.Substring($taskLibraryRoot.Length + 1).Replace('\', '/')
+            $taskRelative = Get-SourceRelativePath $taskLibraryRoot $taskFile
             if ($taskRelative -match '\.(exe|dll|syso)$') { $taskOmissions += $taskRelative; continue }
             $taskDestination = Join-Path $taskLibraryTarget $taskRelative
             [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($taskDestination)) | Out-Null
@@ -146,7 +157,7 @@ $taskZip = [IO.Compression.ZipFile]::Open($taskArchivePath, [IO.Compression.ZipA
 try {
     foreach ($taskFile in Get-ChildItem -LiteralPath $taskStage -Recurse -File -Force | Sort-Object FullName) {
         if ($taskFile.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Linked source file is not permitted.' }
-        $taskEntryName = $taskFile.FullName.Substring($taskStage.Length + 1).Replace('\', '/')
+        $taskEntryName = Get-SourceRelativePath $taskStage $taskFile
         [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($taskZip, $taskFile.FullName, $taskEntryName, [IO.Compression.CompressionLevel]::Optimal) | Out-Null
     }
 } finally { $taskZip.Dispose() }

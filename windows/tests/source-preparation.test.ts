@@ -18,8 +18,15 @@ function run(command: string[], cwd: string, env = cleanEnv) {
   return result.stdout.toString().trim();
 }
 
-function fixture() {
-  const folder = mkdtempSync(join(testRoot, "case-"));
+const shortTestRoot = run(["powershell", "-NoProfile", "-Command", `
+Add-Type -TypeDefinition 'using System.Text; using System.Runtime.InteropServices; public static class SourceTestPaths { [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] public static extern uint GetShortPathName(string path, StringBuilder output, uint count); }'
+$buffer = New-Object Text.StringBuilder 32768
+if ([SourceTestPaths]::GetShortPathName($env:SOURCE_TEST_ROOT, $buffer, $buffer.Capacity) -eq 0) { throw 'Cannot resolve test root short path.' }
+$buffer.ToString()
+`], testRoot, { ...cleanEnv, SOURCE_TEST_ROOT: testRoot });
+
+function fixture(shortPaths = false) {
+  const folder = mkdtempSync(join(shortPaths ? shortTestRoot : testRoot, "case-"));
   const root = join(folder, "repo");
   const app = join(root, "windows");
   const module = "github.com/ethereum/go-ethereum";
@@ -43,9 +50,10 @@ function fixture() {
   writeFileSync(join(endpoint, `${version}.info`), JSON.stringify({ Version: version, Time: "2020-01-01T00:00:00Z" }));
   writeFileSync(join(endpoint, "list"), version + "\n");
   run(["powershell", "-NoProfile", "-Command", `Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+$zipRoot = (Get-Item -LiteralPath $env:SOURCE_FIXTURE_ZIP_ROOT).FullName
 $archive = [IO.Compression.ZipFile]::Open($env:SOURCE_FIXTURE_ZIP_PATH, [IO.Compression.ZipArchiveMode]::Create)
-try { foreach ($file in Get-ChildItem -LiteralPath $env:SOURCE_FIXTURE_ZIP_ROOT -Recurse -File) {
-  $name = $file.FullName.Substring($env:SOURCE_FIXTURE_ZIP_ROOT.Length + 1).Replace('\\', '/')
+try { foreach ($file in Get-ChildItem -LiteralPath $zipRoot -Recurse -File) {
+  $name = $file.FullName.Substring($zipRoot.Length + 1).Replace('\\', '/')
   [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $file.FullName, $name) | Out-Null
 } } finally { $archive.Dispose() }`], folder,
     { ...cleanEnv, SOURCE_FIXTURE_ZIP_ROOT: zipRoot, SOURCE_FIXTURE_ZIP_PATH: join(endpoint, `${version}.zip`) });
@@ -92,6 +100,24 @@ test("default source path resolves from the script and archives exact tracked so
   expect(existsSync(join(extracted, "windows/vendor/modules.txt"))).toBe(true);
   expect(JSON.parse(readFileSync(join(extracted, "SOURCE-PROVENANCE.json"), "utf8")).sourceCommit).toBe(f.commit);
   for (const name of [".git", ".env", "windows/build", "windows/node_modules"]) expect(existsSync(join(extracted, name))).toBe(false);
+});
+
+test.skipIf(!shortTestRoot.includes("~"))("short Windows paths preserve exact source archive entry names", () => {
+  const f = fixture(true);
+  const result = f.prepare();
+  if (result.exitCode !== 0) throw new Error(result.stderr.toString() + result.stdout.toString());
+  const manifest = JSON.parse(readFileSync(join(f.output, "source-manifest.json"), "utf8"));
+  expect(manifest.sourceCommit).toBe(f.commit);
+  const entries = JSON.parse(run(["powershell", "-NoProfile", "-Command", `
+Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+$archive = [IO.Compression.ZipFile]::OpenRead($env:SOURCE_FIXTURE_ARCHIVE)
+try { @($archive.Entries | ForEach-Object { $_.FullName }) | ConvertTo-Json } finally { $archive.Dispose() }
+`], f.root, { ...f.env, SOURCE_FIXTURE_ARCHIVE: join(f.output, manifest.archive) })) as string[];
+  expect(entries).toContain("SOURCE-PROVENANCE.json");
+  expect(entries).toContain("windows/main.go");
+  expect(entries).toContain("windows/vendor/github.com/ethereum/go-ethereum/COPYING.LESSER");
+  expect(entries).toContain("windows/vendor/github.com/ethereum/go-ethereum/common/value_test.go");
+  expect(entries.every(entry => !entry.startsWith("/") && !entry.includes("\\") && !entry.startsWith("ip/"))).toBe(true);
 });
 
 test("dirty tracked source is rejected before any source artifact is emitted", () => {

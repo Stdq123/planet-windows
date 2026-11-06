@@ -18,7 +18,7 @@ powershell -NoProfile -File scripts/prepare-source.ps1
 
 ## 重建可运行的 Windows 程序
 
-将源码 ZIP 解压到新的空目录，不要覆盖已有安装或真实 Planet 资料。使用 `windows/go.mod` 指定的 Go 工具链，以及 [Windows 指南](../windows/README.md#构建与测试) 中的 Bun 和 WebView2 环境。以下命令在解压后的 `windows/` 目录运行，执行前请记录已有环境变量，需要时在完成后恢复。
+将源码 ZIP 解压到任何 Git 仓库之外的新的空目录，不要覆盖已有安装或真实 Planet 资料。在已有仓库的忽略目录内构建会让 Go 错误继承父仓库的版本信息；若必须这样构建，将下方 `GOFLAGS` 改为 `-mod=vendor -buildvcs=false`。使用 `windows/go.mod` 指定的 Go 工具链，以及 [Windows 指南](../windows/README.md#构建与测试) 中的 Bun 和 WebView2 环境。以下命令在解压后的 `windows/` 目录运行，执行前请记录已有环境变量，需要时在完成后恢复。
 
 ```powershell
 bun install --frozen-lockfile
