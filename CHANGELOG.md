@@ -10,6 +10,7 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 - Improved editor placeholders, selected-row details, sidebar errors, IPFS chart labels, removed-site IDs and template-library text contrast.
 - Unified error and destructive-action colors, added non-color selection indicators to navigation, article rows, the first draft and editor view controls, and aligned template selection with the graphite palette.
 - Kept the last loaded dashboard visible when a background refresh fails, with an error message and an available refresh action to retry.
+- Restored the saved public gateway in the visible radio group at startup so its selected option matches the links in use.
 
 ## [0.0.1-alpha.2] - 2026-11-06
 

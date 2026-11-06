@@ -143,7 +143,7 @@ export function prepareChoices(document: Document) {
   syncChoices(document);
 }
 
-function syncChoices(root: ParentNode) {
+export function syncChoices(root: ParentNode) {
   for (const group of root.querySelectorAll<HTMLElement>(".choice-group")) {
     const select = group.ownerDocument.getElementById(group.dataset.select!) as HTMLSelectElement;
     for (const radio of group.querySelectorAll<HTMLInputElement>("input")) {

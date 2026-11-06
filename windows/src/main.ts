@@ -8,7 +8,7 @@ import { refreshDue } from "./auto-refresh";
 import { gatewayKey, planetShareURL, selectedGateway, sitePublicURL } from "./gateway";
 import { localGatewayResource } from "./local-gateway";
 import { feedArticleBase, feedReaderDocument } from "./feed-reader";
-import { hasDialogChanges, openDialog, prepareChoices, prepareDialogs, readingStyles, rememberDialog } from "./ui";
+import { hasDialogChanges, openDialog, prepareChoices, prepareDialogs, readingStyles, rememberDialog, syncChoices } from "./ui";
 
 prepareChoices(document);
 prepareDialogs(document);
@@ -226,6 +226,7 @@ $("#close-ipfs-status").addEventListener("click", () => ipfsDialog.close());
 ipfsDialog.addEventListener("close", () => { ipfsStatusRevision++; clearTimeout(ipfsTimer); ipfsRefresh.disabled = false; ipfsStatus=null; updateIPFSResource(); ipfsOpenSite.hidden=true; ipfsOpenSite.removeAttribute("href"); });
 try { publicGateway.value = selectedGateway(window.localStorage.getItem(gatewayKey)); }
 catch { publicGateway.value = "ipfs.io"; }
+syncChoices(publicGateway.parentElement!);
 const addAttachment = $<HTMLButtonElement>("#add-attachment"), attachmentList = $("#attachment-list"), attachmentHelp = $("#attachment-help");
 const tagInput=$<HTMLInputElement>("#tag-input"), addTag=$<HTMLButtonElement>("#add-tag"), tagList=$("#tag-list");
 const importedWarning = $("#imported-warning");
