@@ -22,6 +22,7 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` a
 
 ### Changed
 
+- Renamed the Chinese overview navigation, heading, refresh label and loading/error messages to “写作台”.
 - Rebuilt the all-sites overview from the approved Figma writing workspace, with the subsequent neutral-palette revision: warm white surfaces, graphite controls, compact draft/article rows, inline totals and an adaptive site-status rail. Writing selects the destination site when needed; recent articles can be filtered by site and longer recent lists expanded.
 - Refined the writing workspace with a narrower navigation/list rail, aligned title and body, compact view controls, and an on-demand tag/attachment panel that does not move the text. Publication details remain available in the workspace menu.
 

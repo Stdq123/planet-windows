@@ -61,7 +61,7 @@ export function createDashboard(root: HTMLElement, actions: DashboardActions) {
   async function act(action: () => Promise<void>) {
     const current = revision;
     try { message(""); await action(); }
-    catch { if (active && current === revision) message("无法打开此内容，请刷新概览后重试。"); }
+    catch { if (active && current === revision) message("无法打开此内容，请刷新写作台后重试。"); }
   }
   function entries(selector: string, items: DashboardEntry[], kind: "draft" | "article") {
     const list = $(selector); list.replaceChildren();
@@ -159,7 +159,7 @@ export function createDashboard(root: HTMLElement, actions: DashboardActions) {
     if (!active) return;
     const current = ++revision; resetAnalytics();
     closeCompose(); composeButton.disabled = composeConfirm.disabled = true;
-    refreshButton.disabled = true; root.setAttribute("aria-busy", "true"); message("正在读取本地概览…");
+    refreshButton.disabled = true; root.setAttribute("aria-busy", "true"); message("正在读取写作台…");
     try {
       const data = await actions.load();
       if (!active || current !== revision) return;
@@ -167,7 +167,7 @@ export function createDashboard(root: HTMLElement, actions: DashboardActions) {
     } catch {
       if (!active || current !== revision) return;
       snapshot = null;
-      content.hidden = true; message("无法读取工作区概览。请重试，已有内容不会被更改。");
+      content.hidden = true; message("无法读取写作台。请重试，已有内容不会被更改。");
     } finally {
       if (active && current === revision) { refreshButton.disabled = false; root.setAttribute("aria-busy", "false"); }
     }
