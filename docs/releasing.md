@@ -36,7 +36,7 @@ bun run release:prepare -BundleDir $bundle
 
 ## 对外发行检查（含 alpha）
 
-GitHub 的 pre-release 标记只说明版本阶段，不豁免签名、许可或原生 Windows 验收要求。alpha 同样必须完成以下步骤；存在未决项时只能准备本地草稿。
+默认发行要求程序和安装包具有有效 Authenticode 签名，稳定版始终遵循此要求。维护者明确选择未签名预发布时，可使用下述 `-AllowUnsignedPrerelease` 选项；GitHub 的 pre-release 标记本身不会启用此例外。许可和原生 Windows 验收要求不变，存在这些未决项时仍只能准备本地草稿。
 
 1. 完成发布 PR，在干净工作区检查目标版本条目：
 
@@ -46,7 +46,7 @@ GitHub 的 pre-release 标记只说明版本阶段，不豁免签名、许可或
    ```
 
 2. 确认本地 HEAD 为待发布提交后，创建对应的附注标签，先不推送。重新从该提交执行检查和构建。`release:check` 只检查元数据；标签是否真实存在由下一步的正式准备检查。
-3. 用受信任的发布身份签署第一方程序，再生成包含已签名程序的安装包，最后签署安装包。现有构建脚本尚未配置证书和自动签名环节，不能假定 `bun run build` 的输出已经签名。重新运行 [安装包审计](../windows/docs/release-audit.md) 验证最终字节。
+3. 对于签名发行，用受信任的发布身份签署第一方程序，再生成包含已签名程序的安装包，最后签署安装包。现有构建脚本尚未配置证书和自动签名环节，不能假定 `bun run build` 的输出已经签名。明确选择未签名预发布时，按下一节记录签名状态。两种情况都要重新运行 [安装包审计](../windows/docs/release-audit.md) 验证最终字节。
 4. 填写 [原生 Windows 验收记录](release-acceptance-template.md)，关联最终安装包 SHA-256；完成第三方许可审查及 [更新清单验证](../windows/docs/update-publisher.md)。这些步骤需要实际环境和证据。
 5. 执行严格的本地材料检查：
 
@@ -54,9 +54,23 @@ GitHub 的 pre-release 标记只说明版本阶段，不豁免签名、许可或
    bun run release:prepare -BundleDir $bundle -Release -Tag "v$version"
    ```
 
-严格模式要求版本与标签相同、存在有效日期的 Changelog、干净工作区、附注标签指向 HEAD、安装包 payload 一致、程序及安装包 Authenticode 状态为 Valid、Kubo 许可待审计数为零。任何失败都不会被当作通过；保留未完成输出用于排查，勿将其上传。
+严格模式要求版本与标签相同、存在有效日期的 Changelog、干净工作区、附注标签指向 HEAD、安装包 payload 一致、程序及安装包各有一条 Authenticode 审计记录、Kubo 许可待审计数为零。默认仅接受 `Valid` 签名状态；未签名预发布的显式例外见下节。任何失败都不会被当作通过；保留未完成输出用于排查，勿将其上传。
 
-技术检查不能代替完整许可判断、发布者证书身份确认、原生 Windows 验收及备份兼容性验证。全部验收通过后，维护者再推送标签、创建 GitHub Release 草稿，核对材料后发布。脚本不会自动执行这些外部操作。
+技术检查不能代替完整许可判断、签名发行的发布者证书身份确认、原生 Windows 验收及备份兼容性验证。全部适用验收通过后，维护者再推送标签、创建 GitHub Release 草稿，核对材料后发布；预发布必须标记为 pre-release。脚本不会自动执行这些外部操作。
+
+## 未签名预发布
+
+维护者明确选择未签名 alpha 等预发布后，在完成其余发行检查的前提下，使用：
+
+```powershell
+bun run release:prepare -BundleDir $bundle -Release -Tag "v$version" -AllowUnsignedPrerelease
+```
+
+此参数必须与 `-Release` 同时使用，且版本必须带预发布后缀；稳定版和草稿模式不能使用。程序及安装包各自的 Authenticode 状态只能是 `Valid` 或 `NotSigned`。缺失或重复记录、`HashMismatch`、`NotTrusted`、`UnknownError` 等其他状态仍会阻止发行；元数据、标签、payload、许可审查和原生 Windows 验收要求保持不变。
+
+只要程序或安装包有一项未签名，材料会记录 `unsignedPrerelease: true` 和实际签名状态，并在发行说明中加入 **UNSIGNED PRERELEASE** 提示。GitHub Release 必须保留该提示，同时提供 `SHA256SUMS.txt` 和审计材料。SHA-256 只能核对文件是否与所列摘要一致，不能证明发布者身份；Windows 可能显示安全提示或阻止运行。不要把未签名包描述成已验证发布者身份的包，也不要要求使用者关闭系统防护。
+
+申请代码签名服务不代表已获批准或已经签名。后续接入签名服务时，以最终程序和安装包的实际 Authenticode 审计结果为准。
 
 ## 出现问题时
 
