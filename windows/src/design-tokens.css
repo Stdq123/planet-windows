@@ -1,19 +1,24 @@
 /* Shared visual contract for navigation, overview and its entry dialogs. */
 :root {
-  --pw-brand: #f2c94c;
-  --pw-brand-hover: #e6ba35;
-  --pw-brand-active: #d5a728;
-  --pw-accent: #8a641b;
-  --pw-selection: #fff3cc;
-  --pw-canvas: #f4f6f8;
-  --pw-sidebar: #fafbfc;
+  --pw-brand: #6e56a6;
+  --pw-brand-hover: #604994;
+  --pw-brand-active: #57417c;
+  --pw-brand-ink: #fff;
+  --pw-accent: #6e56a6;
+  --pw-accent-ink: #57417c;
+  --pw-selection: #eee8f6;
+  --pw-canvas: #fbfaf7;
+  --pw-sidebar: #f3f1ed;
   --pw-card: #fff;
-  --pw-ink: #202536;
-  --pw-muted: #616b7d;
-  --pw-line: #e0e5ec;
-  --pw-control-line: #a8b2c2;
-  --pw-hover: #f2f5f8;
-  --pw-active: #e8edf3;
-  --pw-font: "Segoe UI", "Microsoft YaHei", sans-serif;
-  --pw-popover-shadow: 0 8px 16px #20253614;
+  --pw-ink: #2d2933;
+  --pw-secondary: #635d69;
+  --pw-muted: #6d6672;
+  --pw-line: #e5e1da;
+  --pw-control-line: #d6d0c9;
+  --pw-hover: #f0ede8;
+  --pw-active: #e9e4ed;
+  --pw-green: #426f58;
+  --pw-amber: #946537;
+  --pw-font: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+  --pw-popover-shadow: 0 8px 16px #2d293314;
 }

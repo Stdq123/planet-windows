@@ -28,7 +28,8 @@ async function fixture(overrides: Record<string, unknown> = {}) {
 test("dashboard renders real totals and safe cross-site recent actions", async () => {
   const { controller, $, calls } = await fixture(); controller.setActive(true); await tick();
   expect($("[data-count='articles']").textContent).toBe("9");
-  expect($("#dashboard-articles img")).toBeNull();
+  expect($("#dashboard-articles .dashboard-row-title").textContent).toBe(snapshot.recentArticles[0].title);
+  expect($("#dashboard-articles img[onerror]")).toBeNull();
   $<HTMLButtonElement>("#dashboard-drafts button").click(); await tick();
   expect(calls).toEqual([["draft", "b", "draft"]]);
   expect($("#dashboard-sites").textContent).toContain("有更改待发布");
@@ -83,4 +84,84 @@ test("empty overview retains create and import actions without fake recent items
   expect($("#dashboard-compose-controls").hidden).toBe(true);
   expect($("#dashboard-first-site").hidden).toBe(false);
   $<HTMLButtonElement>("#dashboard-first-site").click(); expect(created).toBe(1);
+});
+
+test("writing with multiple sites requires a confirmed site and preserves the choice", async () => {
+  const { controller, $, calls } = await fixture(); controller.setActive(true); await tick();
+  const dialog = $<HTMLDialogElement>("#dashboard-compose-dialog");
+  $<HTMLButtonElement>("#dashboard-compose").click();
+  expect(dialog.open).toBe(true); expect(calls).toEqual([]);
+  $<HTMLSelectElement>("#dashboard-compose-site").value = "b";
+  $<HTMLButtonElement>("#dashboard-compose-cancel").click();
+  expect(dialog.open).toBe(false); expect(calls).toEqual([]);
+  $<HTMLButtonElement>("#dashboard-compose").click();
+  expect($<HTMLSelectElement>("#dashboard-compose-site").value).toBe("b");
+  $<HTMLButtonElement>("#dashboard-compose-confirm").click(); await tick();
+  expect(dialog.open).toBe(false); expect(calls).toEqual([["compose", "b"]]);
+});
+
+test("writing with a single site opens the editor directly", async () => {
+  const { controller, $, calls } = await fixture({ load: async () => ({ ...snapshot, siteCount: 1, sites: [snapshot.sites[0]] }) });
+  controller.setActive(true); await tick(); $<HTMLButtonElement>("#dashboard-compose").click(); await tick();
+  expect(calls).toEqual([["compose", "a"]]);
+  expect($<HTMLDialogElement>("#dashboard-compose-dialog").open).toBe(false);
+});
+
+test("leaving the overview closes the site picker and a failed refresh disables stale writing", async () => {
+  let failed = false;
+  const { controller, $, calls } = await fixture({ load: async () => { if (failed) throw new Error("offline"); return snapshot; } });
+  controller.setActive(true); await tick(); $<HTMLButtonElement>("#dashboard-compose").click();
+  controller.setActive(false); expect($<HTMLDialogElement>("#dashboard-compose-dialog").open).toBe(false);
+  failed = true; controller.setActive(true); await tick();
+  expect($<HTMLButtonElement>("#dashboard-compose").disabled).toBe(true);
+  $<HTMLButtonElement>("#dashboard-compose").click(); await tick(); expect(calls).toEqual([]);
+});
+
+test("site filters show only matching recent articles and recover when a site is removed", async () => {
+  let data = { ...snapshot, recentArticles: [...snapshot.recentArticles, { id: "post-b", siteId: "b", siteName: "第二站", title: "另一篇文章", modified: "2026-11-01T00:00:00Z" }] };
+  const { controller, $, calls } = await fixture({ load: async () => data }); controller.setActive(true); await tick();
+  $<HTMLButtonElement>("#dashboard-article-filters [data-site-filter='b']").click();
+  expect($("#dashboard-articles").textContent).toContain("另一篇文章");
+  expect($("#dashboard-articles").textContent).not.toContain(snapshot.recentArticles[0].title);
+  expect($("#dashboard-article-filters [data-site-filter='b']").getAttribute("aria-pressed")).toBe("true");
+  $<HTMLButtonElement>("#dashboard-articles button").click(); await tick(); expect(calls).toEqual([["article", "b", "post-b"]]);
+  data = { ...data, siteCount: 1, sites: [snapshot.sites[0]], recentArticles: snapshot.recentArticles };
+  await controller.refresh();
+  expect($("#dashboard-article-filters [data-site-filter='']").getAttribute("aria-pressed")).toBe("true");
+  expect($("#dashboard-articles").textContent).toContain(snapshot.recentArticles[0].title);
+});
+
+test("recent lists can expand and collapse without discarding cross-site entries", async () => {
+  const data = { ...snapshot, recentArticles: Array.from({ length: 6 }, (_, i) => ({ ...snapshot.recentArticles[0], id: `post-${i}`, title: `文章 ${i}` })), recentDrafts: Array.from({ length: 6 }, (_, i) => ({ ...snapshot.recentDrafts[0], id: `draft-${i}` })) };
+  const { controller, $ } = await fixture({ load: async () => data }); controller.setActive(true); await tick();
+  for (const kind of ["drafts", "articles"]) {
+    const button = $<HTMLButtonElement>(`#dashboard-${kind}-toggle`), list = $(`#dashboard-${kind}`);
+    expect(button.hidden).toBe(false); expect(list.children.length).toBe(6);
+    button.click(); expect(list.classList.contains("is-expanded")).toBe(true); expect(button.getAttribute("aria-expanded")).toBe("true");
+    button.click(); expect(list.classList.contains("is-expanded")).toBe(false);
+  }
+});
+
+test("a site absent from the global recent snapshot still offers its full article list", async () => {
+  const data = { ...snapshot, articleCount: 14, sites: [snapshot.sites[0], { ...snapshot.sites[1], articleCount: 5 }], recentArticles: Array.from({ length: 6 }, (_, i) => ({ ...snapshot.recentArticles[0], id: `recent-${i}` })) };
+  const { controller, $, calls } = await fixture({ load: async () => data }); controller.setActive(true); await tick();
+  $<HTMLButtonElement>("#dashboard-article-filters [data-site-filter='b']").click();
+  expect($("#dashboard-articles .dashboard-list-empty").textContent).toContain("最近记录中没有这个站点的文章。");
+  const openSite = $<HTMLButtonElement>("#dashboard-articles .dashboard-list-empty .dashboard-text-button");
+  expect(openSite.textContent).toBe("查看站点文章 →");
+  $<HTMLButtonElement>("#dashboard-article-filters [data-site-filter='']").click();
+  openSite.click(); await tick();
+  expect(calls).toEqual([["site", "b"]]);
+});
+
+test("publication feedback follows live state and pending action opens the correct site", async () => {
+  const { controller, $, calls } = await fixture(); controller.setActive(true); await tick();
+  controller.setPublicationStatus(new Map([["a", { running: true, status: "idle" }]]));
+  expect($("[data-site-status='a']").textContent).toBe("正在发布…");
+  controller.setPublicationStatus(new Map([["a", { running: false, status: "failed" }]]));
+  expect($("[data-site-status='a']").textContent).toBe("发布未确认");
+  expect($("[data-site-status='a']").getAttribute("data-tone")).toBe("failed");
+  $<HTMLButtonElement>("#dashboard-publication-link").click(); await tick(); expect(calls).toEqual([["site", "a"]]);
+  expect($("#dashboard-drafts").textContent).toContain("已保存在本地");
+  expect($("#dashboard-drafts").textContent).not.toContain("自动保存");
 });

@@ -11,7 +11,7 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` a
 
 ### Added
 
-- An all-sites startup overview with local content totals, recent drafts and articles, publication states, and on-demand IPFS and Plausible access. The overview uses light navigation with amber selection, an amber writing area, and a guided empty workspace.
+- An all-sites startup overview with local content totals, recent drafts and articles, publication states, and on-demand IPFS and Plausible access.
 - A single `bun run check` command for Go formatting and static analysis, frontend and Go tests, TypeScript checks and the frontend production build.
 - Optional Git hooks to catch staged whitespace errors before commits and run the shared checks before pushes.
 - A Chinese Git workflow guide covering branches, focused commits, pull requests, versioning and mirror synchronization.
@@ -22,7 +22,7 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` a
 
 ### Changed
 
-- Refined the all-sites overview with consistent light navigation, core totals before writing actions, an 8px spacing grid, accessible interaction states, and header search.
+- Rebuilt the all-sites overview from the approved Figma writing workspace: warm white surfaces, restrained purple navigation, compact draft/article rows, inline totals and an adaptive site-status rail. Writing selects the destination site when needed; recent articles can be filtered by site and longer recent lists expanded.
 
 - Updated RSS, Atom and JSON Feed parsing to gofeed 1.5.0, preserving feeds with long preambles and rejecting invalid null JSON items without crashing.
 - Updated the MyGo desktop framework, frontend runtime and build CLI together to 0.7.4, with the installer safety hook re-audited for that version.
