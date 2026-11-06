@@ -1,6 +1,6 @@
 # Changelog
 
-User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` and an immutable `vMAJOR.MINOR.PATCH` Git tag. Earlier development snapshots are described in the [Windows guide](windows/README.md); this file does not reconstruct unverified release dates.
+User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` with an optional SemVer prerelease suffix and an immutable Git tag containing `v` plus the complete version. Build metadata is not accepted. Earlier development snapshots are described in the [Windows guide](windows/README.md); this file does not reconstruct unverified release dates.
 
 ## [Unreleased]
 
@@ -24,6 +24,7 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` a
 
 ### Changed
 
+- Set the first public prerelease target to `0.0.1-alpha.1`, resetting the untagged development numbering. Release preparation, update manifests and the installer now support SemVer prereleases with numeric identifier ordering. Stable installations skip prerelease updates; prerelease installations can update to later prereleases or stable versions. Existing `0.2.0`/`0.3.0` development installations reject this target as a downgrade; use an isolated, fresh Windows user profile for alpha testing. Signing, license review and native Windows acceptance remain required before publication.
 - Documentation-only pushes and pull requests now run lightweight encoding, Markdown and local-link checks without application tests or a frontend build; code, mixed changes and manual CI runs retain the full quality checks.
 - Renamed the Chinese overview navigation, heading, refresh label and loading/error messages to “写作台”.
 - Rebuilt the all-sites overview from the approved Figma writing workspace, with the subsequent neutral-palette revision: warm white surfaces, graphite controls, compact draft/article rows, inline totals and an adaptive site-status rail. Writing selects the destination site when needed; recent articles can be filtered by site and longer recent lists expanded.

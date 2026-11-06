@@ -17,6 +17,8 @@ import (
 	"strings"
 	"unicode/utf16"
 
+	releaseversion "windows/internal/version"
+
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 )
@@ -619,24 +621,6 @@ func applyUpgrade(root, source string, files map[string]string) error {
 }
 
 func newerVersion(newVersion, oldVersion string) bool {
-	parse := func(s string) ([3]int, bool) {
-		var v [3]int
-		var tail string
-		n, _ := fmt.Sscanf(s, "%d.%d.%d%s", &v[0], &v[1], &v[2], &tail)
-		return v, n == 3 && v[0] >= 0 && v[1] >= 0 && v[2] >= 0 && fmt.Sprintf("%d.%d.%d", v[0], v[1], v[2]) == s
-	}
-	a, ok := parse(newVersion)
-	if !ok {
-		return false
-	}
-	b, ok := parse(oldVersion)
-	if !ok {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return a[i] > b[i]
-		}
-	}
-	return false
+	result, err := releaseversion.Compare(newVersion, oldVersion)
+	return err == nil && result > 0
 }

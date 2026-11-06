@@ -16,24 +16,24 @@ afterAll(() => {
   rmSync(testRoot, { recursive: true });
 });
 
-function fixture() {
+function fixture(version = "0.3.0") {
   const folder = mkdtempSync(join(testRoot, "case "));
   const root = join(folder, "repository");
   const bundle = join(folder, "bundle");
   mkdirSync(join(root, "scripts"), { recursive: true });
   mkdirSync(join(root, "windows/scripts"), { recursive: true });
   mkdirSync(bundle);
-  for (const name of ["prepare-release.ps1", "release-metadata.ts"]) {
+  for (const name of ["prepare-release.ps1", "release-metadata.ts", "release-version.ts"]) {
     copyFileSync(join(repo, "scripts", name), join(root, "scripts", name));
   }
   writeFileSync(join(root, ".gitignore"), "windows/.mygo/\n");
-  writeFileSync(join(root, "windows/release.json"), '{"version":"0.3.0"}\n');
-  writeFileSync(join(root, "CHANGELOG.md"), "# Changelog\n\n## [Unreleased]\n- Draft fix.\n\n## [0.3.0] - 2020-01-01\n- Released fix.\n");
-  writeFileSync(join(bundle, "planet-windows-safe-setup-0.3.0-amd64.exe"), "TEST TEXT ONLY, NOT EXECUTABLE");
+  writeFileSync(join(root, "windows/release.json"), JSON.stringify({ version }) + "\n");
+  writeFileSync(join(root, "CHANGELOG.md"), `# Changelog\n\n## [Unreleased]\n- Draft fix.\n\n## [${version}] - 2020-01-01\n- Released fix.\n`);
+  writeFileSync(join(bundle, `planet-windows-safe-setup-${version}-amd64.exe`), "TEST TEXT ONLY, NOT EXECUTABLE");
   // Stub only the existing binary audit. Exercise real git, Bun, PowerShell,
   // metadata checks, copy and hashing without a certificate or installer execution.
   writeFileSync(join(root, "windows/scripts/audit-release.ps1"), `param([string]$BundleDir)
-$name = 'planet-windows-safe-setup-0.3.0-amd64.exe'
+$name = 'planet-windows-safe-setup-${version}-amd64.exe'
 $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $BundleDir $name)).Hash.ToLowerInvariant()
 $signature = if ($env:PLANET_RELEASE_FIXTURE -eq 'unsigned') { 'NotSigned' } else { 'Valid' }
 $reviews = if ($env:PLANET_RELEASE_FIXTURE -eq 'license') { 1 } else { 0 }
@@ -47,10 +47,10 @@ if ($env:PLANET_RELEASE_FIXTURE -eq 'hash') { $hash = '0' * 64 }
   git("init", "--quiet");
   git("add", ".");
   git("commit", "--quiet", "-m", "test: release fixture");
-  git("tag", "-a", "v0.3.0", "-m", "Test only");
+  git("tag", "-a", `v${version}`, "-m", "Test only");
   const run = (release = true, mode = "") => Bun.spawnSync([
     "powershell", "-NoProfile", "-File", join(root, "scripts/prepare-release.ps1"), "-BundleDir", bundle,
-    ...(release ? ["-Release", "-Tag", "v0.3.0"] : []),
+    ...(release ? ["-Release", "-Tag", `v${version}`] : []),
   ], { cwd: folder, env: { ...fixtureEnv, PLANET_RELEASE_FIXTURE: mode } });
   const outputs = () => {
     const path = join(root, "windows/.mygo/release-drafts");
@@ -80,6 +80,21 @@ test("release materials require a clean annotated tag and accepted audit", () =>
   if (result.exitCode !== 0) throw new Error(result.stderr.toString());
   expect(result.exitCode).toBe(0);
   expect(JSON.parse(readFileSync(join(f.outputs()[0]!, "release-manifest.json"), "utf8")).mode).toBe("release");
+});
+
+test("prerelease materials preserve the channel and require the same audit gates", () => {
+  const f = fixture("0.0.1-alpha.1");
+  const result = f.run();
+  if (result.exitCode !== 0) throw new Error(result.stderr.toString());
+  const manifest = JSON.parse(readFileSync(join(f.outputs()[0]!, "release-manifest.json"), "utf8"));
+  expect(manifest.version).toBe("0.0.1-alpha.1");
+  expect(manifest.tag).toBe("v0.0.1-alpha.1");
+  expect(manifest.prerelease).toBe(true);
+  for (const mode of ["unsigned", "license"]) {
+    const rejected = f.run(true, mode);
+    expect(rejected.exitCode).not.toBe(0);
+    expect(rejected.stderr.toString()).toContain("Release blocked");
+  }
 });
 
 for (const mode of ["unsigned", "license", "hash"]) {
