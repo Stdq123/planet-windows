@@ -1,6 +1,7 @@
 import { Library, type Article, type Draft, type Site, type Subscription, type Item, type KuboStatus, type SearchResult, type Builtin } from "./mygo";
 import { initUpdates } from "./updates";
 import { initXSync } from "./x-sync";
+import { createFormErrors } from "./form-errors";
 import { createDashboard } from "./dashboard";
 import release from "../release.json";
 import { refreshDue } from "./auto-refresh";
@@ -24,6 +25,7 @@ const title = $<HTMLInputElement>("#title"), content = $<HTMLTextAreaElement>("#
 const preview = $<HTMLIFrameElement>("#preview"), saveButton = $<HTMLButtonElement>("#save");
 const newArticle = $<HTMLButtonElement>("#new-article"), dialog = $<HTMLDialogElement>("#site-dialog");
 const form = $<HTMLFormElement>("#site-form"), emptyAction = $<HTMLButtonElement>("#empty-action");
+const siteFormErrors = createFormErrors(form, $("#site-settings-result"));
 const subscriptionsEl = $("#subscriptions"), feedDialog = $<HTMLDialogElement>("#feed-dialog"), feedForm = $<HTMLFormElement>("#feed-form");
 const reader = $("#reader"), readerTitle = $("#reader-title"), readerDate = $("#reader-date"), readerPreview = $<HTMLIFrameElement>("#reader-preview");
 const ownReader = $("#own-reader"), ownReaderPreview=$<HTMLIFrameElement>("#own-reader-preview");
@@ -660,8 +662,10 @@ function selectArticle(item: Article) {
 }
 $("#edit-article").addEventListener("click",()=>{if(!site || !article || saving)return;navigationRevision++;editing=true;dirty=false;title.value=article.title;content.value=article.content;setEditorTags(article.tags);clearError();updateView();void renderPreview();});
 const articleSettingsDialog=$<HTMLDialogElement>("#article-settings-dialog"),articleSettingsForm=$<HTMLFormElement>("#article-settings-form");
+const articleFormErrors=createFormErrors(articleSettingsForm,$("#article-settings-result"));
 $("#article-settings").addEventListener("click",()=>{
   if(!site || site.imported || !article || saving)return;
+  articleFormErrors.clear();
   articleSettingsForm.querySelector<HTMLInputElement>('[name="slug"]')!.value=article.slug || "";
   articleSettingsForm.querySelector<HTMLSelectElement>('[name="articleType"]')!.value=String(article.articleType || 0);
   articleSettingsForm.querySelector<HTMLInputElement>('[name="externalLink"]')!.value=article.externalLink || "";
@@ -673,17 +677,24 @@ $("#close-article-settings").addEventListener("click",()=>{if(!saving)articleSet
 articleSettingsDialog.addEventListener("cancel",event=>{if(saving)event.preventDefault();});
 articleSettingsForm.addEventListener("submit",async event=>{
   event.preventDefault();if(!site || site.imported || !article || saving)return;
+  $("#article-settings-result").textContent="";if(!articleFormErrors.validate())return;
   const siteID=site.id,articleID=article.id,slug=articleSettingsForm.querySelector<HTMLInputElement>('[name="slug"]')!.value.trim();
   const type=Number(articleSettingsForm.querySelector<HTMLSelectElement>('[name="articleType"]')!.value),external=articleSettingsForm.querySelector<HTMLInputElement>('[name="externalLink"]')!.value.trim();
   const included=articleSettingsForm.querySelector<HTMLInputElement>('[name="inNavigation"]')!.checked,weight=Number(articleSettingsForm.querySelector<HTMLInputElement>('[name="weight"]')!.value);
-  if(!Number.isSafeInteger(weight) || weight < -2147483648 || weight > 2147483647){$("#article-settings-result").textContent="请输入有效的整数权重。";return;}
+  if(!Number.isSafeInteger(weight) || weight < -2147483648 || weight > 2147483647){articleFormErrors.show([{field:articleSettingsForm.querySelector<HTMLInputElement>('[name="weight"]')!,message:"请输入有效的整数权重。"}]);return;}
   const controls=Array.from(articleSettingsForm.querySelectorAll<HTMLInputElement|HTMLSelectElement|HTMLButtonElement>("input,select,button"));controls.forEach(control=>control.disabled=true);saving=true;updateView();
   try {
     const saved=await Library.updateArticleSettings(siteID,articleID,slug,type,external,included,weight);
     articles=articles.map(entry=>entry.id===articleID ? saved : entry);if(site?.id===siteID && article?.id===articleID)article=saved;
     markLocalChange(siteID);articleSettingsDialog.close();clearError();void queuePublication(siteID);
-  } catch(error){$("#article-settings-result").textContent=`保存失败：${error instanceof Error ? error.message : String(error)}`;}
-  finally{controls.forEach(control=>control.disabled=false);saving=false;updateView();}
+  } catch(error){
+    const message=error instanceof Error ? error.message : String(error),text=`保存失败：${message}`;
+    const fieldName:Record<string,string>={"自定义路径只能包含小写字母、数字或连字符，且不能使用保留名称":"slug","自定义路径与其他文章冲突":"slug","文章类型无效":"articleType","外部链接必须是有效的 HTTP 或 HTTPS 地址":"externalLink"};
+    const name=fieldName[message];
+    if(name)articleFormErrors.show([{field:articleSettingsForm.querySelector<HTMLInputElement|HTMLSelectElement>(`[name="${name}"]`)!,message:text}]);
+    else $("#article-settings-result").textContent=text;
+  }
+  finally{controls.forEach(control=>control.disabled=false);saving=false;updateView();articleFormErrors.focusFirst();}
 });
 $("#share-own-article").addEventListener("click",async()=>{
   if(!site?.ipns || !site.lastPublishedCID || !article)return;
@@ -970,7 +981,10 @@ dialog.addEventListener("cancel", event => { if (saving) event.preventDefault();
 dialog.addEventListener("close", () => { navigationRevision++; });
 form.addEventListener("submit", async (event) => {
   event.preventDefault(); if (saving) return;
-  $("#site-settings-result").textContent="";const button = form.querySelector<HTMLButtonElement>('button[type="submit"]')!; button.disabled = true;
+  $("#site-settings-result").textContent="";if(!siteFormErrors.validate())return;
+  const nameInput=form.querySelector<HTMLInputElement>('[name="name"]')!;
+  if(!nameInput.value.trim()){siteFormErrors.show([{field:nameInput,message:"请输入站点名称"}]);return;}
+  const button = form.querySelector<HTMLButtonElement>('button[type="submit"]')!; button.disabled = true;
   const revision = ++navigationRevision;
   const isUpdate=!!editingSiteID, cancel=$<HTMLButtonElement>("#cancel-site");
   saving=true; cancel.disabled=true; busyMessage=isUpdate ? "正在保存站点设置…" : "正在创建站点…"; updateView();
@@ -997,11 +1011,17 @@ form.addEventListener("submit", async (event) => {
     if (revision !== navigationRevision) { if(refreshError) showError(`站点已创建，但站点列表刷新失败：${String(refreshError)}`); updateView(); return; }
     site = created; favoritesView = false; smartView=null; subscription = null; item = null; articles = []; article = null; draft=null; drafts=[]; draftsView=false; editing = false; dirty = false; dialog.close();
     if (refreshError) showError(`站点已创建，但站点列表刷新失败：${String(refreshError)}`); else clearError(); updateView();
-  } catch (e) { $("#site-settings-result").textContent=`${isUpdate ? "保存" : "创建"}失败：${e instanceof Error ? e.message : String(e)}。请检查后重试。`; }
+  } catch (e) {
+    const message=e instanceof Error ? e.message : String(e),text=`${isUpdate ? "保存" : "创建"}失败：${message}。请检查后重试。`;
+    const fieldName:Record<string,string>={"请输入站点名称":"name","站点标识只能包含字母、数字和连字符":"siteSlug","作者名称不能超过 250 个字符":"authorName"};
+    const name=fieldName[message];
+    if(name)siteFormErrors.show([{field:form.querySelector<HTMLInputElement>(`[name="${name}"]`)!,message:text}]);
+    else $("#site-settings-result").textContent=text;
+  }
   finally {
     button.disabled = false; button.textContent = submitLabel; saving=false; cancel.disabled=false;
     for (const field of form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input,textarea")) field.disabled = false;
-    busyMessage=""; updateView();
+    busyMessage=""; updateView();siteFormErrors.focusFirst();
   }
 });
 $("#new-feed").addEventListener("click", () => { if (canLeave()) { navigationRevision++; feedForm.reset(); $("#feed-result").textContent=""; openDialog(feedDialog); } });
