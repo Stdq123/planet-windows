@@ -1,5 +1,42 @@
 // Native controls keep keyboard focus, modality and form semantics in WebView2.
 const baselines = new WeakMap<HTMLDialogElement, string>();
+const dialogReturnTargets = new WeakMap<HTMLDialogElement, HTMLElement[]>();
+const dialogCloseListeners = new WeakSet<HTMLDialogElement>();
+const dialogStacks = new WeakMap<Document, HTMLDialogElement[]>();
+
+function canReceiveFocus(element: HTMLElement): boolean {
+  if (!element.isConnected || element.matches(':disabled, [aria-disabled="true"]')
+    || element.closest('[hidden], [inert], [aria-hidden="true"]')) return false;
+  const view = element.ownerDocument.defaultView!;
+  for (let ancestor: HTMLElement | null = element; ancestor; ancestor = ancestor.parentElement) {
+    if (ancestor.matches("dialog:not([open])")) return false;
+    if (ancestor.matches("details:not([open])") && !ancestor.querySelector(":scope > summary")?.contains(element)) return false;
+    const style = view.getComputedStyle(ancestor);
+    if (style.display === "none" || style.visibility === "hidden" || style.visibility === "collapse") return false;
+  }
+  return element.matches('button, input:not([type="hidden"]), select, textarea, a[href], summary, iframe, [tabindex], [contenteditable="true"]');
+}
+
+function restoreDialogFocus(dialog: HTMLDialogElement) {
+  // A queued close event can arrive after the same dialog has been reopened.
+  if (dialog.open) return;
+  const targets = dialogReturnTargets.get(dialog);
+  if (!targets) return;
+  dialogReturnTargets.delete(dialog);
+  const document = dialog.ownerDocument;
+  const stack = (dialogStacks.get(document) ?? []).filter(entry => entry.isConnected && entry.open);
+  dialogStacks.set(document, stack);
+  const activeModal = document.activeElement?.closest<HTMLDialogElement>("dialog[open]")
+    ?? stack.at(-1) ?? Array.from(document.querySelectorAll<HTMLDialogElement>("dialog[open]")).at(-1);
+  // Return into a parent modal, but never take focus out of another open modal.
+  const candidates = activeModal ? targets.filter(target => activeModal.contains(target))
+    : [...targets, ...document.querySelectorAll<HTMLElement>("main[tabindex]")];
+  for (const target of candidates) {
+    if (!canReceiveFocus(target)) continue;
+    target.focus({preventScroll: true});
+    if (document.activeElement === target) return;
+  }
+}
 
 function formSignature(dialog: HTMLDialogElement): string {
   return JSON.stringify(Array.from(dialog.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("input,textarea,select"))
@@ -16,10 +53,29 @@ export function hasDialogChanges(document: Document): boolean {
     !!dialog.querySelector("form") && baselines.get(dialog) !== formSignature(dialog));
 }
 
-export function openDialog(dialog: HTMLDialogElement) {
+export function openDialog(dialog: HTMLDialogElement, opener?: HTMLElement) {
+  if (dialog.open) return;
+  const document = dialog.ownerDocument;
+  const trigger = opener ?? document.activeElement;
+  const targets: HTMLElement[] = [];
+  if (trigger instanceof document.defaultView!.HTMLElement) {
+    targets.push(trigger);
+    // The entry can disappear when its enclosing menu closes after this click.
+    for (let menu = trigger.closest("details"); menu; menu = menu.parentElement?.closest("details") ?? null) {
+      const summary = menu.querySelector<HTMLElement>(":scope > summary");
+      if (summary) targets.push(summary);
+    }
+  }
   syncChoices(dialog);
   rememberDialog(dialog);
   dialog.showModal();
+  dialogReturnTargets.set(dialog, targets);
+  const stack = (dialogStacks.get(document) ?? []).filter(entry => entry !== dialog && entry.isConnected && entry.open);
+  dialogStacks.set(document, [...stack, dialog]);
+  if (!dialogCloseListeners.has(dialog)) {
+    dialogCloseListeners.add(dialog);
+    dialog.addEventListener("close", () => restoreDialogFocus(dialog));
+  }
 }
 
 function mayDismiss(dialog: HTMLDialogElement): boolean {

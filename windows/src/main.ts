@@ -119,9 +119,6 @@ for (const menu of [workspaceMenu, $<HTMLDetailsElement>(".sidebar-tools")]) {
 const publicationDialog = $<HTMLDialogElement>("#publication-dialog");
 $("#show-publication").addEventListener("click", () => {
   if (publicationDialog.open) return;
-  publicationDialog.addEventListener("close", () => {
-    if (!workspace.hidden && !workspaceMenu.hidden && !document.querySelector("dialog[open]")) workspaceMenu.querySelector("summary")!.focus();
-  }, { once: true });
   openDialog(publicationDialog);
 });
 $("#close-publication").addEventListener("click", () => publicationDialog.close());
@@ -1211,7 +1208,7 @@ templateSettingsButton.addEventListener("click", async () => {
       field.append(input); fields.append(field);
     }
     templateSettingsForm.querySelector<HTMLInputElement>('[name="showRef"]')!.checked=settings.showRef==="true";
-    editingTemplateSiteID=siteID; openDialog(templateSettingsDialog);
+    editingTemplateSiteID=siteID; openDialog(templateSettingsDialog, templateSettingsButton);
   } catch(e) { showError(e); } finally { saving=false; title.disabled=false; content.disabled=false; busyMessage=""; updateView(); }
 });
 $("#cancel-template-settings").addEventListener("click",()=>{if(!saving)templateSettingsDialog.close();});
@@ -1349,7 +1346,7 @@ pinnableButton.addEventListener("click",async()=>{
   if(!site || saving)return;const siteID=site.id;navigationRevision++;saving=true;title.disabled=true;content.disabled=true;updateView();clearError();
   try {
     const configured=await Library.pinnableConfigured(siteID);if(site?.id!==siteID)return;
-    pinnableSiteID=siteID;pinnableConfigured=configured;pinnableForm.reset();pinnableResult.textContent=configured ? "已配置固定服务地址。" : "尚未配置固定服务。";openDialog(pinnableDialog);
+    pinnableSiteID=siteID;pinnableConfigured=configured;pinnableForm.reset();pinnableResult.textContent=configured ? "已配置固定服务地址。" : "尚未配置固定服务。";openDialog(pinnableDialog, pinnableButton);
   } catch(e){showError(e);} finally {saving=false;title.disabled=false;content.disabled=false;updatePinnableControls();updateView();}
 });
 $("#pinnable-close").addEventListener("click",()=>{if(!saving)pinnableDialog.close();});
