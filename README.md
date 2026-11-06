@@ -1,12 +1,19 @@
 # Planet Windows
 
+<a href="docs/branding/README.md">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/branding/planet-horizontal-reversed.svg">
+    <img src="docs/branding/planet-horizontal-color.svg" alt="Planet Windows - Neighbor Pages logo" width="300">
+  </picture>
+</a>
+
 Write a blog, publish it to IPFS, and follow your favorite sites from a Windows desktop app.
 
 > **Upstream project: [Planetable/Planet](https://github.com/Planetable/Planet)**
 >
 > Planet Windows is an independent Windows port derived from Planet, the original macOS app.
 
-[Download](#download) · [中文使用指南](windows/README.md) · [Run from source](#run-from-source) · [Contributing](CONTRIBUTING.md)
+[Download](#download) · [中文使用指南](windows/README.md) · [Run from source](#run-from-source) · [Logo & branding](docs/branding/README.md) · [Contributing](CONTRIBUTING.md)
 
 ## Download
 
