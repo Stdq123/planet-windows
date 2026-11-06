@@ -12,6 +12,7 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` a
 ### Added
 
 - Optional X (Twitter) article sync after successful IPNS publication, with encrypted local credentials, manual history sync, persistent delivery status and explicit recovery for uncertain requests.
+- Per-site Telegram group or channel synchronization after successful publication, with title, summary and article link, encrypted local bot credentials, duplicate suppression, message updates and manual retry.
 - An all-sites startup overview with local content totals, recent drafts and articles, publication states, and on-demand IPFS and Plausible access.
 - A single `bun run check` command for Go formatting and static analysis, frontend and Go tests, TypeScript checks and the frontend production build.
 - Optional Git hooks to catch staged whitespace errors before commits and run the shared checks before pushes.

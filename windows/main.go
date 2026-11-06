@@ -57,6 +57,7 @@ type Library struct {
 	updateClosing    bool
 	updateWorkers    sync.WaitGroup
 	xPoster          services.XPoster
+	telegramAPI      services.TelegramAPI
 }
 
 func (l *Library) open() (*store.Store, error) {
@@ -285,6 +286,9 @@ func (l *Library) permanentlyDeleteSiteLocked(siteID string) error {
 	}
 	if err = services.DeleteXPostsForSite(root, siteID); err != nil {
 		return fmt.Errorf("永久删除已开始，清理 X 同步记录失败，可稍后重试：%w", err)
+	}
+	if err = services.DeleteTelegramConfig(root, siteID); err != nil {
+		return fmt.Errorf("永久删除已开始，清理 Telegram 配置失败，可稍后重试：%w", err)
 	}
 	if hasRepo {
 		if err = l.node.RemoveKeyIfMatches(siteID, selected.IPNS); err != nil {
@@ -1302,6 +1306,9 @@ func (l *Library) PublishSite(siteID string) (publisher.Result, error) {
 		if warning := l.syncPublishedX(root, *site, articles); warning != "" {
 			result.PinnableWarning += " 站点已发布，但 X 同步未完成：" + warning
 		}
+		result.TelegramWarning = l.syncPublishedTelegram(root, *site, articles, raw)
+	} else {
+		result.TelegramWarning = "站点已发布，但无法读取 Telegram 本机配置。"
 	}
 	return result, nil
 }
