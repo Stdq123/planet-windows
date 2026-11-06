@@ -76,7 +76,9 @@ bun run check
 bun run build
 ```
 
-`bun run check` is the shared local and CI entry point. It runs Go formatting checks, `go vet`, frontend tests, uncached Go tests, TypeScript checks and the frontend production build, stopping on the first failure. Default tests do not publish to IPFS; optional Kubo, online and template tests are documented in the [Windows guide](windows/README.md#构建与测试).
+`bun run check` is the full local and CI entry point. It runs documentation checks, Go formatting checks, `go vet`, frontend tests, uncached Go tests, TypeScript checks and the frontend production build, stopping on the first failure. Default tests do not publish to IPFS; optional Kubo, online and template tests are documented in the [Windows guide](windows/README.md#构建与测试).
+
+For changes limited to the [documentation allowlist](docs/git-workflow.md#纯文档检查), run `bun run check:docs` with Git and Bun only. It checks text formatting and local links without installing dependencies or building the app. CI and the optional pre-push hook select this path automatically; code, mixed changes and uncertain comparisons retain full checks.
 
 Close running Planet and Kubo processes before `bun run build`. The build prepares Kubo 0.38.2 from its official release, verifies the archive's SHA-512 checksum, and packages the app and installer. It prints both output paths:
 
@@ -96,6 +98,7 @@ Run these from `windows/`:
 | --- | --- |
 | `bun run generate` | Regenerate the TypeScript bindings for Go methods. |
 | `bun run test` | Run frontend tests. |
+| `bun run check:docs` | Check documentation encoding, Markdown fences and local links without a build. |
 | `go test ./...` | Run Go tests; optional integration tests require explicit setup. |
 | `bun run typecheck` | Check TypeScript types. |
 | `bun run build:web` | Check TypeScript and build frontend assets. |
@@ -103,7 +106,7 @@ Run these from `windows/`:
 | `bun run release:check --tag vX.Y.Z` | Validate the supplied release tag against the app version and dated Changelog entry; replace `vX.Y.Z` with the intended tag. |
 | `bun run release:prepare -BundleDir <bundle-directory>` | Prepare local draft release materials; see the release guide for required inputs and acceptance. |
 
-Windows CI runs the shared quality checks and dependency security scan on pull requests and pushes to `main`. Repository protection and validation requirements are recorded in the [maintenance standard](docs/maintenance.md).
+Windows CI runs the required `Windows quality checks` job on pull requests and pushes to `main`: documentation-only changes use the lightweight check, while other changes run the full checks and dependency security scan. Manual runs always use full checks. Repository protection and validation requirements are recorded in the [maintenance standard](docs/maintenance.md).
 
 ## Incomplete and awaiting validation
 
