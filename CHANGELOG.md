@@ -4,7 +4,9 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 ## [Unreleased]
 
-- No unreleased changes.
+### Changed
+
+- Unified the Windows application icon, sidebar brand mark and web-preview favicon around the Neighbor Pages identity, with maintained SVG logo sources and a branding guide.
 
 ## [0.0.1-alpha.1] - 2026-11-06
 
