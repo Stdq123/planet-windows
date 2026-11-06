@@ -17,11 +17,11 @@ Write a blog, publish it to IPFS, and follow your favorite sites from a Windows 
 
 ## Download
 
-**[Download v0.0.1-alpha.1 for Windows x64](https://github.com/Stdq123/planet-windows/releases/download/v0.0.1-alpha.1/planet-windows-safe-setup-0.0.1-alpha.1-amd64.exe)**
+**[Download v0.0.1-alpha.2 for Windows x64](https://github.com/Stdq123/planet-windows/releases/download/v0.0.1-alpha.2/planet-windows-safe-setup-0.0.1-alpha.2-amd64.exe)**
 
-Requires Windows x64 and WebView2 Runtime. Install into an empty folder, then open **Planet Windows** from the Start menu. [Release notes, source code and SHA-256 checksums](https://github.com/Stdq123/planet-windows/releases/tag/v0.0.1-alpha.1) are available on the release page.
+Requires Windows x64 and WebView2 Runtime. Install into an empty folder, then open **Planet Windows** from the Start menu. The [release page](https://github.com/Stdq123/planet-windows/releases/tag/v0.0.1-alpha.2) provides release notes, corresponding source, SHA-256 checksums and the final package's acceptance evidence.
 
-> **Unsigned alpha.** Features are still incomplete. Native installer tests passed on Windows Server 2025; Windows 10/11 desktop, input-method and recovery testing remain incomplete. Real Mac backup compatibility is unverified. See the [known limitations](windows/README.md#尚未完成与待验证) and [acceptance record](docs/acceptance-0.0.1-alpha.1.md).
+> **Unsigned alpha.** Features are still incomplete. Native installer acceptance is limited to seven smoke-test scenarios; use this release's attached results, not evidence from an older package. Windows 10/11 desktop, input-method and recovery testing remain incomplete. Real Mac backup compatibility is unverified. See the [known limitations](windows/README.md#尚未完成与待验证) and [acceptance scope](docs/acceptance-0.0.1-alpha.2.md).
 
 ## What you can do
 

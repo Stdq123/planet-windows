@@ -4,9 +4,20 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 ## [Unreleased]
 
+- No unreleased changes.
+
+## [0.0.1-alpha.2] - 2026-11-06
+
 ### Changed
 
-- Unified the Windows application icon, sidebar brand mark and web-preview favicon around the Neighbor Pages identity, with maintained SVG logo sources and a branding guide.
+- Unified the Windows application, installer and uninstaller icons, sidebar brand mark and web-preview favicon around the Neighbor Pages identity, with maintained SVG logo sources and a branding guide.
+- Reorganized the README around downloading and getting started, with clearer Windows prerequisites and known limitations.
+
+### Known limitations
+
+- This remains an experimental, unsigned Windows x64 prerelease. SHA-256 checks confirm file integrity, not publisher identity. The final installer must pass the disposable Windows Server 2025 native smoke workflow before publication; the release includes its package-specific evidence.
+- Windows 10/11 GUI, WebView2 failure handling, Chinese input, DPI transitions, real cross-version upgrades, interrupted upgrades and power-loss recovery remain unverified. Real Mac backup compatibility and live external-service integrations are also unverified. Use an isolated Windows user profile with disposable data and keep original backups; see the [acceptance scope](https://github.com/Stdq123/planet-windows/blob/v0.0.1-alpha.2/docs/acceptance-0.0.1-alpha.2.md).
+- No production update feed is configured. Download manually; existing alpha.1 installations are not claimed to have passed cross-version upgrade acceptance. Earlier `0.2.0`/`0.3.0` development installations cannot downgrade to this version.
 
 ## [0.0.1-alpha.1] - 2026-11-06
 
