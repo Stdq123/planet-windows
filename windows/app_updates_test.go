@@ -64,7 +64,7 @@ func TestTrustChangeAfterPublishingDownloadCleansOnlyOwnedCache(t *testing.T) {
 	old := http.DefaultTransport
 	http.DefaultTransport = &afterDownloadTransport{server.Client().Transport, published, release}
 	t.Cleanup(func() { http.DefaultTransport = old })
-	r := updates.Release{Schema: 1, App: updates.AppID, Platform: "windows-amd64", Version: "0.4.0", MinimumVersion: "0.2.0", URL: server.URL + "/setup.exe", SHA256: hex.EncodeToString(sum[:]), Size: int64(len(body)), PublishedAt: time.Now().Add(-time.Hour), ExpiresAt: time.Now().Add(time.Hour)}
+	r := updates.Release{Schema: 1, App: updates.AppID, Platform: "windows-amd64", Version: "0.4.0", MinimumVersion: appVersion, URL: server.URL + "/setup.exe", SHA256: hex.EncodeToString(sum[:]), Size: int64(len(body)), PublishedAt: time.Now().Add(-time.Hour), ExpiresAt: time.Now().Add(time.Hour)}
 	payload, _ := json.Marshal(r)
 	envelope, _ = json.Marshal(map[string][]byte{"payload": payload, "signature": ed25519.Sign(key, payload)})
 	lib := &Library{}
@@ -174,7 +174,7 @@ func TestUpdateCheckPersistsSeenVersionAndRejectsStaleDownload(t *testing.T) {
 	oldTransport := http.DefaultTransport
 	http.DefaultTransport = server.Client().Transport
 	t.Cleanup(func() { http.DefaultTransport = oldTransport })
-	r := updates.Release{Schema: 1, App: updates.AppID, Platform: "windows-amd64", Version: "0.4.0", MinimumVersion: "0.2.0", URL: server.URL + "/setup.exe", SHA256: strings.Repeat("a", 64), Size: 10, PublishedAt: time.Now().Add(-time.Hour), ExpiresAt: time.Now().Add(time.Hour)}
+	r := updates.Release{Schema: 1, App: updates.AppID, Platform: "windows-amd64", Version: "0.4.0", MinimumVersion: appVersion, URL: server.URL + "/setup.exe", SHA256: strings.Repeat("a", 64), Size: 10, PublishedAt: time.Now().Add(-time.Hour), ExpiresAt: time.Now().Add(time.Hour)}
 	payload, _ := json.Marshal(r)
 	envelope, _ = json.Marshal(map[string][]byte{"payload": payload, "signature": ed25519.Sign(key, payload)})
 	lib := &Library{}
@@ -197,5 +197,48 @@ func TestUpdateCheckPersistsSeenVersionAndRejectsStaleDownload(t *testing.T) {
 	cancel()
 	if _, e = updates.NewClient().Check(ctx, cfg, appVersion, time.Now()); e == nil {
 		t.Fatal("canceled context accepted")
+	}
+}
+
+func TestPrereleaseAppRecordsFullVersionAndRejectsReplay(t *testing.T) {
+	root := t.TempDir()
+	mygo.App.SetPath(mygo.PathUserData, root)
+	previousVersion := appVersion
+	appVersion = "0.0.1-alpha.1"
+	t.Cleanup(func() {
+		mygo.App.SetPath(mygo.PathUserData, "")
+		appVersion = previousVersion
+	})
+	pub, key, _ := ed25519.GenerateKey(rand.Reader)
+	var envelope []byte
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write(envelope) }))
+	defer server.Close()
+	oldTransport := http.DefaultTransport
+	http.DefaultTransport = server.Client().Transport
+	t.Cleanup(func() { http.DefaultTransport = oldTransport })
+	lib := &Library{}
+	settings, err := lib.SaveUpdateSettings(server.URL+"/feed.json", base64.StdEncoding.EncodeToString(pub), false)
+	if err != nil || settings.CurrentVersion != appVersion {
+		t.Fatalf("current prerelease version: %+v, %v", settings, err)
+	}
+	r := updates.Release{Schema: 1, App: updates.AppID, Platform: "windows-amd64", MinimumVersion: appVersion, URL: server.URL + "/setup.exe", SHA256: strings.Repeat("a", 64), Size: 10, PublishedAt: time.Now().Add(-time.Hour), ExpiresAt: time.Now().Add(time.Hour)}
+	for _, next := range []string{"0.0.1-alpha.10", "0.0.1-alpha.2", "0.0.1"} {
+		r.Version = next
+		payload, _ := json.Marshal(r)
+		envelope, _ = json.Marshal(map[string][]byte{"payload": payload, "signature": ed25519.Sign(key, payload)})
+		info, err := lib.CheckUpdates()
+		cfg, configErr := updates.LoadConfig(root)
+		if configErr != nil {
+			t.Fatal(configErr)
+		}
+		if next == "0.0.1-alpha.2" {
+			if err == nil || cfg.HighestVersion != "0.0.1-alpha.10" || lib.checkedUpdate != nil {
+				t.Fatalf("replayed alpha changed trusted state: %+v, %v", cfg, err)
+			}
+			continue
+		}
+		if err != nil || !info.Available || info.Version != next || cfg.HighestVersion != next {
+			t.Fatalf("prerelease/stable update: %+v, %+v, %v", info, cfg, err)
+		}
 	}
 }

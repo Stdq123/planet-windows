@@ -15,9 +15,10 @@ import (
 	"io"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
 	"time"
+
+	releaseversion "windows/internal/version"
 )
 
 type release struct {
@@ -31,22 +32,6 @@ type release struct {
 	Size           int64     `json:"size"`
 	PublishedAt    time.Time `json:"publishedAt"`
 	ExpiresAt      time.Time `json:"expiresAt"`
-}
-
-func parseVersion(s string) ([3]uint64, error) {
-	var version [3]uint64
-	parts := strings.Split(s, ".")
-	if len(parts) != 3 {
-		return version, errors.New("invalid version")
-	}
-	for i, part := range parts {
-		number, err := strconv.ParseUint(part, 10, 32)
-		if err != nil || strconv.FormatUint(number, 10) != part {
-			return version, errors.New("invalid version")
-		}
-		version[i] = number
-	}
-	return version, nil
 }
 
 func writeNew(path string, contents []byte, mode os.FileMode) error {
@@ -110,21 +95,16 @@ func run(args []string, output io.Writer) error {
 		if err := flags.Parse(args[1:]); err != nil || flags.NArg() != 0 || *keyPath == "" || *installer == "" || *downloadURL == "" || *version == "" || *out == "" {
 			return errors.New("sign requires -private-key, -installer, -url, -version and -out")
 		}
-		v, err := parseVersion(*version)
+		v, err := releaseversion.Parse(*version)
 		if err != nil {
 			return errors.New("invalid release version")
 		}
-		min, err := parseVersion(*minimum)
+		min, err := releaseversion.Parse(*minimum)
 		if err != nil {
 			return errors.New("invalid minimum version")
 		}
-		for i := range v {
-			if v[i] < min[i] {
-				return errors.New("minimum version exceeds release version")
-			}
-			if v[i] > min[i] {
-				break
-			}
+		if v.Compare(min) < 0 {
+			return errors.New("minimum version exceeds release version")
 		}
 		if *days < 1 || *days > 30 {
 			return errors.New("valid-days must be between 1 and 30")

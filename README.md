@@ -8,6 +8,8 @@ Publish websites with IPFS and follow web feeds from a Windows desktop app, buil
 
 **Early development:** not all original Planet features are implemented, and compatibility with real macOS backups has not been verified. Keep original backups and test recovery before relying on imported data.
 
+**First public prerelease target: `v0.0.1-alpha.1`.** Earlier `0.3.0` and other version numbers identify untagged development snapshots. This target is still awaiting the [release checks](docs/releasing.md); it is not an approved release. Existing `0.2.0`/`0.3.0` development installations reject it as a downgrade. Test alpha in an isolated, fresh Windows user profile and preserve the original installation and data.
+
 [中文使用指南](windows/README.md) · [Build and test](#build-and-test) · [Known limitations](#incomplete-and-awaiting-validation) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
 
 ## Screenshot
@@ -103,7 +105,7 @@ Run these from `windows/`:
 | `bun run typecheck` | Check TypeScript types. |
 | `bun run build:web` | Check TypeScript and build frontend assets. |
 | `bun run security:check` | Query online dependency advisories; required for dependency changes and release preparation. |
-| `bun run release:check --tag vX.Y.Z` | Validate the supplied release tag against the app version and dated Changelog entry; replace `vX.Y.Z` with the intended tag. |
+| `bun run release:check --tag vX.Y.Z` | Validate the supplied release tag against the app version and dated Changelog entry; use the full intended tag, including any prerelease suffix. |
 | `bun run release:prepare -BundleDir <bundle-directory>` | Prepare local draft release materials; see the release guide for required inputs and acceptance. |
 
 Windows CI runs the required `Windows quality checks` job on pull requests and pushes to `main`: documentation-only changes use the lightweight check, while other changes run the full checks and dependency security scan. Manual runs always use full checks. Repository protection and validation requirements are recorded in the [maintenance standard](docs/maintenance.md).

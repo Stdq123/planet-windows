@@ -18,9 +18,10 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strconv"
 	"strings"
 	"time"
+
+	releaseversion "windows/internal/version"
 )
 
 const AppID = "org.planetable.planetwindows"
@@ -88,7 +89,7 @@ func ValidateConfig(cfg Config) (Config, error) {
 	}
 	cfg.PublicKey = base64.StdEncoding.EncodeToString(pub)
 	if cfg.HighestVersion != "" {
-		if _, e = version(cfg.HighestVersion); e != nil || !validHash(cfg.HighestSHA256) {
+		if _, e = releaseversion.Parse(cfg.HighestVersion); e != nil || !validHash(cfg.HighestSHA256) {
 			return Config{}, errors.New("已保存的更新版本记录无效")
 		}
 	}
@@ -98,39 +99,8 @@ func validHash(s string) bool {
 	b, e := hex.DecodeString(s)
 	return e == nil && len(b) == 32 && s == strings.ToLower(s)
 }
-func version(s string) ([3]uint64, error) {
-	var out [3]uint64
-	parts := strings.Split(s, ".")
-	if len(parts) != 3 {
-		return out, errors.New("版本号必须是三个非负整数")
-	}
-	for i, p := range parts {
-		v, e := strconv.ParseUint(p, 10, 32)
-		if e != nil || strconv.FormatUint(v, 10) != p {
-			return out, errors.New("版本号无效")
-		}
-		out[i] = v
-	}
-	return out, nil
-}
 func Compare(a, b string) (int, error) {
-	x, e := version(a)
-	if e != nil {
-		return 0, e
-	}
-	y, e := version(b)
-	if e != nil {
-		return 0, e
-	}
-	for i := range x {
-		if x[i] < y[i] {
-			return -1, nil
-		}
-		if x[i] > y[i] {
-			return 1, nil
-		}
-	}
-	return 0, nil
+	return releaseversion.Compare(a, b)
 }
 
 // Both protocol objects are flat: reject duplicate keys, unknown fields and
@@ -215,6 +185,13 @@ func Verify(envelope []byte, cfg Config, current string, now time.Time) (Release
 	cmp, e := Compare(r.Version, current)
 	if e != nil || cmp < 0 {
 		return Release{}, errors.New("更新版本旧于当前版本或格式无效")
+	}
+	// Installing a prerelease is the opt-in. A stable installation must not
+	// silently switch channels when its configured feed offers a later alpha.
+	targetVersion, _ := releaseversion.Parse(r.Version)
+	currentVersion, _ := releaseversion.Parse(current)
+	if targetVersion.IsPrerelease() && !currentVersion.IsPrerelease() {
+		return Release{}, errors.New("稳定版本不接收预发布更新")
 	}
 	cmp, e = Compare(current, r.MinimumVersion)
 	if e != nil || cmp < 0 {

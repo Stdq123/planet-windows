@@ -56,6 +56,7 @@ $taskManifest = [ordered]@{
     schemaVersion = 1
     mode = $taskMetadata.mode
     version = $taskMetadata.version
+    prerelease = $taskMetadata.prerelease
     tag = $taskMetadata.tag
     sourceCommitAtPreparation = $taskCommit
     sourceCheckoutDirty = ($taskStatus.Count -gt 0)
