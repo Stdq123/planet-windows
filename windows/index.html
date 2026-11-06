@@ -15,31 +15,31 @@
 <body>
   <div class="shell">
     <aside class="sidebar" aria-label="主导航">
-      <div class="brand"><img class="planet-mark" src="./resources/icon.png" alt="" /><span>Planet</span></div>
-      <button id="show-dashboard" class="sidebar-action smart-action" aria-pressed="true"><span class="system-icon" aria-hidden="true">&#xE80F;</span><span class="nav-label">概览</span></button>
+      <div class="brand"><img class="planet-mark" src="./resources/workspace/planet.svg" alt="" /><span>Planet</span></div>
+      <button id="show-dashboard" class="sidebar-action smart-action" aria-pressed="true"><img class="design-icon" src="./resources/workspace/grid.svg" alt="" /><span class="nav-label">写作台</span></button>
       <button id="show-search" class="sidebar-action smart-action" aria-label="搜索文章" aria-keyshortcuts="Control+f"><span class="system-icon" aria-hidden="true">&#xE721;</span><span class="nav-label">搜索文章</span><kbd aria-hidden="true">Ctrl F</kbd></button>
       <div class="sidebar-scroll">
         <section class="nav-section" aria-labelledby="sites-heading">
-          <div class="section-label"><h2 id="sites-heading">我的站点</h2><button id="new-site" class="icon-button" title="新建站点" aria-label="新建站点"><span class="system-icon" aria-hidden="true">&#xE710;</span></button></div>
+          <div class="section-label"><h2 id="sites-heading">我的站点</h2><button id="new-site" class="icon-button" title="新建站点" aria-label="新建站点"><img class="design-icon" src="./resources/workspace/plus.svg" alt="" /></button></div>
           <nav id="sites" class="sites" aria-label="我的站点"></nav>
         </section>
         <section class="nav-section" aria-labelledby="reading-heading">
           <div class="section-label"><h2 id="reading-heading">阅读</h2></div>
           <nav class="reading-navigation" aria-label="阅读分类">
-            <button id="show-today" class="sidebar-action smart-action"><span class="system-icon" aria-hidden="true">&#xE787;</span><span class="nav-label">今天</span><span id="today-count" class="smart-count"></span></button>
-            <button id="show-unread" class="sidebar-action smart-action"><span class="system-icon" aria-hidden="true">&#xE715;</span><span class="nav-label">未读</span><span id="unread-count" class="smart-count"></span></button>
-            <button id="show-favorites" class="sidebar-action smart-action"><span class="system-icon" aria-hidden="true">&#xE734;</span><span class="nav-label">收藏的文章</span><span id="favorites-count" class="smart-count"></span></button>
+            <button id="show-today" class="sidebar-action smart-action"><img class="design-icon" src="./resources/workspace/clock.svg" alt="" /><span class="nav-label">今天</span><span id="today-count" class="smart-count"></span></button>
+            <button id="show-unread" class="sidebar-action smart-action"><img class="design-icon" src="./resources/workspace/inbox.svg" alt="" /><span class="nav-label">未读</span><span id="unread-count" class="smart-count"></span></button>
+            <button id="show-favorites" class="sidebar-action smart-action"><img class="design-icon" src="./resources/workspace/star.svg" alt="" /><span class="nav-label">收藏</span><span id="favorites-count" class="smart-count"></span></button>
           </nav>
         </section>
         <section class="nav-section" aria-labelledby="subscriptions-heading">
-          <div class="section-label"><h2 id="subscriptions-heading">订阅</h2><button id="new-feed" class="icon-button" title="添加订阅" aria-label="添加订阅"><span class="system-icon" aria-hidden="true">&#xE710;</span></button></div>
+          <div class="section-label"><h2 id="subscriptions-heading">订阅</h2><button id="new-feed" class="icon-button" title="添加订阅" aria-label="添加订阅"><img class="design-icon" src="./resources/workspace/plus.svg" alt="" /></button></div>
           <nav id="subscriptions" class="sites" aria-label="关注的订阅"></nav>
         </section>
       </div>
       <div class="sidebar-bottom">
         <button id="show-ipfs-status" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE774;</span><span class="nav-label">IPFS 节点</span></button>
         <details class="sidebar-tools">
-          <summary><span class="system-icon" aria-hidden="true">&#xE713;</span><span class="nav-label">工作区工具</span><span class="nav-chevron system-icon" aria-hidden="true">&#xE70E;</span></summary>
+          <summary><img class="design-icon" src="./resources/workspace/settings.svg" alt="" /><span class="nav-label">设置与工具</span><span class="nav-chevron system-icon" aria-hidden="true">&#xE70E;</span></summary>
           <div class="sidebar-tools-content">
             <button id="import-planet" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE8B5;</span>导入 .planet 备份</button>
             <button id="show-removed-sites" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE74D;</span>已移除的站点</button>
@@ -54,59 +54,71 @@
     <main id="dashboard" class="dashboard" hidden aria-labelledby="dashboard-title">
       <div class="dashboard-inner">
         <header class="dashboard-header">
-          <h1 id="dashboard-title" tabindex="-1">工作区概览</h1>
+          <div class="dashboard-heading">
+            <h1 id="dashboard-title" tabindex="-1">写作台</h1>
+            <p class="dashboard-subtitle">继续上次的思路，也开始新的记录。</p>
+          </div>
           <div class="dashboard-actions">
-            <button id="dashboard-search" class="secondary dashboard-search" type="button" aria-label="搜索文章" aria-keyshortcuts="Control+f"><span class="system-icon" aria-hidden="true">&#xE721;</span><span>搜索文章</span><kbd aria-hidden="true">Ctrl F</kbd></button>
-            <button id="dashboard-refresh" class="secondary dashboard-refresh" type="button" aria-label="刷新概览" title="刷新概览"><span class="system-icon" aria-hidden="true">&#xE72C;</span></button>
-            <button id="dashboard-create" class="secondary" type="button"><span class="system-icon" aria-hidden="true">&#xE710;</span>新建站点</button>
-            <span class="dashboard-identity" title="内容保存在这台电脑上"><span class="system-icon" aria-hidden="true">&#xE770;</span><span>本地工作区</span></span>
+            <button id="dashboard-search" class="secondary dashboard-search" type="button" aria-label="搜索文章" aria-keyshortcuts="Control+f"><span>搜索文章</span><span class="system-icon" aria-hidden="true">&#xE721;</span></button>
+            <div id="dashboard-compose-controls"><button id="dashboard-compose" class="primary" type="button">写文章</button></div>
           </div>
         </header>
         <p id="dashboard-feedback" class="dashboard-feedback" role="status" hidden></p>
         <div id="dashboard-content" hidden>
-          <dl class="dashboard-metrics" aria-label="本地内容统计">
-            <div class="dashboard-metric"><dt><span class="dashboard-metric-icon system-icon" aria-hidden="true">&#xE774;</span>我的站点</dt><dd data-count="sites">—</dd></div>
-            <div class="dashboard-metric"><dt><span class="dashboard-metric-icon system-icon" aria-hidden="true">&#xE8A5;</span>已保存文章</dt><dd data-count="articles">—</dd></div>
-            <div class="dashboard-metric"><dt><span class="dashboard-metric-icon system-icon" aria-hidden="true">&#xE70F;</span>私密草稿</dt><dd data-count="drafts">—</dd></div>
-            <div class="dashboard-metric"><dt><span class="dashboard-metric-icon system-icon" aria-hidden="true">&#xE715;</span><button id="dashboard-unread" type="button">未读文章</button></dt><dd data-count="unread">—</dd></div>
-          </dl>
-          <section class="dashboard-welcome" aria-labelledby="dashboard-welcome-title">
-            <div class="dashboard-welcome-copy">
-              <h2 id="dashboard-welcome-title">开始写作</h2>
-              <p id="dashboard-welcome-description">选择站点，撰写一篇新文章。</p>
-              <div id="dashboard-compose-controls" class="dashboard-compose">
-                <label class="sr-only" for="dashboard-compose-site">写入站点</label><select id="dashboard-compose-site"></select><button id="dashboard-compose" class="primary" type="button"><span class="system-icon" aria-hidden="true">&#xE70F;</span>撰写文章</button>
-              </div>
-              <button id="dashboard-first-site" class="primary" type="button" hidden><span class="system-icon" aria-hidden="true">&#xE710;</span>创建第一个站点</button>
-            </div>
-            <img class="dashboard-welcome-art" src="./resources/dashboard-writing.svg" alt="" width="264" height="184" />
-          </section>
+          <div class="dashboard-summary">
+            <dl class="dashboard-metrics" aria-label="本地内容统计">
+              <div><dd data-count="sites">—</dd><dt>个站点</dt></div>
+              <div><dd data-count="articles">—</dd><dt>篇文章</dt></div>
+              <div><dd data-count="drafts">—</dd><dt>篇草稿</dt></div>
+            </dl>
+            <span class="sr-only">订阅未读 <span data-count="unread">—</span> 篇</span>
+            <span class="dashboard-caption">所有站点</span>
+          </div>
           <section id="dashboard-empty" class="dashboard-empty" hidden aria-labelledby="dashboard-empty-title">
-            <div class="dashboard-section-heading"><h2 id="dashboard-empty-title">从这里开始</h2><span class="dashboard-caption">让内容慢慢生长</span></div>
-            <ol class="dashboard-start-steps">
-              <li><span aria-hidden="true">01</span><div><h3>建立自己的站点</h3><p>一个博客、一本日记，或一份灵感集。</p></div></li>
-              <li><span aria-hidden="true">02</span><div><h3>写下第一篇文章</h3><p>想法先存为私密草稿，准备好了再分享。</p></div></li>
-              <li><span aria-hidden="true">03</span><div><h3>发布到网络</h3><p>通过 IPFS 发布，让你的声音被看见。</p></div></li>
-            </ol>
-            <div class="dashboard-import-row"><p>已经有 Planet 站点？接着之前的故事。</p><button id="dashboard-import" class="secondary" type="button">导入 .planet 备份</button></div>
+            <div class="dashboard-empty-mark"><img src="./resources/workspace/empty-file.svg" alt="" /></div>
+            <h2 id="dashboard-empty-title">为你的想法，留一个地方</h2>
+            <p>创建一个站点，写下第一篇文章。<br />也可以导入已有的 Planet 备份，继续之前的记录。</p>
+            <div class="dashboard-empty-actions"><button id="dashboard-first-site" class="primary" type="button">创建第一个站点</button><button id="dashboard-import" class="secondary" type="button">导入站点</button></div>
+            <span class="dashboard-caption">支持 .planet 备份文件</span>
           </section>
           <div id="dashboard-columns" class="dashboard-columns">
             <div class="dashboard-primary">
               <section class="dashboard-section" aria-labelledby="dashboard-drafts-title">
-                <div class="dashboard-section-heading"><h2 id="dashboard-drafts-title">继续写作</h2><span class="dashboard-caption">最近的私密草稿</span></div>
+                <div class="dashboard-section-heading"><h2 id="dashboard-drafts-title">继续写作</h2><button id="dashboard-drafts-toggle" class="dashboard-text-button" type="button" aria-controls="dashboard-drafts" aria-expanded="false" hidden>更多草稿 →</button></div>
                 <div id="dashboard-drafts" class="dashboard-list dashboard-drafts"></div>
               </section>
-              <section class="dashboard-section" aria-labelledby="dashboard-articles-title"><div class="dashboard-section-heading"><h2 id="dashboard-articles-title">最近文章</h2><span class="dashboard-caption">按修改时间</span></div><div id="dashboard-articles" class="dashboard-list"></div></section>
+              <section class="dashboard-section" aria-labelledby="dashboard-articles-title">
+                <div class="dashboard-section-heading"><h2 id="dashboard-articles-title">最近文章</h2><button id="dashboard-articles-toggle" class="dashboard-text-button" type="button" aria-controls="dashboard-articles" aria-expanded="false" hidden>更多文章 →</button></div>
+                <div id="dashboard-article-filters" class="dashboard-article-filters" role="group" aria-label="最近文章按站点筛选"></div>
+                <div id="dashboard-articles" class="dashboard-list dashboard-articles"></div>
+              </section>
             </div>
             <aside class="dashboard-secondary" aria-label="站点与服务">
-              <section class="dashboard-section" aria-labelledby="dashboard-sites-title"><div class="dashboard-section-heading"><h2 id="dashboard-sites-title">站点发布</h2><span class="dashboard-caption">所有站点</span></div><div id="dashboard-sites" class="dashboard-list"></div></section>
-              <section class="dashboard-section dashboard-node"><span class="dashboard-node-icon system-icon" aria-hidden="true">&#xE774;</span><div><h2>IPFS 节点</h2><p class="dashboard-caption">连接、流量与存储</p></div><button id="dashboard-node" class="secondary" type="button" aria-label="查看 IPFS 节点状态">查看</button></section>
-              <details class="dashboard-section dashboard-analytics"><summary><span class="system-icon" aria-hidden="true">&#xE9D9;</span>访问统计<span class="dashboard-disclosure system-icon" aria-hidden="true">&#xE70D;</span></summary><p class="dashboard-caption">按需查看站点的访问表现</p><div class="dashboard-analytics-body"><label for="dashboard-analytics-site">站点</label><select id="dashboard-analytics-site"></select><label for="dashboard-period">时间范围</label><select id="dashboard-period"><option value="day">今天</option><option value="7d" selected>最近 7 天</option><option value="30d">最近 30 天</option></select><button id="dashboard-query" type="button" class="secondary">查询 Plausible</button><p id="dashboard-analytics-result" role="status">尚未查询</p></div></details>
+              <section class="dashboard-section dashboard-sites-section" aria-labelledby="dashboard-sites-title">
+                <div class="dashboard-section-heading"><h2 id="dashboard-sites-title">站点状态</h2><button id="dashboard-create" class="dashboard-icon-button" type="button" aria-label="创建站点" title="创建站点"><img class="design-icon" src="./resources/workspace/plus.svg" alt="" /></button></div>
+                <div id="dashboard-sites" class="dashboard-list"></div>
+              </section>
+              <section class="dashboard-publishing-note">
+                <h3>写好之后，再分享出去</h3>
+                <p>私密草稿只保存在本地。保存并发布后，站点内容才会更新。</p>
+                <button id="dashboard-publication-link" class="dashboard-text-button" type="button" hidden>查看待发布内容 →</button>
+              </section>
+              <details class="dashboard-analytics">
+                <summary>访问统计<span class="system-icon" aria-hidden="true">&#xE70D;</span></summary>
+                <div class="dashboard-analytics-body"><label for="dashboard-analytics-site">站点</label><select id="dashboard-analytics-site"></select><label for="dashboard-period">时间范围</label><select id="dashboard-period"><option value="day">今天</option><option value="7d" selected>最近 7 天</option><option value="30d">最近 30 天</option></select><button id="dashboard-query" type="button" class="secondary">查询 Plausible</button><p id="dashboard-analytics-result" role="status">尚未查询</p></div>
+              </details>
             </aside>
           </div>
         </div>
+        <footer class="dashboard-footer"><span>内容保存在这台电脑上</span><div><button id="dashboard-refresh" class="dashboard-icon-button" type="button" aria-label="刷新写作台" title="刷新写作台"><span class="system-icon" aria-hidden="true">&#xE72C;</span></button><button id="dashboard-footer-import" class="dashboard-text-button" type="button">导入站点</button></div></footer>
       </div>
+      <dialog id="dashboard-compose-dialog" aria-labelledby="dashboard-compose-title">
+        <div class="dialog-header"><h2 id="dashboard-compose-title">写在哪个站点？</h2></div>
+        <div class="dialog-body"><label for="dashboard-compose-site">站点</label><select id="dashboard-compose-site"></select></div>
+        <div class="dialog-actions"><button id="dashboard-compose-cancel" class="secondary" type="button">取消</button><button id="dashboard-compose-confirm" class="primary" type="button">开始写作</button></div>
+      </dialog>
     </main>
+
     <section id="posts-panel" class="posts-panel">
       <header class="posts-header"><div><h1 id="site-title">我的站点</h1></div><button id="new-article" class="icon-button" title="新建文章" aria-label="新建文章" disabled><span class="system-icon" aria-hidden="true">&#xE70F;</span></button></header>
       <div class="posts-caption"><span id="posts-kind">文章</span><button id="show-drafts" class="secondary" disabled>草稿</button><span class="posts-total"><span id="post-count">0</span> 篇</span></div>
@@ -114,20 +126,23 @@
       <div class="panel-note">你的内容保存在这台电脑上</div>
     </section>
     <main class="workspace">
-      <header class="workspace-header"><div class="workspace-leading"><button id="toggle-posts" type="button" class="icon-button" aria-controls="posts-panel" aria-expanded="true" aria-label="收起文章列表" title="收起文章列表"><span class="system-icon" aria-hidden="true">&#xE700;</span></button><span class="workspace-divider"></span><div class="workspace-heading"><div id="workspace-title" class="workspace-title">欢迎来到 Planet</div></div></div><div class="header-actions"><span id="save-state" role="status"></span><button id="show-publication" type="button" class="secondary quiet" hidden>发布信息</button><button id="refresh-feed" class="secondary" hidden>刷新订阅</button><button id="new-article-header" class="primary" type="button" hidden><span class="system-icon" aria-hidden="true">&#xE70F;</span> 撰写文章</button><button id="save-draft" class="secondary" title="保存到本机（Ctrl+S），不会公开发布" hidden>保存草稿</button><button id="save" class="primary" title="保存后自动公开发布整个站点及其已保存附件" disabled>保存并发布</button><details id="workspace-menu" class="workspace-menu"><summary aria-label="更多操作" title="更多操作"><span class="system-icon" aria-hidden="true">&#xE712;</span></summary><div class="workspace-menu-content"><button id="publish-site" disabled>发布到 IPFS</button><button id="edit-site" disabled>站点设置</button><button id="site-profile" disabled>域名与社交资料</button><button id="podcast-settings" disabled>播客设置</button><button id="deployment-settings" disabled>SSH / Cloudflare 发布</button><button id="select-template" disabled>选择模板</button><button id="template-settings" disabled>模板设置</button><button id="pinnable-settings" disabled>固定服务</button><button id="service-settings" disabled>Filebase / 统计</button><button id="export-site" disabled>导出网页</button><button id="export-planet" disabled>备份</button><button id="pin-subscription" hidden>固定离线</button><button id="mark-feed-read" hidden>全部标为已读</button><button id="unfollow" hidden>取消订阅</button><button id="delete-article" hidden>删除文章</button><button id="remove-site" disabled>移除站点</button></div></details></div></header>
+      <header class="workspace-header"><div class="workspace-leading"><button id="toggle-posts" type="button" class="icon-button" aria-controls="posts-panel" aria-expanded="true" aria-label="收起文章列表" title="收起文章列表"><span class="system-icon" aria-hidden="true">&#xE700;</span></button><span class="workspace-divider"></span><div class="workspace-heading"><div id="workspace-title" class="workspace-title">欢迎来到 Planet</div></div></div><div class="header-actions"><span id="save-state" role="status"></span><button id="refresh-feed" class="secondary" hidden>刷新订阅</button><button id="new-article-header" class="primary" type="button" hidden><span class="system-icon" aria-hidden="true">&#xE70F;</span> 撰写文章</button><button id="save-draft" class="secondary" title="保存到本机（Ctrl+S），不会公开发布" hidden>保存草稿</button><button id="save" class="primary" title="保存后自动公开发布整个站点及其已保存附件" disabled>保存并发布</button><details id="workspace-menu" class="workspace-menu"><summary aria-label="更多操作" title="更多操作"><span class="system-icon" aria-hidden="true">&#xE712;</span></summary><div class="workspace-menu-content"><button id="show-publication" type="button" hidden>发布信息</button><button id="publish-site" disabled>发布到 IPFS</button><button id="edit-site" disabled>站点设置</button><button id="site-profile" disabled>域名与社交资料</button><button id="podcast-settings" disabled>播客设置</button><button id="deployment-settings" disabled>SSH / Cloudflare 发布</button><button id="select-template" disabled>选择模板</button><button id="template-settings" disabled>模板设置</button><button id="pinnable-settings" disabled>固定服务</button><button id="service-settings" disabled>Filebase / 统计</button><button id="export-site" disabled>导出网页</button><button id="export-planet" disabled>备份</button><button id="pin-subscription" hidden>固定离线</button><button id="mark-feed-read" hidden>全部标为已读</button><button id="unfollow" hidden>取消订阅</button><button id="delete-article" hidden>删除文章</button><button id="remove-site" disabled>移除站点</button></div></details></div></header>
 
       <div id="library-notice" class="library-notice" role="status" hidden><span id="library-message"></span><button id="retry-library" type="button" class="secondary" hidden>重新加载</button></div>
-      <div id="empty" class="empty"><div class="empty-orbit"><img src="./resources/icon.png" alt="" /></div><h2>让想法有一个地方安放。</h2><p>创建站点，开始撰写你的第一篇文章。</p><button id="empty-action" class="primary">创建站点</button></div>
+      <div id="empty" class="empty"><div class="empty-orbit"><img src="./resources/workspace/planet.svg" alt="" /></div><h2>让想法有一个地方安放。</h2><p>创建站点，开始撰写你的第一篇文章。</p><button id="empty-action" class="primary">创建站点</button></div>
       <div id="editor" class="editor" hidden>
         <div id="imported-warning" class="imported-warning" hidden></div>
         <div class="document-head"><label class="editor-title-label sr-only" for="title">文章标题</label><input id="title" class="title-input" placeholder="文章标题" maxlength="250" /></div>
         <div class="editor-controls">
-          <button id="toggle-metadata" type="button" class="secondary quiet" aria-controls="editor-metadata" aria-expanded="false">标签与附件<span id="metadata-count"></span></button>
+          <div class="editor-options">
+            <button id="toggle-metadata" type="button" class="secondary quiet" aria-controls="editor-metadata" aria-expanded="false">标签与附件<span id="metadata-count"></span><span class="system-icon" aria-hidden="true">&#xE70D;</span></button>
+            <section id="editor-metadata" class="editor-metadata" aria-labelledby="metadata-heading" hidden>
+              <div class="metadata-heading"><h2 id="metadata-heading">文章信息</h2><button id="close-metadata" type="button" class="icon-button" aria-label="关闭文章信息" title="关闭"><span class="system-icon" aria-hidden="true">&#xE711;</span></button></div>
+              <div class="tag-bar"><label for="tag-input">标签</label><span id="tag-list"></span><div class="tag-input-row"><input id="tag-input" maxlength="120" placeholder="输入标签" /><button id="add-tag" type="button" class="secondary">添加</button></div><span class="tag-help">随文章或草稿保存</span></div>
+              <div class="attachment-bar"><div class="attachment-actions"><span>附件</span><button id="add-attachment" class="secondary" disabled>添加附件</button><button id="play-article-audio" class="secondary" hidden>播放音频</button></div><span id="attachment-list"></span><span id="attachment-help">先保存文章，再添加附件</span></div>
+            </section>
+          </div>
           <div class="view-switch" role="group" aria-label="写作视图"><button id="view-write" type="button" aria-pressed="true">编辑</button><button id="view-preview" type="button" aria-pressed="false">预览</button><button id="view-split" type="button" aria-pressed="false">分栏</button></div>
-        </div>
-        <div id="editor-metadata" class="editor-metadata" hidden>
-        <div class="tag-bar"><span>标签</span><span id="tag-list"></span><label class="sr-only" for="tag-input">添加文章标签</label><input id="tag-input" maxlength="120" placeholder="输入标签" /><button id="add-tag" type="button" class="secondary">添加标签</button><span class="tag-help">随文章或草稿保存</span></div>
-        <div class="attachment-bar"><button id="add-attachment" class="secondary" disabled>添加附件</button><button id="play-article-audio" class="secondary" hidden>播放音频</button><span id="attachment-list"></span><span id="attachment-help">先保存文章，再添加附件</span></div>
         </div>
         <div class="writing-grid"><section id="writing-pane" class="writing-pane"><div class="pane-label">编辑 <span>MARKDOWN</span></div><label class="sr-only" for="content">文章内容</label><textarea id="content" placeholder="从这里开始写作…" spellcheck="false"></textarea></section><section id="preview-pane" class="preview-pane" hidden><div class="pane-label">预览 <span>LIVE PREVIEW</span></div><iframe id="preview" sandbox="" title="文章预览"></iframe></section></div>
         <div class="editor-footer">草稿仅保存在本机；保存并发布会公开整个站点及其附件。</div>

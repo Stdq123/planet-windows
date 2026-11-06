@@ -1,19 +1,30 @@
 /* Shared visual contract for navigation, overview and its entry dialogs. */
 :root {
-  --pw-brand: #f2c94c;
-  --pw-brand-hover: #e6ba35;
-  --pw-brand-active: #d5a728;
-  --pw-accent: #8a641b;
-  --pw-selection: #fff3cc;
-  --pw-canvas: #f4f6f8;
-  --pw-sidebar: #fafbfc;
+  --pw-brand: #333432;
+  --pw-brand-hover: #252623;
+  --pw-brand-active: #1f211e;
+  --pw-brand-ink: #fff;
+  --pw-accent: #333432;
+  --pw-accent-ink: #333432;
+  --pw-selection: #e9e7e2;
+  --pw-canvas: #fbfaf7;
+  --pw-sidebar: #f3f1ed;
   --pw-card: #fff;
-  --pw-ink: #202536;
-  --pw-muted: #616b7d;
-  --pw-line: #e0e5ec;
-  --pw-control-line: #a8b2c2;
-  --pw-hover: #f2f5f8;
-  --pw-active: #e8edf3;
-  --pw-font: "Segoe UI", "Microsoft YaHei", sans-serif;
-  --pw-popover-shadow: 0 8px 16px #20253614;
+  --pw-ink: #2b2b29;
+  --pw-secondary: #5f5c58;
+  --pw-muted: #6d6a65;
+  --pw-line: #e5e1da;
+  --pw-control-line: #d6d0c9;
+  --pw-hover: #eeece7;
+  --pw-active: #e3e0da;
+  --pw-green: #426f58;
+  --pw-amber: #946537;
+  --pw-font: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+  --pw-popover-shadow: 0 8px 16px #2b2b2914;
+  /* Keep the existing editor controls on the same neutral palette. */
+  --brand: var(--pw-brand);
+  --brand-hover: var(--pw-brand-hover);
+  --brand-pressed: var(--pw-brand-active);
+  --focus: var(--pw-accent);
+  --selection: var(--pw-selection);
 }

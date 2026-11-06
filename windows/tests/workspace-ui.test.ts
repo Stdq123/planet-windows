@@ -119,6 +119,100 @@ test("editor and preview switching keeps unsaved content and exposes only the ch
   expect($("#writing-pane").hidden).toBe(false);expect($("#preview-pane").hidden).toBe(true);expect(content.value).toBe("Unsent words");
 });
 
+test("metadata dismissal preserves draft text, attachments and pending tag input",async()=>{
+  const saved={...draft,articleId:"base",tags:{notes:"笔记"},attachments:["photo.png","sound.mp3"]};
+  const original={...draft,id:"base",title:"Original article",attachments:["original.pdf"]};
+  const {window,$,calls}=await fixture(method=>method==="Library.Drafts" ? [saved] : method==="Library.Articles" ? [original] : undefined);
+  await until(()=>!$<HTMLButtonElement>("#show-drafts").disabled);
+  $<HTMLButtonElement>("#show-drafts").click();await until(()=>$("#articles").textContent!.includes(saved.title));
+  $<HTMLButtonElement>(".article-item").click();
+  const toggle=$<HTMLButtonElement>("#toggle-metadata"), content=$<HTMLTextAreaElement>("#content"), tag=$<HTMLInputElement>("#tag-input");
+  toggle.click();tag.value="尚未添加";tag.dispatchEvent(new window.Event("input"));
+  $<HTMLButtonElement>("#close-metadata").click();
+  expect($("#editor-metadata").hidden).toBe(true);expect(window.document.activeElement).toBe(toggle);
+  expect(tag.value).toBe("尚未添加");expect(content.value).toBe(saved.content);
+  expect($("#attachment-list").children.length).toBe(3);expect($("#metadata-count").textContent).toBe("1 个标签 / 3 个附件");
+  toggle.click();content.focus();content.click();
+  expect($("#editor-metadata").hidden).toBe(true);expect(window.document.activeElement).toBe(content);
+  expect(tag.value).toBe("尚未添加");expect(content.value).toBe(saved.content);
+  $<HTMLButtonElement>("#save-draft").click();
+  expect($("#editor-metadata").hidden).toBe(false);expect(window.document.activeElement).toBe(tag);
+  expect(calls.some(name=>/SaveDraft|PublishDraft|SaveArticle|PublishSite|Remove.*Attachment/.test(name))).toBe(false);
+});
+
+test("metadata Escape returns focus but does not interrupt composition or a modal",async()=>{
+  const {window,$}=await fixture();await until(()=>!$<HTMLButtonElement>("#new-article").disabled);
+  $<HTMLButtonElement>("#new-article").click();
+  const toggle=$<HTMLButtonElement>("#toggle-metadata"), tag=$<HTMLInputElement>("#tag-input");
+  toggle.click();tag.focus();
+  const composing=new window.KeyboardEvent("keydown",{key:"Escape",isComposing:true,bubbles:true,cancelable:true});tag.dispatchEvent(composing);
+  expect($("#editor-metadata").hidden).toBe(false);expect(composing.defaultPrevented).toBe(false);
+  const legacyComposition=new window.KeyboardEvent("keydown",{key:"Escape",keyCode:229,bubbles:true,cancelable:true});tag.dispatchEvent(legacyComposition);
+  expect($("#editor-metadata").hidden).toBe(false);expect(legacyComposition.defaultPrevented).toBe(false);
+  const modal=$<HTMLDialogElement>("#site-dialog");modal.showModal();
+  const modalEscape=new window.KeyboardEvent("keydown",{key:"Escape",bubbles:true,cancelable:true});window.dispatchEvent(modalEscape);
+  expect($("#editor-metadata").hidden).toBe(false);expect(modalEscape.defaultPrevented).toBe(false);modal.close();
+  const escape=new window.KeyboardEvent("keydown",{key:"Escape",bubbles:true,cancelable:true});tag.dispatchEvent(escape);
+  expect($("#editor-metadata").hidden).toBe(true);expect(escape.defaultPrevented).toBe(true);
+  expect(toggle.getAttribute("aria-expanded")).toBe("false");expect(window.document.activeElement).toBe(toggle);
+});
+
+test("preview and leaving the editor close metadata without clearing unsaved input",async()=>{
+  const {window,$}=await fixture();await until(()=>!$<HTMLButtonElement>("#new-article").disabled);
+  $<HTMLButtonElement>("#new-article").click();
+  const toggle=$<HTMLButtonElement>("#toggle-metadata"), content=$<HTMLTextAreaElement>("#content");
+  content.value="Keep these words";content.dispatchEvent(new window.Event("input"));toggle.click();
+  $<HTMLButtonElement>("#view-preview").click();expect($("#editor-metadata").hidden).toBe(true);
+  $<HTMLButtonElement>("#view-write").click();expect(content.value).toBe("Keep these words");
+  toggle.click();window.confirm=()=>false;$<HTMLButtonElement>("#show-dashboard").click();
+  expect($("#editor").hidden).toBe(false);expect(content.value).toBe("Keep these words");
+  toggle.click();window.confirm=()=>true;$<HTMLButtonElement>("#show-dashboard").click();
+  expect($("#editor").hidden).toBe(true);expect($("#editor-metadata").hidden).toBe(true);
+});
+
+test("editor resize preserves the chosen article list while mode entry keeps it collapsed",async()=>{
+  const {window,$}=await fixture();await until(()=>!$<HTMLButtonElement>("#new-article").disabled);
+  $<HTMLButtonElement>("#new-article").click();
+  const toggle=$<HTMLButtonElement>("#toggle-posts"), panel=$("#posts-panel");
+  expect(panel.hidden).toBe(true);toggle.click();expect(panel.hidden).toBe(false);
+  window.happyDOM.setWindowSize({width:900,height:800});window.dispatchEvent(new window.Event("resize"));
+  expect(panel.hidden).toBe(false);expect(toggle.getAttribute("aria-expanded")).toBe("true");
+  toggle.click();window.happyDOM.setWindowSize({width:1440,height:900});window.dispatchEvent(new window.Event("resize"));
+  expect(panel.hidden).toBe(true);expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  toggle.click();$<HTMLButtonElement>("#show-dashboard").click();
+  $<HTMLButtonElement>("#sites button").click();await until(()=>!$<HTMLButtonElement>("#new-article").disabled);
+  $<HTMLButtonElement>("#new-article").click();expect(panel.hidden).toBe(true);
+});
+
+test("publication details opens from the workspace menu and closes that menu",async()=>{
+  const {window,$}=await fixture();await until(()=>$("#site-title").textContent==="Site");
+  const menu=$<HTMLDetailsElement>("#workspace-menu"), publication=$<HTMLDialogElement>("#publication-dialog");
+  const entry=$<HTMLButtonElement>("#show-publication"), close=$<HTMLButtonElement>("#close-publication");
+  menu.open=true;entry.focus();entry.click();
+  expect(menu.open).toBe(false);expect(publication.open).toBe(true);
+  close.focus();close.click();expect(publication.open).toBe(false);
+  expect(window.document.activeElement===menu.querySelector("summary")).toBe(true);
+  const other=$<HTMLButtonElement>("#toggle-posts");other.focus();publication.showModal();publication.close();
+  expect(window.document.activeElement).toBe(other);
+});
+
+test("metadata height follows the real editor bounds after notices and window layout changes",async()=>{
+  const {window,$}=await fixture();await until(()=>!$<HTMLButtonElement>("#new-article").disabled);
+  $<HTMLButtonElement>("#new-article").click();
+  const toggle=$<HTMLButtonElement>("#toggle-metadata"), metadata=$("#editor-metadata"), editor=$("#editor");
+  toggle.click();expect(metadata.style.maxHeight).toBe("");toggle.click();
+  let metadataTop=150, editorBottom=800;
+  editor.getBoundingClientRect=()=>new window.DOMRect(0,100,900,editorBottom-100);
+  metadata.getBoundingClientRect=()=>new window.DOMRect(32,metadataTop,360,500);
+  toggle.click();expect(metadata.style.maxHeight).toBe("440px");
+  metadataTop=560;
+  const content=$<HTMLTextAreaElement>("#content");content.value="Keeps the panel open during state updates";content.dispatchEvent(new window.Event("input"));
+  expect(metadata.style.maxHeight).toBe("208px");
+  editorBottom=720;window.dispatchEvent(new window.Event("resize"));expect(metadata.style.maxHeight).toBe("128px");
+  editor.getBoundingClientRect=()=>new window.DOMRect(0,0,0,0);
+  window.dispatchEvent(new window.Event("resize"));expect(metadata.style.maxHeight).not.toBe("0px");
+});
+
 test("dirty settings can reject both Escape and the cancel button",async()=>{
   const {window,$}=await fixture();await until(()=>$("#site-title").textContent==="Site");
   $<HTMLButtonElement>("#edit-site").click();$<HTMLInputElement>('#site-form [name="name"]').value="Unsaved";

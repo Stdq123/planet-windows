@@ -49,6 +49,14 @@ const workspaceMenu = $<HTMLDetailsElement>("#workspace-menu");
 const postsPanel = $("#posts-panel"), shell = $(".shell"), togglePosts = $<HTMLButtonElement>("#toggle-posts");
 const workspace = $(".workspace"), metadata = $("#editor-metadata"), metadataToggle = $("#toggle-metadata");
 let editorView: "write" | "preview" | "split" = "write";
+function syncMetadataLayout() {
+  if (metadata.hidden) return;
+  const bounds = editor.getBoundingClientRect();
+  if (bounds.height <= 0) return;
+  // Leave room for the popover shadow inside the editor's clipped surface.
+  const available = bounds.bottom - metadata.getBoundingClientRect().top - 32;
+  metadata.style.maxHeight = `${Math.max(0, Math.min(440, Math.floor(available)))}px`;
+}
 function syncEditorView() {
   const canSplit = workspace.clientWidth >= 960;
   const view = editorView === "split" && !canSplit ? "write" : editorView;
@@ -57,12 +65,26 @@ function syncEditorView() {
   $("#preview-pane").hidden = view === "write";
   $("#view-split").hidden = !canSplit;
   for (const choice of ["write", "preview", "split"]) $("#view-" + choice).setAttribute("aria-pressed", String(view === choice));
+  syncMetadataLayout();
 }
-for (const choice of ["write", "preview", "split"] as const) $("#view-" + choice).addEventListener("click", () => { editorView = choice; syncEditorView(); });
+for (const choice of ["write", "preview", "split"] as const) $("#view-" + choice).addEventListener("click", () => {
+  editorView = choice;
+  if (choice === "preview") setMetadataOpen(false);
+  syncEditorView();
+});
 function setMetadataOpen(open: boolean) {
   metadata.hidden = !open; metadataToggle.setAttribute("aria-expanded", String(open));
+  if (open) syncMetadataLayout();
 }
 metadataToggle.addEventListener("click", () => setMetadataOpen(!!metadata.hidden));
+$("#close-metadata").addEventListener("click", () => { setMetadataOpen(false); metadataToggle.focus(); });
+document.addEventListener("click", event => {
+  if (!metadata.hidden && !metadata.contains(event.target as Node) && !metadataToggle.contains(event.target as Node)) setMetadataOpen(false);
+}, true);
+window.addEventListener("keydown", event => {
+  if (event.key !== "Escape" || event.defaultPrevented || event.isComposing || event.keyCode === 229 || metadata.hidden || document.querySelector("dialog[open]")) return;
+  event.preventDefault(); setMetadataOpen(false); metadataToggle.focus();
+});
 new window.ResizeObserver(syncEditorView).observe(workspace);
 function setPostsCollapsed(collapsed: boolean) {
   postsPanel.hidden = collapsed;
@@ -87,7 +109,13 @@ for (const menu of [workspaceMenu, $<HTMLDetailsElement>(".sidebar-tools")]) {
   });
 }
 const publicationDialog = $<HTMLDialogElement>("#publication-dialog");
-$("#show-publication").addEventListener("click", () => openDialog(publicationDialog));
+$("#show-publication").addEventListener("click", () => {
+  if (publicationDialog.open) return;
+  publicationDialog.addEventListener("close", () => {
+    if (!workspace.hidden && !workspaceMenu.hidden && !document.querySelector("dialog[open]")) workspaceMenu.querySelector("summary")!.focus();
+  }, { once: true });
+  openDialog(publicationDialog);
+});
 $("#close-publication").addEventListener("click", () => publicationDialog.close());
 
 const ipfsDialog = $<HTMLDialogElement>("#ipfs-status-dialog"), ipfsRefresh = $<HTMLButtonElement>("#refresh-ipfs-status");
@@ -421,7 +449,8 @@ function renderArticles() {
 let previousMode = "browsing";
 function layoutMode() { return isDashboard() ? "dashboard" : editing ? "editing" : article || item ? "reading" : "browsing"; }
 window.addEventListener("resize", () => {
-  setPostsCollapsed(editing || layoutMode() === "reading" && window.innerWidth < 1100);
+  if (editing) syncEditorView();
+  else setPostsCollapsed(layoutMode() === "reading" && window.innerWidth < 1100);
 });
 function updateView() {
   const mode = layoutMode();
@@ -434,7 +463,8 @@ function updateView() {
   $("#show-dashboard").setAttribute("aria-pressed", String(overview));
   if (mode !== previousMode) {
     setPostsCollapsed(editing || mode === "reading" && window.innerWidth < 1100);
-    if (editing) { editorView = "write"; setMetadataOpen(false); }
+    setMetadataOpen(false);
+    if (editing) editorView = "write";
     previousMode = mode;
   }
   shell.classList.toggle("editing-mode", editing);
@@ -539,7 +569,8 @@ function updateView() {
   const unpublished = !!site && ((site.contentRevision ?? 0) > (site.publishedRevision ?? 0) || !!site.publishPending || !!publication && publication.changes > publication.publishedChanges);
   saveState.textContent = saving ? busyMessage || "正在处理…" : publication?.running ? `${current}${current ? "，" : ""}正在发布已保存内容…` : publication?.status === "failed" ? `${current}${current ? "，" : ""}发布未确认` : unpublished ? `${current}${current ? "，" : ""}站点更改尚未发布` : publication?.status === "published" ? `${current}${current ? "，" : ""}${dirty ? "已发布上次保存的内容" : "已发布"}` : current;
   saveState.title = publication?.error || saveState.textContent;
-  $("#metadata-count").textContent = editorTags.size || (draft?.attachments?.length ?? article?.attachments?.length) ? ` · ${editorTags.size} 个标签 / ${draft?.attachments?.length ?? article?.attachments?.length ?? 0} 个附件` : "";
+  const attachmentCount = attachmentList.childElementCount;
+  $("#metadata-count").textContent = editorTags.size || attachmentCount ? `${editorTags.size} 个标签 / ${attachmentCount} 个附件` : "";
   const notice = $("#library-notice"), retry = $<HTMLButtonElement>("#retry-library");
   if (overview) $(".dashboard-header").after(notice, errorEl);
   else { $(".workspace-header").after(notice); workspace.append(errorEl); }
@@ -552,6 +583,7 @@ function updateView() {
     empty.querySelector("p")!.textContent = libraryLoading ? "你的站点和订阅正在加载。" : "请重新加载；已有内容不会被更改。";
     emptyAction.hidden = true;
   }
+  syncMetadataLayout();
 }
 async function selectSite(item: Site) {
   if (item.id === site?.id && !articleLoadFailures.has(item.id)) return;

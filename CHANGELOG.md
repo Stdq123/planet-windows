@@ -11,7 +11,7 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` a
 
 ### Added
 
-- An all-sites startup overview with local content totals, recent drafts and articles, publication states, and on-demand IPFS and Plausible access. The overview uses light navigation with amber selection, an amber writing area, and a guided empty workspace.
+- An all-sites startup overview with local content totals, recent drafts and articles, publication states, and on-demand IPFS and Plausible access.
 - A single `bun run check` command for Go formatting and static analysis, frontend and Go tests, TypeScript checks and the frontend production build.
 - Optional Git hooks to catch staged whitespace errors before commits and run the shared checks before pushes.
 - A Chinese Git workflow guide covering branches, focused commits, pull requests, versioning and mirror synchronization.
@@ -22,7 +22,9 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` a
 
 ### Changed
 
-- Refined the all-sites overview with consistent light navigation, core totals before writing actions, an 8px spacing grid, accessible interaction states, and header search.
+- Renamed the Chinese overview navigation, heading, refresh label and loading/error messages to “写作台”.
+- Rebuilt the all-sites overview from the approved Figma writing workspace, with the subsequent neutral-palette revision: warm white surfaces, graphite controls, compact draft/article rows, inline totals and an adaptive site-status rail. Writing selects the destination site when needed; recent articles can be filtered by site and longer recent lists expanded.
+- Refined the writing workspace with a narrower navigation/list rail, aligned title and body, compact view controls, and an on-demand tag/attachment panel that does not move the text. Publication details remain available in the workspace menu.
 
 - Updated RSS, Atom and JSON Feed parsing to gofeed 1.5.0, preserving feeds with long preambles and rejecting invalid null JSON items without crashing.
 - Updated the MyGo desktop framework, frontend runtime and build CLI together to 0.7.4, with the installer safety hook re-audited for that version.
@@ -31,6 +33,7 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` a
 
 ### Fixed
 
+- Preserve a manually expanded article list while resizing the editor, and close article details with Escape without interfering with Chinese input composition or discarding pending tags.
 - Aligned dashboard navigation and page headings, statistic labels and values, article columns, and site/service card content across desktop window sizes.
 - Platinum template verification accepts LF and CRLF stylesheets while still rejecting changed content, so clean Git checkouts can use the bundled template.
 - Service configuration accepts Windows short directory names while continuing to reject symbolic links and junctions in configuration paths.

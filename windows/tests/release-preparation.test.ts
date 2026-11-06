@@ -86,16 +86,26 @@ for (const mode of ["unsigned", "license", "hash"]) {
   });
 }
 
-test("dirty, lightweight or mismatched-tag checkouts are blocked before producing materials", () => {
+test("dirty checkouts are blocked before producing release materials", () => {
   const dirty = fixture();
   writeFileSync(join(dirty.root, "uncommitted.txt"), "unfinished");
-  expect(dirty.run().exitCode).not.toBe(0);
+  const result = dirty.run();
+  expect(result.exitCode).not.toBe(0);
+  expect(result.stderr.toString()).toContain("requires a clean checkout");
   expect(dirty.outputs()).toEqual([]);
+});
+
+test("lightweight tags are blocked before producing release materials", () => {
   const lightweight = fixture();
   lightweight.git("tag", "-d", "v0.3.0");
   lightweight.git("tag", "v0.3.0");
-  expect(lightweight.run().exitCode).not.toBe(0);
+  const result = lightweight.run();
+  expect(result.exitCode).not.toBe(0);
+  expect(result.stderr.toString()).toContain("requires an existing annotated tag");
   expect(lightweight.outputs()).toEqual([]);
+});
+
+test("mismatched tags are blocked before producing release materials", () => {
   const mismatch = fixture();
   mismatch.git("commit", "--allow-empty", "--quiet", "-m", "test: later commit");
   const result = mismatch.run();
