@@ -1,6 +1,6 @@
 # Export source locally. No installation, Git mutation, tagging or publishing.
 [CmdletBinding()]
-param([string]$RepositoryRoot = (Split-Path -Parent $PSScriptRoot), [string]$OutputDirectory = '')
+param([string]$RepositoryRoot = '', [string]$OutputDirectory = '')
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -11,6 +11,7 @@ Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
 $taskUtf8 = [Text.UTF8Encoding]::new($false)
 [Console]::OutputEncoding = $taskUtf8
 $OutputEncoding = $taskUtf8
+if (-not $RepositoryRoot) { $RepositoryRoot = Split-Path -Parent $PSScriptRoot }
 $taskRoot = (Resolve-Path -LiteralPath $RepositoryRoot).Path
 
 function Invoke-SourceGit([string[]]$Arguments) {
@@ -83,7 +84,7 @@ try {
         $taskGoModJson = & go mod edit -json
         if ($LASTEXITCODE -ne 0) { throw 'Cannot read locked Go module metadata.' }
         $taskGoMod = ($taskGoModJson -join "`n") | ConvertFrom-Json
-        if (@($taskGoMod.Replace).Count -gt 0 -and $null -ne $taskGoMod.Replace) { throw 'Source packaging does not permit module replacements; review and pin them first.' }
+        if ($null -ne $taskGoMod.PSObject.Properties['Replace'] -and @($taskGoMod.Replace).Count -gt 0 -and $null -ne $taskGoMod.Replace) { throw 'Source packaging does not permit module replacements; review and pin them first.' }
         $taskDownloadJson = & go mod download -json github.com/ethereum/go-ethereum
         if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch locked go-ethereum source.' }
         $taskLibrary = ($taskDownloadJson -join "`n") | ConvertFrom-Json

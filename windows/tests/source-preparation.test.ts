@@ -32,6 +32,7 @@ function fixture() {
   const output = join(folder, "output");
   for (const path of [app, join(root, "docs"), join(root, "scripts"), endpoint, join(library, "common")]) mkdirSync(path, { recursive: true });
   copyFileSync(resolve(import.meta.dir, "../../scripts/release-version.ts"), join(root, "scripts/release-version.ts"));
+  copyFileSync(script, join(root, "scripts/prepare-source.ps1"));
   const moduleFile = `module ${module}\n\ngo 1.23\n`;
   writeFileSync(join(library, "go.mod"), moduleFile);
   writeFileSync(join(library, "COPYING"), "TEST FIXTURE license text\n");
@@ -60,16 +61,19 @@ try { foreach ($file in Get-ChildItem -LiteralPath $env:SOURCE_FIXTURE_ZIP_ROOT 
   const git = (...args: string[]) => run(["git", "-c", "core.hooksPath=.fixture-hooks", "-c", "commit.gpgSign=false", "-c", "user.name=Source fixture", "-c", "user.email=fixture@example.invalid", ...args], root, env);
   git("init", "--quiet"); git("add", "."); git("commit", "--quiet", "-m", "test: source fixture");
   const commit = git("rev-parse", "HEAD");
-  const prepare = () => Bun.spawnSync(["powershell", "-NoProfile", "-File", script, "-RepositoryRoot", root, "-OutputDirectory", output], { cwd: folder, env });
+  const prepare = (defaultRoot = false) => Bun.spawnSync([
+    "powershell", "-NoProfile", "-File", defaultRoot ? join(root, "scripts/prepare-source.ps1") : script,
+    ...(defaultRoot ? [] : ["-RepositoryRoot", root]), "-OutputDirectory", output,
+  ], { cwd: folder, env });
   return { root, app, cache, output, env, commit, git, prepare };
 }
 
-test("source archive ties tracked app source and vendored library source to the exact commit", () => {
+test("default source path resolves from the script and archives exact tracked source with vendored libraries", () => {
   const f = fixture();
   writeFileSync(join(f.root, ".env"), "PRIVATE_FIXTURE_DO_NOT_ARCHIVE=secret\n");
   for (const path of [join(f.app, "build"), join(f.app, "node_modules")]) mkdirSync(path);
   writeFileSync(join(f.app, "build", "private.exe"), "not source");
-  const result = f.prepare();
+  const result = f.prepare(true);
   if (result.exitCode !== 0) throw new Error(result.stderr.toString() + result.stdout.toString());
   const manifest = JSON.parse(readFileSync(join(f.output, "source-manifest.json"), "utf8"));
   expect(manifest.schemaVersion).toBe(1);
@@ -117,5 +121,17 @@ test("modified dependency cache is rejected rather than attested as pinned sourc
   const result = f.prepare();
   expect(result.exitCode).not.toBe(0);
   expect(result.stderr.toString()).toContain("verification");
+  expect(existsSync(join(f.output, "source-manifest.json"))).toBe(false);
+});
+
+test("module replacement is rejected instead of archiving different library source", () => {
+  const f = fixture();
+  f.git("config", "core.autocrlf", "false");
+  writeFileSync(join(f.app, "go.mod"), readFileSync(join(f.app, "go.mod"), "utf8") + "\nreplace github.com/ethereum/go-ethereum => ../unreviewed-library\n");
+  f.git("add", "windows/go.mod");
+  f.git("commit", "--quiet", "-m", "test: replaced source");
+  const result = f.prepare();
+  expect(result.exitCode).not.toBe(0);
+  expect(result.stderr.toString()).toContain("does not permit module replacements");
   expect(existsSync(join(f.output, "source-manifest.json"))).toBe(false);
 });
