@@ -4,7 +4,7 @@
 
 **Design:** https://www.figma.com/design/C7q0U2bLBOQihrNC6hYKjT?node-id=3-51
 **Architecture:** Keep Go, MyGo/WebView2, the existing TypeScript dashboard controller and local metadata API. Replace the overview composition and navigation styling; preserve existing editing, publishing, subscriptions and analytics.
-**Constraints:** No merge or push to main, no dependency/framework migration, no real user data in fixtures. Native Windows title bar remains native. Preserve Windows fonts, with Figma geometry checked in the actual renderer.
+**Constraints:** The initial preview stayed on its feature branch. Main-branch integration was authorized on 2026-11-06 and must follow the normal PR and CI requirements. No dependency/framework migration or real user data in fixtures. Native Windows title bar remains native. Preserve Windows fonts, with Figma geometry checked in the actual renderer.
 
 - [x] Apply local Figma SVG assets and tokens; rebuild the compact header, inline totals, writing rows, site rail, responsive layout and empty state.
 - [x] Wire site selection for writing, recent article filters, expandable recent lists, error/retry and live publication states. Add tests for changed interactions and retain stale-request safety.

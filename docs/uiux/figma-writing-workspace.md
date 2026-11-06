@@ -1,6 +1,6 @@
 # Figma writing workspace
 
-Source: [approved Figma proposal](https://www.figma.com/design/C7q0U2bLBOQihrNC6hYKjT?node-id=3-51). This iteration lives on `feat/figma-writing-workspace` and is a local preview, not a release or main-branch merge.
+Source: [approved Figma proposal](https://www.figma.com/design/C7q0U2bLBOQihrNC6hYKjT?node-id=3-51). The writing desk (写作台) is ready for integration through the normal pull-request checks. Local preview packages remain development builds; merging this UI does not publish a release.
 
 The overview places drafts and recent articles first. Totals are an inline summary; site status moves above the content at widths up to 1100px. Navigation uses a warm white surface and 36px rows. Following the user's review, graphite controls and warm gray selection replace the original Figma purple throughout the application. The existing Windows title bar remains native.
 
