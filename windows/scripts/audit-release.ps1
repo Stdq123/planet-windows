@@ -7,6 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Utility/Microsoft.PowerShell.Utility.psd1') -Force -ErrorAction Stop
 Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Security/Microsoft.PowerShell.Security.psd1') -Force -ErrorAction Stop
+. (Join-Path $PSScriptRoot 'release-audit/archive-entries.ps1')
 if (-not $InstallerName) { $InstallerName = 'planet-windows-safe-setup-' + (([IO.File]::ReadAllText((Join-Path ([IO.Directory]::GetParent($PSScriptRoot).FullName) 'release.json')) | ConvertFrom-Json).version) + '-amd64.exe' }
 $bundle = (Resolve-Path -LiteralPath $BundleDir).Path
 if (-not (Test-Path -LiteralPath $SevenZip -PathType Leaf)) { throw "7-Zip not found: $SevenZip" }
@@ -21,9 +22,6 @@ if ($LASTEXITCODE -ne 0 -or -not ($header -contains 'Type = Nsis')) { throw 'Ins
 $listing = & $SevenZip l -slt -ba $installer
 if ($LASTEXITCODE -ne 0) { throw 'Cannot read the installer with 7-Zip.' }
 $entries = @($listing | Where-Object { $_ -like 'Path = *' } | ForEach-Object { $_.Substring(7) })
-if (@($entries | Where-Object { -not $_.StartsWith('$PLUGINSDIR\') -and $_ -notin $files }).Count) {
-    throw 'Installer has unexpected payload entries; audit the changed payload and uninstall manifest.'
-}
 
 function Get-ArchiveEntryHash([string]$Name) {
     $p = New-Object System.Diagnostics.Process
@@ -44,6 +42,7 @@ function Get-ArchiveEntryHash([string]$Name) {
     } finally { $p.Dispose() }
 }
 
+$generatedUninstaller = Assert-InstallerArchiveEntries -Entries $entries -PayloadFiles $files -GetEntryHash ${function:Get-ArchiveEntryHash}
 $results = @()
 foreach ($name in $files) {
     if (@($entries | Where-Object { $_ -eq $name }).Count -ne 1) { throw "Installer must have exactly one $name entry." }
@@ -63,6 +62,7 @@ $manualReviews = @([System.IO.File]::ReadLines((Join-Path $bundle 'KUBO-DEPENDEN
     installer = $installerName
     installerSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $installer).Hash.ToLowerInvariant()
     payload = $results
+    generatedUninstaller = $generatedUninstaller
     signatures = $signatures
     kuboModulesRequiringManualLicenseReview = $manualReviews
     note = 'Payload equality does not prove install/uninstall safety, Windows execution, or license compliance.'
