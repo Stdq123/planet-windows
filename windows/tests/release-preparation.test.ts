@@ -5,6 +5,10 @@ import { dirname, join, resolve } from "node:path";
 
 const testRoot = mkdtempSync(join(tmpdir(), "planet-release-tests-"));
 const repo = resolve(import.meta.dir, "../..");
+// Git hooks export repository selectors; -C alone cannot isolate fixture commands.
+const fixtureEnv = Object.fromEntries(
+  Object.entries(process.env).filter(([name]) => !name.toUpperCase().startsWith("GIT_")),
+);
 afterAll(() => {
   if (dirname(testRoot) !== resolve(tmpdir()) || !testRoot.split(/[\\/]/).at(-1)?.startsWith("planet-release-tests-")) {
     throw new Error("Unexpected fixture cleanup path");
@@ -37,7 +41,7 @@ if ($env:PLANET_RELEASE_FIXTURE -eq 'hash') { $hash = '0' * 64 }
 @{installer=$name; installerSha256=$hash; signatures=@(@{file='Planet Windows.exe';status=$signature},@{file=$name;status=$signature}); kuboModulesRequiringManualLicenseReview=$reviews} | ConvertTo-Json -Depth 4
 `);
   const git = (...args: string[]) => {
-    const result = Bun.spawnSync(["git", "-C", root, "-c", "core.hooksPath=.fixture-hooks", "-c", "commit.gpgSign=false", "-c", "tag.gpgSign=false", "-c", "user.name=Release test", "-c", "user.email=fixture@example.invalid", ...args]);
+    const result = Bun.spawnSync(["git", "-C", root, "-c", "core.hooksPath=.fixture-hooks", "-c", "commit.gpgSign=false", "-c", "tag.gpgSign=false", "-c", "user.name=Release test", "-c", "user.email=fixture@example.invalid", ...args], { env: fixtureEnv });
     if (result.exitCode !== 0) throw new Error(result.stderr.toString());
   };
   git("init", "--quiet");
@@ -47,7 +51,7 @@ if ($env:PLANET_RELEASE_FIXTURE -eq 'hash') { $hash = '0' * 64 }
   const run = (release = true, mode = "") => Bun.spawnSync([
     "powershell", "-NoProfile", "-File", join(root, "scripts/prepare-release.ps1"), "-BundleDir", bundle,
     ...(release ? ["-Release", "-Tag", "v0.3.0"] : []),
-  ], { cwd: folder, env: { ...process.env, PLANET_RELEASE_FIXTURE: mode } });
+  ], { cwd: folder, env: { ...fixtureEnv, PLANET_RELEASE_FIXTURE: mode } });
   const outputs = () => {
     const path = join(root, "windows/.mygo/release-drafts");
     return existsSync(path) ? readdirSync(path).map(name => join(path, name)) : [];
