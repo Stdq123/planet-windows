@@ -11,6 +11,8 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 ### Added
 
+- Corresponding source archives containing pinned Go dependencies and go-ethereum source, with release-time commit and checksum validation and library rebuilding instructions.
+- A manually triggered installer smoke workflow that uses a disposable native Windows VM and retains the tested package with installation, refusal and uninstall evidence.
 - Optional X (Twitter) article sync after successful IPNS publication, with encrypted local credentials, manual history sync, persistent delivery status and explicit recovery for uncertain requests.
 - Per-site Telegram group or channel synchronization after successful publication, with title, summary and article link, encrypted local bot credentials, duplicate suppression, message updates and manual retry.
 - An all-sites startup overview with local content totals, recent drafts and articles, publication states, and on-demand IPFS and Plausible access.
@@ -24,6 +26,8 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 ### Changed
 
+- Retain all five bundled templates and their pinned upstream sources, attribution and available license texts, and remove the project's template pending-review release gate. This does not assign new licenses to upstream assets.
+- Complete four missing Kubo notice entries using pinned source and nested-license evidence, with exact module and file checks that reject changed or unsupported inputs.
 - Set the first public prerelease target to `0.0.1-alpha.1`, resetting the untagged development numbering. Release preparation, update manifests and the installer now support SemVer prereleases with numeric identifier ordering. Stable installations skip prerelease updates; prerelease installations can update to later prereleases or stable versions. Existing `0.2.0`/`0.3.0` development installations reject this target as a downgrade; use an isolated, fresh Windows user profile for alpha testing. The applicable signing policy, license review and native Windows acceptance must be satisfied before publication.
 - Allow explicitly selected unsigned prereleases through `release:prepare -Release -AllowUnsignedPrerelease`, with actual signing status, SHA-256 checksums and an unsigned distribution notice. Stable releases still require valid Authenticode signatures; invalid signatures remain blocked. Checksums do not authenticate publisher identity, and the exception does not waive license review or native Windows acceptance.
 - Documentation-only pushes and pull requests now run lightweight encoding, Markdown and local-link checks without application tests or a frontend build; code, mixed changes and manual CI runs retain the full quality checks.

@@ -2,6 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { createHash } from "node:crypto";
 
 const testRoot = mkdtempSync(join(tmpdir(), "planet-release-tests-"));
 const repo = resolve(import.meta.dir, "../..");
@@ -62,16 +63,30 @@ switch ($env:PLANET_RELEASE_FIXTURE) {
   git("add", ".");
   git("commit", "--quiet", "-m", "test: release fixture");
   git("tag", "-a", `v${version}`, "-m", "Test only");
-  const run = (release = true, mode = "", allowUnsigned = false) => Bun.spawnSync([
+  const sourceArchive = join(folder, `planet-windows-source-${version}.zip`);
+  const sourceManifest = join(folder, "source-manifest.json");
+  const sourceBytes = Buffer.from("TEST SOURCE ARCHIVE BYTES");
+  writeFileSync(sourceArchive, sourceBytes);
+  const source = {
+    schemaVersion: 1,
+    sourceCommit: Bun.spawnSync(["git", "-C", root, "rev-parse", "HEAD"], { env: fixtureEnv }).stdout.toString().trim(),
+    version,
+    archive: `planet-windows-source-${version}.zip`,
+    archiveSha256: createHash("sha256").update(sourceBytes).digest("hex"),
+    archiveBytes: sourceBytes.length,
+  };
+  writeFileSync(sourceManifest, JSON.stringify(source));
+  const run = (release = true, mode = "", allowUnsigned = false, includeSource = true) => Bun.spawnSync([
     "powershell", "-NoProfile", "-File", join(root, "scripts/prepare-release.ps1"), "-BundleDir", bundle,
     ...(release ? ["-Release", "-Tag", `v${version}`] : []),
     ...(allowUnsigned ? ["-AllowUnsignedPrerelease"] : []),
+    ...(includeSource ? ["-SourceManifest", sourceManifest] : []),
   ], { cwd: folder, env: { ...fixtureEnv, PLANET_RELEASE_FIXTURE: mode } });
   const outputs = () => {
     const path = join(root, "windows/.mygo/release-drafts");
     return existsSync(path) ? readdirSync(path).map(name => join(path, name)) : [];
   };
-  return { root, git, run, outputs };
+  return { root, git, run, outputs, source, sourceArchive, sourceManifest };
 }
 
 test("draft materials copy bytes, record dirtiness and retain unresolved audit state", () => {
@@ -94,8 +109,41 @@ test("release materials require a clean annotated tag and accepted audit", () =>
   const result = f.run();
   if (result.exitCode !== 0) throw new Error(result.stderr.toString());
   expect(result.exitCode).toBe(0);
-  expect(JSON.parse(readFileSync(join(f.outputs()[0]!, "release-manifest.json"), "utf8")).mode).toBe("release");
+  const output = f.outputs()[0]!;
+  const manifest = JSON.parse(readFileSync(join(output, "release-manifest.json"), "utf8"));
+  expect(manifest.mode).toBe("release");
+  expect(manifest.correspondingSource).toEqual(f.source);
+  expect(readFileSync(join(output, f.source.archive))).toEqual(readFileSync(f.sourceArchive));
+  expect(readFileSync(join(output, "SHA256SUMS.txt"), "utf8")).toContain(`${f.source.archiveSha256}  ${f.source.archive}`);
+  expect(JSON.parse(readFileSync(join(output, "source-manifest.json"), "utf8"))).toEqual(f.source);
 });
+
+test("release requires source while a draft can omit it", () => {
+  const f = fixture();
+  const release = f.run(true, "", false, false);
+  expect(release.exitCode).not.toBe(0);
+  expect(release.stderr.toString()).toContain("Release requires a corresponding source archive");
+  expect(f.outputs()).toEqual([]);
+  expect(f.run(false, "unsigned", false, false).exitCode).toBe(0);
+});
+
+for (const changed of ["commit", "version", "path", "hash", "bytes", "tampered"] as const) {
+  test(`source archive ${changed} mismatch blocks release before copying`, () => {
+    const f = fixture();
+    const source = { ...f.source };
+    if (changed === "commit") source.sourceCommit = "0".repeat(40);
+    if (changed === "version") source.version = "9.9.9";
+    if (changed === "path") source.archive = "../planet-windows-source-other.zip";
+    if (changed === "hash") source.archiveSha256 = "0".repeat(64);
+    if (changed === "bytes") source.archiveBytes++;
+    if (changed === "tampered") writeFileSync(f.sourceArchive, "CHANGED SOURCE BYTES");
+    writeFileSync(f.sourceManifest, JSON.stringify(source));
+    const result = f.run();
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stderr.toString()).toContain("Source");
+    expect(f.outputs()).toEqual([]);
+  });
+}
 
 test("prerelease materials preserve the channel and require the same audit gates", () => {
   const f = fixture("0.0.1-alpha.1");

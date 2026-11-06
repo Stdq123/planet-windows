@@ -1,6 +1,6 @@
 # 本地发布流程
 
-`CHANGELOG.md` 是面向用户的主记录；GitHub 自动发布说明只补充 PR 和贡献者索引。云端 CI 执行质量检查与依赖安全扫描；本文的发行构建和材料准备在本机执行。脚本不会安装程序、创建标签、推送或发布 GitHub Release。
+`CHANGELOG.md` 是面向用户的主记录；GitHub 自动发布说明只补充 PR 和贡献者索引。云端 CI 执行质量检查与依赖安全扫描；本文的材料准备脚本不会安装程序、创建标签、推送或发布 GitHub Release。另有显式手动触发的原生安装器测试，实际安装操作仅在一次性 Windows 虚拟机中执行。
 
 ## 日常改动
 
@@ -34,6 +34,21 @@ bun run release:prepare -BundleDir $bundle
 
 每次输出使用新目录，不覆盖原包。准备时重新核对安装包和独立 payload 的一致性，复制后再次核对摘要。清单记录的 `sourceCommitAtPreparation` 仅表示准备材料时的检出版本，不是证明二进制由该提交构建的供应链证明。
 
+## 对应源码与原生安装测试
+
+正式材料必须同时携带从同一干净提交生成的对应源码包：
+
+```powershell
+powershell -NoProfile -File ../scripts/prepare-source.ps1
+$sourceManifest = Read-Host '粘贴脚本输出的 source-manifest.json 完整路径'
+```
+
+记录脚本输出的 `source-manifest.json` 路径，作为后续 `-SourceManifest` 参数。源码包包含项目的已提交文件、固定版本的 Go vendor 源码、完整 go-ethereum 模块源码及许可材料，详见[源码与重建说明](rebuilding-release.md)。正式准备会核对提交、版本、文件名、大小和 SHA-256，并将源码包及清单复制到发行目录，加入 `SHA256SUMS.txt`；GitHub 自动生成的源代码 ZIP 不能替代这份带依赖的材料。
+
+手动运行 [Native Windows installer smoke](../.github/workflows/windows-installer-smoke.yml) 会在 GitHub 托管的 Windows 虚拟机中完成共享检查、安全扫描、构建与真实静默安装测试。保留的 JSON 记录实际安装包 SHA-256、新装、同包重装、锁定和篡改拒绝、卸载及合成数据保留结果。只把该次通过的原始安装包与该证据关联；重新构建产生不同摘要时须重新测试。
+
+该测试不覆盖 Windows 10/11 桌面界面、缺少 WebView2、中文输入、跨版本数据兼容、进程中断或断电恢复。它补充而不代替完整验收。脚本默认拒绝普通宿主；手动使用 `-IsolatedWindowsVM` 只适用于已确认干净且可丢弃的虚拟机。
+
 ## 对外发行检查（含 alpha）
 
 默认发行要求程序和安装包具有有效 Authenticode 签名，稳定版始终遵循此要求。维护者明确选择未签名预发布时，可使用下述 `-AllowUnsignedPrerelease` 选项；GitHub 的 pre-release 标记本身不会启用此例外。许可和原生 Windows 验收要求不变，存在这些未决项时仍只能准备本地草稿。
@@ -51,10 +66,10 @@ bun run release:prepare -BundleDir $bundle
 5. 执行严格的本地材料检查：
 
    ```powershell
-   bun run release:prepare -BundleDir $bundle -Release -Tag "v$version"
+   bun run release:prepare -BundleDir $bundle -SourceManifest $sourceManifest -Release -Tag "v$version"
    ```
 
-严格模式要求版本与标签相同、存在有效日期的 Changelog、干净工作区、附注标签指向 HEAD、安装包 payload 一致、程序及安装包各有一条 Authenticode 审计记录、Kubo 许可待审计数为零。默认仅接受 `Valid` 签名状态；未签名预发布的显式例外见下节。任何失败都不会被当作通过；保留未完成输出用于排查，勿将其上传。
+严格模式要求版本与标签相同、存在有效日期的 Changelog、干净工作区、附注标签指向 HEAD、安装包 payload 一致、对应源码清单和摘要匹配、程序及安装包各有一条 Authenticode 审计记录、Kubo 许可待审计数为零。五个内置模板继续保留，本项目按维护者决定移除其待审发布门槛；上游来源、署名及已有许可文本保持保留。默认仅接受 `Valid` 签名状态；未签名预发布的显式例外见下节。任何失败都不会被当作通过；保留未完成输出用于排查，勿将其上传。
 
 技术检查不能代替完整许可判断、签名发行的发布者证书身份确认、原生 Windows 验收及备份兼容性验证。全部适用验收通过后，维护者再推送标签、创建 GitHub Release 草稿，核对材料后发布；预发布必须标记为 pre-release。脚本不会自动执行这些外部操作。
 
@@ -63,7 +78,7 @@ bun run release:prepare -BundleDir $bundle
 维护者明确选择未签名 alpha 等预发布后，在完成其余发行检查的前提下，使用：
 
 ```powershell
-bun run release:prepare -BundleDir $bundle -Release -Tag "v$version" -AllowUnsignedPrerelease
+bun run release:prepare -BundleDir $bundle -SourceManifest $sourceManifest -Release -Tag "v$version" -AllowUnsignedPrerelease
 ```
 
 此参数必须与 `-Release` 同时使用，且版本必须带预发布后缀；稳定版和草稿模式不能使用。程序及安装包各自的 Authenticode 状态只能是 `Valid` 或 `NotSigned`。缺失或重复记录、`HashMismatch`、`NotTrusted`、`UnknownError` 等其他状态仍会阻止发行；元数据、标签、payload、许可审查和原生 Windows 验收要求保持不变。

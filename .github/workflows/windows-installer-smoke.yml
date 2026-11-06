@@ -1,0 +1,60 @@
+name: Native Windows installer smoke
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  installer:
+    name: Disposable native installer smoke
+    runs-on: windows-2025
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: powershell
+        working-directory: windows
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.3.5'
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: windows/go.mod
+          cache-dependency-path: windows/go.sum
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+      - name: Run shared quality checks
+        run: bun run check
+      - name: Audit dependencies
+        run: bun run security:check
+      - name: Build and audit installer
+        run: bun run build
+      - name: Test real installer in disposable Windows VM
+        env:
+          PLANET_NATIVE_INSTALLER_SMOKE: '1'
+        run: |
+          $taskVersion = (Get-Content release.json -Raw -Encoding UTF8 | ConvertFrom-Json).version
+          $taskInstaller = Join-Path $PWD "build/windows-amd64/planet-windows-safe-setup-$taskVersion-amd64.exe"
+          $taskHash = (Get-FileHash -LiteralPath $taskInstaller -Algorithm SHA256).Hash.ToLowerInvariant()
+          & scripts/test-installer-native.ps1 -Installer $taskInstaller -ExpectedSHA256 $taskHash -ExpectedVersion $taskVersion -EvidenceDir (Join-Path $PWD 'build/native-smoke-evidence')
+          $taskAudit = & scripts/audit-release.ps1 -BundleDir (Join-Path $PWD 'build/windows-amd64')
+          [IO.File]::WriteAllText((Join-Path $PWD 'build/native-smoke-evidence/audit.json'), ($taskAudit -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
+      - name: Retain evidence and tested installer
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: native-installer-smoke-${{ github.sha }}
+          path: |
+            windows/build/native-smoke-evidence/*.json
+            windows/build/windows-amd64/
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 0
