@@ -19,6 +19,7 @@ The following features are available in the development version; see the limitat
 - Follow and refresh RSS, Atom, JSON Feed, IPNS and supported ENS sites. Discover feeds from supported website homepages, read inline media, and keep selected content available offline.
 - Import selected Planet backups and export backups containing IPNS keys. Compatible sites can be rebuilt using verified versions of Plain, 8-bit, Grid, Platinum and Sepia.
 - Configure Filebase or Pinnable for remote pinning, and Plausible for site analytics.
+- Optionally sync new articles to X (Twitter) after IPNS publication, or manually sync existing published articles. See the [X setup guide](windows/README.md#同步文章到-xtwitter) for developer credentials, delivery recovery and limitations.
 - Check for signed updates through a configured HTTPS feed, download a verified installer, and run it to upgrade a compatible installation.
 
 Published content is public. Long-term availability depends on other nodes or pinning services. Exported backups contain unencrypted IPNS private keys; store them securely. For supported import scenarios, restrictions and known gaps, read [windows/README.md](windows/README.md).

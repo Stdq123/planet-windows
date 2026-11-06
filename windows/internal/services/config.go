@@ -8,24 +8,29 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 )
 
 type Config struct {
-	Name         string `json:"name"`
-	Token        string `json:"token"`
-	Server       string `json:"server,omitempty"`
-	LastCID      string `json:"lastCid,omitempty"`
-	RequestID    string `json:"requestId,omitempty"`
-	PendingCID   string `json:"pendingCid,omitempty"`
-	DeleteRemote bool   `json:"deleteRemote,omitempty"`
-	AutoDeploy   bool   `json:"autoDeploy,omitempty"`
-	LastURL      string `json:"lastUrl,omitempty"`
+	Name         string        `json:"name"`
+	Token        string        `json:"token"`
+	Server       string        `json:"server,omitempty"`
+	LastCID      string        `json:"lastCid,omitempty"`
+	RequestID    string        `json:"requestId,omitempty"`
+	PendingCID   string        `json:"pendingCid,omitempty"`
+	DeleteRemote bool          `json:"deleteRemote,omitempty"`
+	AutoDeploy   bool          `json:"autoDeploy,omitempty"`
+	LastURL      string        `json:"lastUrl,omitempty"`
+	XCredentials *XCredentials `json:"xCredentials,omitempty"`
+	AutoSync     bool          `json:"autoSync,omitempty"`
+	XEnabledAt   time.Time     `json:"xEnabledAt,omitempty"`
+	XError       string        `json:"xError,omitempty"`
 }
 
 var safeID = regexp.MustCompile(`^[A-Za-z0-9-]{1,100}$`)
 
 func configPath(root, id, kind string, create bool) (string, error) {
-	if !safeID.MatchString(id) || (kind != "filebase" && kind != "plausible" && kind != "cloudflare" && kind != "ssh") {
+	if !safeID.MatchString(id) || (kind != "filebase" && kind != "plausible" && kind != "cloudflare" && kind != "ssh" && kind != "x" && kind != "x-post") {
 		return "", errors.New("服务配置标识无效")
 	}
 	// Check ancestors directly: EvalSymlinks also expands Windows short names,
@@ -66,6 +71,12 @@ func configPath(root, id, kind string, create bool) (string, error) {
 	return filepath.Join(dir, id+".dat"), nil
 }
 func SaveConfig(root, id, kind string, cfg Config) error {
+	if kind == "x" && (cfg.Token != "" || cfg.XCredentials != nil) && !validXConfig(cfg) {
+		return errors.New("X 凭据配置无效")
+	}
+	if cfg.Token != "" && kind == "x-post" && !validXPostConfig(id, cfg) {
+		return errors.New("X 同步记录无效")
+	}
 	if cfg.Token != "" && kind == "cloudflare" && !ValidCloudflareConfig(cfg.Server, cfg.Name, cfg.Token) {
 		return errors.New("Cloudflare 配置无效")
 	}
@@ -172,6 +183,12 @@ func LoadConfig(root, id, kind string) (Config, error) {
 	}
 	if kind == "cloudflare" && !ValidCloudflareConfig(cfg.Server, cfg.Name, cfg.Token) {
 		return Config{}, errors.New("Cloudflare 配置无效")
+	}
+	if kind == "x" && !validXConfig(cfg) {
+		return Config{}, errors.New("X 凭据配置无效")
+	}
+	if kind == "x-post" && !validXPostConfig(id, cfg) {
+		return Config{}, errors.New("X 同步记录无效")
 	}
 	if kind == "ssh" && (cfg.Token != "ssh-agent" || !ValidRsyncDestination(cfg.Name) || cfg.Server != "" && (!filepath.IsAbs(cfg.Server) || strings.ContainsAny(cfg.Server, "\"'`$;&|\r\n"))) {
 		return Config{}, errors.New("SSH 配置无效")

@@ -1,5 +1,6 @@
 import { Library, type Article, type Draft, type Site, type Subscription, type Item, type KuboStatus, type SearchResult, type Builtin } from "./mygo";
 import { initUpdates } from "./updates";
+import { initXSync } from "./x-sync";
 import { createDashboard } from "./dashboard";
 import release from "../release.json";
 import { refreshDue } from "./auto-refresh";
@@ -236,6 +237,11 @@ let editing = false, dirty = false, saving = false, previewRevision = 0, preview
 let libraryLoading = false, libraryFailed: string[] = [];
 let refreshTimer: ReturnType<typeof setInterval> | undefined;
 let editorTags=new Map<string,string>(), savedTagSignature="[]";
+const xSync = initXSync({
+  getSiteID: () => subscription || site?.imported ? null : site?.id ?? null,
+  isBusy: () => saving,
+  setBusy: busy => { if (busy) navigationRevision++; saving = busy; title.disabled = busy; content.disabled = busy; updateView(); },
+});
 
 function tagSignature(): string { return JSON.stringify([...editorTags.entries()].sort(([a],[b])=>a.localeCompare(b))); }
 function tagJSON(): string { return JSON.stringify(Object.fromEntries(editorTags)); }
@@ -496,6 +502,7 @@ function updateView() {
   templateSettingsButton.hidden = !!subscription; templateSettingsButton.disabled = !site || site.templateName !== "Sepia" || saving;
   pinnableButton.hidden=!!subscription; pinnableButton.disabled=!site || saving;
   serviceButton.hidden=!!subscription; serviceButton.disabled=!site || saving;
+  xSync.update();
   editSite.hidden = !!subscription; editSite.disabled = !site || saving;
   const profileButton=$<HTMLButtonElement>("#site-profile");profileButton.hidden=!!subscription;profileButton.disabled=!site || !!site.imported || saving;profileButton.title=site?.imported ? "导入站点暂不支持修改公开资料" : "";
   const podcastButton=$<HTMLButtonElement>("#podcast-settings");podcastButton.hidden=!!subscription;podcastButton.disabled=!site || !!site.imported || saving;
