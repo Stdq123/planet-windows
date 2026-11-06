@@ -50,7 +50,7 @@
 .sidebar-tools .gateway-setting { margin:16px 8px 8px; gap:8px; color:var(--pw-muted); }
 .sidebar .gateway-setting legend { padding:0; margin-bottom:8px; font:500 12px/16px var(--pw-font); color:var(--pw-muted); }
 .sidebar .gateway-setting .choice-group { display:grid; grid-template-columns:1fr; gap:8px; }
-.sidebar .gateway-setting .choice-group label { gap:8px; padding:8px; margin:0; border:.5px solid transparent; background:transparent; color:var(--pw-ink); font:400 12px/16px var(--pw-font); }
+.sidebar .gateway-setting .choice-group label { gap:8px; padding:8px; margin:0; border:.5px solid var(--pw-control-line); background:transparent; color:var(--pw-ink); font:400 12px/16px var(--pw-font); }
 .sidebar .gateway-setting .choice-group label:hover { background:var(--pw-hover); }
 .sidebar .gateway-setting .choice-group label:has(:checked) { background:var(--pw-selection); color:var(--pw-accent-ink); border-color:var(--pw-accent); }
 .sidebar .gateway-setting input { width:16px; height:16px; margin:0; accent-color:var(--pw-accent); }

@@ -4,7 +4,9 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 ## [Unreleased]
 
-- No unreleased changes.
+### Fixed
+
+- Improved the contrast of input, select, secondary-button and radio/checkbox-card boundaries on the Windows light surfaces.
 
 ## [0.0.1-alpha.2] - 2026-11-06
 
