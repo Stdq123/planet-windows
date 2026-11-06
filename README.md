@@ -8,7 +8,7 @@ Publish websites with IPFS and follow web feeds from a Windows desktop app, buil
 
 **Early development:** not all original Planet features are implemented, and compatibility with real macOS backups has not been verified. Keep original backups and test recovery before relying on imported data.
 
-**First public prerelease target: `v0.0.1-alpha.1`.** Earlier `0.3.0` and other version numbers identify untagged development snapshots. This target is still awaiting the [release checks](docs/releasing.md); it is not an approved release. Existing `0.2.0`/`0.3.0` development installations reject it as a downgrade. Test alpha in an isolated, fresh Windows user profile and preserve the original installation and data.
+**First public prerelease: `v0.0.1-alpha.1`.** [Downloads and release notes](https://github.com/Stdq123/planet-windows/releases) include the Windows x64 installer, corresponding source and SHA-256 checksums. This alpha is **unsigned** and has a deliberately limited [acceptance scope](docs/acceptance-0.0.1-alpha.1.md). Earlier `0.3.0` and other version numbers identify untagged development snapshots; existing `0.2.0`/`0.3.0` installations reject this version as a downgrade. Test alpha in an isolated, fresh Windows user profile and preserve the original installation and data.
 
 [中文使用指南](windows/README.md) · [Build and test](#build-and-test) · [Known limitations](#incomplete-and-awaiting-validation) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
 
@@ -116,7 +116,7 @@ Windows CI runs the required `Windows quality checks` job on pull requests and p
 - **Templates and integrations:** Only the listed template versions and supported settings are implemented. Other original Planet features and integrations remain incomplete.
 - **External services:** Telegram, X, Filebase, Pinnable and Plausible integrations and SSH/Cloudflare deployments have been tested with local simulations; they have not been verified with real accounts or servers.
 - **ENS and media:** Non-IPFS/IPNS ENS content is unsupported. Live end-to-end testing of ENS/IPNS content with a subpath remains outstanding; media format support depends on available Windows components.
-- **Distribution:** Native Windows installer and uninstaller end-to-end validation, executable signing, a preconfigured update source and parts of the third-party license review remain outstanding. Signed update metadata does not mean the executable or installer has a code signature. See the [release audit](windows/docs/release-audit.md).
+- **Distribution:** Native silent installer and uninstaller checks passed on Windows Server 2025. Full Windows 10/11 desktop, input-method and recovery acceptance remain incomplete. This alpha is unsigned and has no preconfigured update feed; download it manually. Signed update metadata does not mean the executable or installer has a code signature. See the [acceptance scope](docs/acceptance-0.0.1-alpha.1.md) and [release audit](windows/docs/release-audit.md).
 
 ## Project layout
 
