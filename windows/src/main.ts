@@ -35,6 +35,8 @@ const exportPlanet = $<HTMLButtonElement>("#export-planet"), importPlanet = $<HT
 const selectTemplate = $<HTMLButtonElement>("#select-template");
 const templateSettingsButton = $<HTMLButtonElement>("#template-settings"), templateSettingsDialog = $<HTMLDialogElement>("#template-settings-dialog"), templateSettingsForm = $<HTMLFormElement>("#template-settings-form");
 const pinnableButton=$<HTMLButtonElement>("#pinnable-settings"), pinnableDialog=$<HTMLDialogElement>("#pinnable-dialog"), pinnableForm=$<HTMLFormElement>("#pinnable-form"), pinnableResult=$("#pinnable-result");
+const telegramButton=$<HTMLButtonElement>("#telegram-settings"), telegramDialog=$<HTMLDialogElement>("#telegram-dialog"), telegramForm=$<HTMLFormElement>("#telegram-form"), telegramResult=$("#telegram-result");
+const telegramChat=telegramForm.querySelector<HTMLInputElement>('[name="chatId"]')!, telegramToken=telegramForm.querySelector<HTMLInputElement>('[name="token"]')!;
 const serviceButton=$<HTMLButtonElement>("#service-settings"),serviceDialog=$<HTMLDialogElement>("#service-dialog"),serviceForm=$<HTMLFormElement>("#service-form"),serviceResult=$("#service-result");
 const editSite = $<HTMLButtonElement>("#edit-site");
 const removeSite = $<HTMLButtonElement>("#remove-site");
@@ -269,6 +271,8 @@ let busyMessage = "";
 let editingSiteID = "";
 let editingTemplateSiteID = "";
 let pinnableSiteID="", pinnableConfigured=false;
+let telegramSiteID="", telegramRevision=0, telegramLoading=false, telegramBusy=false, telegramLoadFailed=false;
+let telegramCurrent: {configured:boolean;chatId:string;chatTitle:string;syncedCount:number;pending:boolean}|null=null;
 const sepiaFields: Array<[string,string,string]> = [
   ["backgroundColor","背景色","#F4F1EC"], ["foregroundColor","文字颜色","#000000"], ["foregroundSecondaryColor","次要文字","#999999"],
   ["highlightColor","强调色","#FF4500"], ["linkColor","链接颜色","#778087"], ["linkHoverColor","链接悬停","#4D5256"],
@@ -495,6 +499,9 @@ function updateView() {
   selectTemplate.hidden = !!subscription; selectTemplate.disabled = !site || saving;
   templateSettingsButton.hidden = !!subscription; templateSettingsButton.disabled = !site || site.templateName !== "Sepia" || saving;
   pinnableButton.hidden=!!subscription; pinnableButton.disabled=!site || saving;
+  telegramButton.hidden=!!subscription; telegramButton.disabled=!site || saving;
+  if(telegramDialog.open && site?.id!==telegramSiteID)telegramDialog.close();
+  updateTelegramControls();
   serviceButton.hidden=!!subscription; serviceButton.disabled=!site || saving;
   editSite.hidden = !!subscription; editSite.disabled = !site || saving;
   const profileButton=$<HTMLButtonElement>("#site-profile");profileButton.hidden=!!subscription;profileButton.disabled=!site || !!site.imported || saving;profileButton.title=site?.imported ? "导入站点暂不支持修改公开资料" : "";
@@ -761,9 +768,10 @@ async function queuePublication(siteID: string, manual = false) {
         if (sites.some(entry=>entry.id===siteID)) { sitesRevision++; sites = sites.map(entry => entry.id === siteID ? { ...entry, ipns: result.ipns, lastPublishedCID: result.cid, contentRevision: Math.max(entry.contentRevision ?? 0, result.revision), publishedRevision: result.revision, publishPending: result.pending } : entry); }
         if (site?.id === siteID) site = sites.find(entry => entry.id === siteID) ?? site;
         if (!state.pending && state.changes === changes) state.publishedChanges = changes;
-        state.status = "published"; state.error = result.pinnableWarning ?? "";
-        if (result.pinnableWarning && site?.id===siteID) showError(result.pinnableWarning);
-        if (manual && !state.pending) window.alert(`发布请求已完成。\n\nIPNS：${result.ipns}\nCID：${result.cid}\n\n网络传播可能需要时间；请保持应用运行以提供内容。${result.pinnableWarning ? `\n\n${result.pinnableWarning}` : ""}`);
+        const warning = [result.pinnableWarning, result.telegramWarning].filter(Boolean).join("\n\n");
+        state.status = "published"; state.error = warning;
+        if (warning && site?.id===siteID) showError(warning);
+        if (manual && !state.pending) window.alert(`发布请求已完成。\n\nIPNS：${result.ipns}\nCID：${result.cid}\n\n网络传播可能需要时间；请保持应用运行以提供内容。${warning ? `\n\n${warning}` : ""}`);
       } catch (e) {
         state.status = "failed";
         state.error = `文章已保存，但站点发布未确认：${e instanceof Error ? e.message : String(e)}。可点击“发布到 IPFS”重试。`;
@@ -1209,6 +1217,109 @@ templateSettingsForm.addEventListener("submit",async event=>{
     templateSettingsDialog.close();
   } catch(e) { showError(e); } finally { saving=false; title.disabled=false; content.disabled=false; busyMessage=""; for(const control of controls)control.disabled=false; updateView(); }
 });
+function telegramContextCurrent(id: string, revision: number): boolean {
+  return telegramDialog.open && telegramSiteID===id && site?.id===id && telegramRevision===revision;
+}
+function telegramHasUnsavedChanges(): boolean {
+  return telegramChat.value.trim()!==(telegramCurrent?.chatId ?? "") || !!telegramToken.value;
+}
+function telegramRevisionPublished(): boolean {
+  if(!site || site.id!==telegramSiteID || !site.ipns || !site.lastPublishedCID || site.publishPending || (site.contentRevision ?? 0)>(site.publishedRevision ?? 0))return false;
+  const state=publicationStates.get(site.id);
+  return !state || !state.running && !state.pending && state.changes<=state.publishedChanges;
+}
+function telegramCanAct(recover=false): boolean {
+  const available=!!telegramCurrent || recover && telegramLoadFailed && !telegramHasUnsavedChanges();
+  return !saving && !telegramBusy && !telegramLoading && available && telegramContextCurrent(telegramSiteID,telegramRevision);
+}
+function updateTelegramControls() {
+  const blocked=saving || telegramBusy || telegramLoading || !telegramContextCurrent(telegramSiteID,telegramRevision);
+  const unsaved=telegramHasUnsavedChanges();
+  telegramChat.disabled=blocked; telegramToken.disabled=blocked;
+  telegramToken.required=!telegramCurrent?.configured || telegramChat.value.trim()!==telegramCurrent.chatId;
+  telegramForm.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled=blocked || !telegramCurrent;
+  $<HTMLButtonElement>("#telegram-close").disabled=saving || telegramBusy;
+  const retry=$<HTMLButtonElement>("#telegram-retry"), disable=$<HTMLButtonElement>("#telegram-disable");
+  retry.disabled=blocked || !telegramCurrent?.configured || unsaved || !telegramRevisionPublished();
+  disable.disabled=blocked || (!telegramCurrent?.configured && !telegramLoadFailed) || unsaved;
+  disable.textContent=telegramLoadFailed ? "清除本机配置" : "停用";
+  retry.title=unsaved ? "请先保存 Telegram 配置" : !telegramRevisionPublished() ? "请先发布当前已保存内容" : "";
+  disable.title=unsaved ? "请先保存或还原 Telegram 配置" : "";
+  telegramForm.setAttribute("aria-busy",String(telegramLoading || telegramBusy));
+}
+function telegramStatus(): string {
+  if(!telegramCurrent?.configured)return "尚未配置 Telegram 同步。";
+  const info=telegramCurrent;
+  return `已连接 ${info.chatTitle || info.chatId}，已同步 ${info.syncedCount} 篇文章。${info.pending ? "上次发送结果不确定，请检查 Telegram 后再重试，重试可能产生重复消息。" : ""}${telegramRevisionPublished() ? "" : "请先发布当前已保存内容，再同步 Telegram。"}`;
+}
+async function readTelegram(id: string, revision: number, message="") {
+  const info=await Library.telegramInfo(id);
+  if(!telegramContextCurrent(id,revision))return;
+  telegramCurrent=info; telegramLoadFailed=false; telegramChat.value=info.chatId || ""; telegramToken.value="";
+  telegramResult.textContent=message ? `${message}${telegramStatus()}` : telegramStatus();
+  rememberDialog(telegramDialog);
+}
+async function loadTelegram() {
+  const id=telegramSiteID, revision=++telegramRevision;
+  telegramCurrent=null; telegramLoadFailed=false; telegramLoading=true; telegramResult.textContent="正在读取配置…"; updateTelegramControls();
+  try { await readTelegram(id,revision); }
+  catch(error) { if(telegramContextCurrent(id,revision)){telegramLoadFailed=true;telegramResult.textContent=`读取失败：${error instanceof Error ? error.message : String(error)}。可关闭后重试，或清除本机配置和同步记录后重新配置；已有 Telegram 消息不会删除。`;} }
+  finally { if(revision===telegramRevision){telegramLoading=false;updateTelegramControls();} }
+}
+async function withTelegramOperation(action: (id:string)=>Promise<string>, clearToken=false, recover=false) {
+  if(!telegramCanAct(recover))return;
+  const id=telegramSiteID, revision=telegramRevision;
+  telegramBusy=true; saving=true; navigationRevision++; updateView();
+  try {
+    const message=await action(id);
+    if(!telegramContextCurrent(id,revision))return;
+    // A successful configuration change makes the previous saved target stale.
+    telegramCurrent=null;
+    await readTelegram(id,revision,message);
+  } catch(error) {
+    if(telegramContextCurrent(id,revision))telegramResult.textContent=`操作失败：${error instanceof Error ? error.message : String(error)}`;
+  } finally {
+    if(clearToken)telegramToken.value="";
+    telegramBusy=false; saving=false; updateView();
+  }
+}
+telegramButton.addEventListener("click",()=>{
+  if(!site || saving || telegramBusy)return;
+  telegramSiteID=site.id; telegramForm.reset(); telegramCurrent=null; telegramLoadFailed=false;
+  openDialog(telegramDialog); void loadTelegram();
+});
+for(const input of [telegramChat,telegramToken])input.addEventListener("input",()=>{
+  updateTelegramControls();
+  if(telegramCurrent)telegramResult.textContent=telegramHasUnsavedChanges() ? "配置有未保存的更改，请先保存后再同步。" : telegramStatus();
+});
+$("#telegram-close").addEventListener("click",()=>{if(!telegramBusy && !saving)telegramDialog.close();});
+telegramDialog.addEventListener("cancel",event=>{if(telegramBusy || saving)event.preventDefault();});
+telegramDialog.addEventListener("close",()=>{
+  telegramRevision++; telegramSiteID=""; telegramCurrent=null; telegramLoading=false; telegramLoadFailed=false; telegramForm.reset();
+});
+telegramForm.addEventListener("submit",event=>{
+  event.preventDefault(); if(!telegramCanAct())return;
+  const chat=telegramChat.value.trim(), token=telegramToken.value.trim();
+  if(!/^(?:@[A-Za-z0-9_]+|-[1-9]\d*)$/.test(chat)){telegramResult.textContent="请输入 @频道用户名或群组 / 频道的负数 ID。";telegramChat.focus();return;}
+  if(!token && (!telegramCurrent?.configured || chat!==telegramCurrent.chatId)){telegramResult.textContent="首次配置或更换目标时，请输入机器人令牌。";telegramToken.focus();return;}
+  if(telegramCurrent?.configured && (chat!==telegramCurrent.chatId || !!token) && !window.confirm("更换机器人或群组 / 频道会清除本机同步记录，下次同步可能重新发送全部文章；已有 Telegram 消息不会删除。继续保存？"))return;
+  void withTelegramOperation(async id=>{
+    await Library.configureTelegram(id,chat,token);
+    return "已保存，未发送消息；下次站点发布成功后自动同步。";
+  },true);
+});
+$("#telegram-retry").addEventListener("click",()=>{
+  if(!telegramCanAct() || !telegramCurrent?.configured || telegramHasUnsavedChanges() || !telegramRevisionPublished())return;
+  if(!window.confirm("将向已配置的 Telegram 群组 / 频道发送所有尚未同步的文章，并更新已同步文章。若上次发送结果不确定，重试可能产生重复消息；请先检查 Telegram。继续同步？"))return;
+  void withTelegramOperation(async id=>{const count=await Library.retryTelegram(id);return `同步完成，本次处理 ${count} 篇文章。`;});
+});
+$("#telegram-disable").addEventListener("click",()=>{
+  if(!telegramCanAct(true) || (!telegramCurrent?.configured && !telegramLoadFailed) || telegramHasUnsavedChanges())return;
+  const recover=telegramLoadFailed;
+  if(!window.confirm(`${recover ? "清除当前站点的 Telegram 本机配置和同步记录" : "停用 Telegram 同步并删除本机配置和同步记录"}？已有 Telegram 消息不会删除；再次启用后可能重新发送全部文章。`))return;
+  void withTelegramOperation(async id=>{await Library.disableTelegram(id);return recover ? "已清除本机配置，可以重新配置 Telegram 同步。" : "已停用 Telegram 同步。";},false,recover);
+});
+
 function updatePinnableControls() {
   for(const id of ["#pinnable-request","#pinnable-status","#pinnable-disable"]) $<HTMLButtonElement>(id).disabled=saving || !pinnableConfigured;
   pinnableForm.querySelector<HTMLInputElement>('[name="endpoint"]')!.disabled=saving;

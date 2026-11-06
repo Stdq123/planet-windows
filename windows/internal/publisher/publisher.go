@@ -23,6 +23,7 @@ type Result struct {
 	Revision        uint64 `json:"revision"`
 	Pending         bool   `json:"pending"`
 	PinnableWarning string `json:"pinnableWarning,omitempty"`
+	TelegramWarning string `json:"telegramWarning,omitempty"`
 }
 
 func Publish(node Node, tempParent string, site store.Site, articles []store.Article) (Result, error) {

@@ -169,6 +169,7 @@ export interface Result {
   revision: number;
   pending: boolean;
   pinnableWarning?: string;
+  telegramWarning?: string;
 }
 
 export interface SearchResult {
@@ -249,6 +250,14 @@ export interface Subscription {
   lastError?: string;
   offlinePinned?: boolean;
   offlineSnapshot?: string;
+}
+
+export interface TelegramInfo {
+  configured: boolean;
+  chatId: string;
+  chatTitle: string;
+  syncedCount: number;
+  pending: boolean;
 }
 
 export interface UpdateCheckInfo {
@@ -333,6 +342,10 @@ export const Library = {
   configureService(siteID: string, kind: string, name: string, token: string): Promise<void> {
     return call("Library.ConfigureService", siteID, kind, name, token);
   },
+  /** ConfigureTelegram only resolves the target. Publication is a separate action. */
+  configureTelegram(siteID: string, chatID: string, token: string): Promise<void> {
+    return call("Library.ConfigureTelegram", siteID, chatID, token);
+  },
   createSite(name: string, about: string): Promise<Site> {
     return call("Library.CreateSite", name, about);
   },
@@ -354,6 +367,9 @@ export const Library = {
   },
   disableDeployment(siteID: string, kind: string): Promise<void> {
     return call("Library.DisableDeployment", siteID, kind);
+  },
+  disableTelegram(siteID: string): Promise<void> {
+    return call("Library.DisableTelegram", siteID);
   },
   downloadUpdate(version: string, sha256: string): Promise<string> {
     return call("Library.DownloadUpdate", version, sha256);
@@ -473,6 +489,9 @@ export const Library = {
   restoreSite(siteID: string): Promise<Site> {
     return call("Library.RestoreSite", siteID);
   },
+  retryTelegram(siteID: string): Promise<number> {
+    return call("Library.RetryTelegram", siteID);
+  },
   revealDownloadedUpdate(): Promise<void> {
     return call("Library.RevealDownloadedUpdate");
   },
@@ -548,6 +567,9 @@ export const Library = {
   },
   subscriptions(): Promise<Subscription[]> {
     return call("Library.Subscriptions");
+  },
+  telegramInfo(siteID: string): Promise<TelegramInfo> {
+    return call("Library.TelegramInfo", siteID);
   },
   /** TemplateSettings returns supported settings, including imported values. */
   templateSettings(siteID: string): Promise<Record<string, string>> {
