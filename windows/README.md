@@ -1,16 +1,16 @@
-# Planet Windows（开发中）
+# Planet Windows 使用指南
+
+在 Windows 上写博客、发布到 IPFS，并订阅和阅读喜欢的网站。
 
 > **上游项目（原版）：[Planetable/Planet](https://github.com/Planetable/Planet)**
 >
 > Planet Windows 基于上述上游项目，是独立开发的 Windows 移植版本。
 
-本项目使用 Go、MyGo、WebView2 和 TypeScript，不使用 Electron 或 Swift。当前为开发版本，尚不具备原版的完整功能；原版数据兼容性仍需要真实 Mac 备份验证。
+[下载 v0.0.1-alpha.1](https://github.com/Stdq123/planet-windows/releases/tag/v0.0.1-alpha.1) · [English README](../README.md) · [贡献指南](../CONTRIBUTING.md)
 
-**首个公开预发布：`v0.0.1-alpha.1`。** [下载与发行说明](https://github.com/Stdq123/planet-windows/releases) 提供 Windows x64 安装包、对应源码和 SHA-256 校验文件。本次为**未签名 alpha**，按明确披露的[有限验收范围](../docs/acceptance-0.0.1-alpha.1.md) 发布。此前 `0.3.0` 等编号属于未打发行标签的开发快照；已有 `0.2.0`/`0.3.0` 安装会拒绝这次降级，请在隔离的新 Windows 用户环境测试，并保留原安装和资料。
+> **当前为未签名 alpha。** 原版功能尚未全部实现；Windows 10/11 界面、输入法、恢复流程和真实 Mac 备份兼容性仍未完成验收。完整范围见[已知限制](#尚未完成与待验证)和[本次验收记录](../docs/acceptance-0.0.1-alpha.1.md)。
 
-[English README](../README.md) · [贡献指南](../CONTRIBUTING.md) · [发行检查记录](docs/release-audit.md)
-
-本文按日常操作介绍当前已实现的功能。支持范围和验证情况以各节说明及“尚未完成与待验证”为准。
+本文介绍日常操作，开发环境与命令见[构建与测试](#构建与测试)。
 
 ## 目录
 
@@ -26,6 +26,12 @@
 - [尚未完成与待验证](#尚未完成与待验证)
 
 ## 快速开始
+
+### 下载与安装
+
+1. 准备 Windows x64 和 WebView2 Runtime。
+2. [下载 Windows x64 安装包](https://github.com/Stdq123/planet-windows/releases/download/v0.0.1-alpha.1/planet-windows-safe-setup-0.0.1-alpha.1-amd64.exe)，安装到空目录后，从开始菜单打开 **Planet Windows**。[发行页面](https://github.com/Stdq123/planet-windows/releases/tag/v0.0.1-alpha.1)同时提供对应源码和 SHA-256 校验文件。
+3. 在写作台创建站点开始写作，或点击侧栏“订阅”旁的 **+** 添加订阅。
 
 ### 写作台
 
