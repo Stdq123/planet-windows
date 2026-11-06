@@ -40,6 +40,10 @@ powershell -NoProfile -File scripts/test-installer-isolated.ps1 -Installer $inst
 
 ## 许可和发布限制
 
-生成脚本收集主程序实际链接的 Go 模块根目录中名为 LICENSE、COPYING、NOTICE 的材料、Go 标准库及 `mygo-runtime` 许可；它并未证明嵌套子目录、前端其他文件或各许可证义务均已完全覆盖。`KUBO-BUILDINFO.txt` 列出 Kubo 二进制中的模块版本；`KUBO-DEPENDENCY-LICENSES.txt` 根据 Kubo 的编译元数据逐一下载模块、核对版本与 h1，收集其根目录许可材料。当前 241 个模块中仍有 4 个未找到根目录许可文件，标记为 `REQUIRES MANUAL REVIEW`；构建会发出警告，并非获准分发。重新收集可运行 `go run scripts/release-audit/kubo-notices.go -output docs/kubo-dependency-licenses.txt`，需要网络；存在未决项时返回非零并保留证据文件。当前 Go 模块包含 go-ethereum，其库代码根据上游声明使用 LGPL-3.0；发布方必须进一步核实静态链接、对应源码和重链接等适用义务。不得将材料收集视为合规结论。
+生成脚本收集主程序实际链接的 Go 模块根目录中名为 LICENSE、COPYING、NOTICE 的材料、Go 标准库及 `mygo-runtime` 许可。`KUBO-BUILDINFO.txt` 列出 Kubo 二进制中的模块版本；`KUBO-DEPENDENCY-LICENSES.txt` 根据 Kubo 的编译元数据逐一下载模块、核对版本与 h1，收集许可材料。当前 241 个模块均有材料，未解决的收集缺项为零。
 
-发布前还需核对 Kubo 所有依赖及第三方模板的许可、执行签名与验证、在干净的 Windows 系统中检查新装/跨版本升级/卸载与数据保留，并检验安装包实际内容。以上 Wine 测试不会覆盖这些事项。
+其中四项没有根目录许可文件的模块使用严格限定的补充证据：`ipfs/bbloom` 的源码 MIT 与 CC0 声明、`p2p-forge/client` 的嵌套许可证，以及 `goissue34681`、`base32` 的 Go Authors 声明与对应上游 Go BSD 文本。补充规则固定模块版本、h1、源码修订及文件 SHA-256；`p2p-forge` 规则还绑定实际只链接 client 的官方 Kubo 0.38.2 二进制。版本或文件变化不能沿用该结论。重新收集可运行 `go run scripts/release-audit/kubo-notices.go -output docs/kubo-dependency-licenses.txt`，需要网络；存在缺项时返回非零并保留证据文件。
+
+五个内置模板保留原固定版本、来源、署名和已有许可文本；按维护者决定，本项目不再以模板待审状态阻止 alpha 发布，不因此替上游授予新的许可。go-ethereum 库使用 LGPL-3.0，对应源码与重建方法见[源码与重建说明](../../docs/rebuilding-release.md)。这些材料说明收集范围，不代表嵌套子目录、前端其他文件或各项许可证义务均已完成全面法律审查。
+
+发布前还需保留适用的第三方许可材料与对应源码、按选定签名策略验证、在干净的 Windows 系统中检查新装/跨版本升级/卸载与数据保留，并检验安装包实际内容。以上 Wine 测试不会覆盖这些事项。
