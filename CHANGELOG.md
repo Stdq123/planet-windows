@@ -9,6 +9,7 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 - Improved the contrast of input, select, secondary-button and radio/checkbox-card boundaries on the Windows light surfaces.
 - Improved editor placeholders, selected-row details, sidebar errors, IPFS chart labels, removed-site IDs and template-library text contrast.
 - Unified error and destructive-action colors, added non-color selection indicators to navigation, article rows, the first draft and editor view controls, and aligned template selection with the graphite palette.
+- Kept the last loaded dashboard visible when a background refresh fails, with an error message and an available refresh action to retry.
 
 ## [0.0.1-alpha.2] - 2026-11-06
 

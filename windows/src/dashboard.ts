@@ -166,8 +166,7 @@ export function createDashboard(root: HTMLElement, actions: DashboardActions) {
       render(data); content.hidden = false; message("");
     } catch {
       if (!active || current !== revision) return;
-      snapshot = null;
-      content.hidden = true; message("无法读取写作台。请重试，已有内容不会被更改。");
+      message("无法读取写作台。请重试，已有内容不会被更改。");
     } finally {
       if (active && current === revision) { refreshButton.disabled = false; root.setAttribute("aria-busy", "false"); }
     }
