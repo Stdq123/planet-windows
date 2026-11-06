@@ -19,6 +19,7 @@ The following features are available in the development version; see the limitat
 - Follow and refresh RSS, Atom, JSON Feed, IPNS and supported ENS sites. Discover feeds from supported website homepages, read inline media, and keep selected content available offline.
 - Import selected Planet backups and export backups containing IPNS keys. Compatible sites can be rebuilt using verified versions of Plain, 8-bit, Grid, Platinum and Sepia.
 - Configure Filebase or Pinnable for remote pinning, and Plausible for site analytics.
+- Connect each site to one Telegram group or channel and synchronize published articles with their title, summary and link.
 - Check for signed updates through a configured HTTPS feed, download a verified installer, and run it to upgrade a compatible installation.
 
 Published content is public. Long-term availability depends on other nodes or pinning services. Exported backups contain unencrypted IPNS private keys; store them securely. For supported import scenarios, restrictions and known gaps, read [windows/README.md](windows/README.md).
@@ -27,7 +28,7 @@ Published content is public. Long-term availability depends on other nodes or pi
 
 - **Mac compatibility:** Real Mac backups and round trips have not been verified. Some imported-site settings cannot be edited, and unsupported backup contents can prevent rebuilding or export. Keep the original backup.
 - **Templates and integrations:** Only the listed template versions and supported settings are implemented. Other original Planet features and integrations remain incomplete.
-- **External services:** The Filebase, Pinnable and Plausible integrations and SSH/Cloudflare deployments have been tested with local simulations; they have not been verified with real accounts or servers.
+- **External services:** The Telegram, Filebase, Pinnable and Plausible integrations and SSH/Cloudflare deployments have been tested with local simulations; they have not been verified with real accounts or servers.
 - **ENS and media:** Non-IPFS/IPNS ENS content is unsupported. Live end-to-end testing of ENS/IPNS content with a subpath remains outstanding; media format support depends on available Windows components.
 - **Distribution:** Native Windows installer and uninstaller end-to-end validation, executable signing, a preconfigured update source and parts of the third-party license review remain outstanding. See the [release audit](windows/docs/release-audit.md).
 

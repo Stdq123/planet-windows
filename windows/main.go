@@ -56,6 +56,7 @@ type Library struct {
 	updateCancel     context.CancelFunc
 	updateClosing    bool
 	updateWorkers    sync.WaitGroup
+	telegramAPI      services.TelegramAPI
 }
 
 func (l *Library) open() (*store.Store, error) {
@@ -281,6 +282,9 @@ func (l *Library) permanentlyDeleteSiteLocked(siteID string) error {
 		if err = services.SaveConfig(root, siteID, kind, services.Config{}); err != nil {
 			return fmt.Errorf("永久删除已开始，清理服务配置失败，可稍后重试：%w", err)
 		}
+	}
+	if err = services.DeleteTelegramConfig(root, siteID); err != nil {
+		return fmt.Errorf("永久删除已开始，清理 Telegram 配置失败，可稍后重试：%w", err)
 	}
 	if hasRepo {
 		if err = l.node.RemoveKeyIfMatches(siteID, selected.IPNS); err != nil {
@@ -1295,6 +1299,9 @@ func (l *Library) PublishSite(siteID string) (publisher.Result, error) {
 		if warning := l.autoDeploy(root, *site, articles); warning != "" {
 			result.PinnableWarning += " IPNS 已发布，但外部发布未完成：" + warning
 		}
+		result.TelegramWarning = l.syncPublishedTelegram(root, *site, articles, raw)
+	} else {
+		result.TelegramWarning = "站点已发布，但无法读取 Telegram 本机配置。"
 	}
 	return result, nil
 }

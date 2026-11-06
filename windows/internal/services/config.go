@@ -25,7 +25,7 @@ type Config struct {
 var safeID = regexp.MustCompile(`^[A-Za-z0-9-]{1,100}$`)
 
 func configPath(root, id, kind string, create bool) (string, error) {
-	if !safeID.MatchString(id) || (kind != "filebase" && kind != "plausible" && kind != "cloudflare" && kind != "ssh") {
+	if !safeID.MatchString(id) || (kind != "filebase" && kind != "plausible" && kind != "cloudflare" && kind != "ssh" && kind != "telegram") {
 		return "", errors.New("服务配置标识无效")
 	}
 	// Check ancestors directly: EvalSymlinks also expands Windows short names,
@@ -66,6 +66,9 @@ func configPath(root, id, kind string, create bool) (string, error) {
 	return filepath.Join(dir, id+".dat"), nil
 }
 func SaveConfig(root, id, kind string, cfg Config) error {
+	if kind == "telegram" {
+		return errors.New("Telegram 配置必须使用专用接口")
+	}
 	if cfg.Token != "" && kind == "cloudflare" && !ValidCloudflareConfig(cfg.Server, cfg.Name, cfg.Token) {
 		return errors.New("Cloudflare 配置无效")
 	}
@@ -135,6 +138,9 @@ func SaveConfig(root, id, kind string, cfg Config) error {
 	return os.Rename(f.Name(), path)
 }
 func LoadConfig(root, id, kind string) (Config, error) {
+	if kind == "telegram" {
+		return Config{}, errors.New("Telegram 配置必须使用专用接口")
+	}
 	path, err := configPath(root, id, kind, false)
 	if errors.Is(err, os.ErrNotExist) {
 		return Config{}, nil
