@@ -188,7 +188,10 @@ test.each([
     }
     throw new Error("The asynchronous settings dialog did not settle");
   };
-  await import(`../src/main.ts?dialog-focus-${entryID}`); enterFirstSite(window);
+  // Keep the specifiers literal: Bun 1.3.5 on Windows can treat a computed query import as a file after earlier suites.
+  if (entryID === "template-settings") await import("../src/main.ts?dialog-focus-template-settings");
+  else await import("../src/main.ts?dialog-focus-pinnable-settings");
+  enterFirstSite(window);
   const $ = <T extends Element = HTMLElement>(selector: string) => window.document.querySelector<T>(selector)!;
   const entry = $<HTMLButtonElement>(`#${entryID}`), menu = $<HTMLDetailsElement>("#workspace-menu");
   const dialog = $<HTMLDialogElement>(`#${dialogID}`), close = $<HTMLButtonElement>(`#${closeID}`);
