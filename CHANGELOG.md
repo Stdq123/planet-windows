@@ -11,6 +11,7 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` a
 
 ### Added
 
+- Optional X (Twitter) article sync after successful IPNS publication, with encrypted local credentials, manual history sync, persistent delivery status and explicit recovery for uncertain requests.
 - Per-site Telegram group or channel synchronization after successful publication, with title, summary and article link, encrypted local bot credentials, duplicate suppression, message updates and manual retry.
 - An all-sites startup overview with local content totals, recent drafts and articles, publication states, and on-demand IPFS and Plausible access.
 - A single `bun run check` command for Go formatting and static analysis, frontend and Go tests, TypeScript checks and the frontend production build.
@@ -34,6 +35,7 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` a
 
 ### Fixed
 
+- Isolate release-test Git subprocesses from push-hook environment variables so checks in linked worktrees cannot modify the source repository's refs or configuration.
 - Preserve a manually expanded article list while resizing the editor, and close article details with Escape without interfering with Chinese input composition or discarding pending tags.
 - Aligned dashboard navigation and page headings, statistic labels and values, article columns, and site/service card content across desktop window sizes.
 - Platinum template verification accepts LF and CRLF stylesheets while still rejecting changed content, so clean Git checkouts can use the bundled template.

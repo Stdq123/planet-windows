@@ -56,6 +56,7 @@ type Library struct {
 	updateCancel     context.CancelFunc
 	updateClosing    bool
 	updateWorkers    sync.WaitGroup
+	xPoster          services.XPoster
 	telegramAPI      services.TelegramAPI
 }
 
@@ -278,10 +279,13 @@ func (l *Library) permanentlyDeleteSiteLocked(siteID string) error {
 	if err = pinnable.Save(root, siteID, ""); err != nil {
 		return fmt.Errorf("永久删除已开始，清理固定服务配置失败，可稍后重试：%w", err)
 	}
-	for _, kind := range []string{"filebase", "plausible", "ssh", "cloudflare"} {
+	for _, kind := range []string{"filebase", "plausible", "ssh", "cloudflare", "x"} {
 		if err = services.SaveConfig(root, siteID, kind, services.Config{}); err != nil {
 			return fmt.Errorf("永久删除已开始，清理服务配置失败，可稍后重试：%w", err)
 		}
+	}
+	if err = services.DeleteXPostsForSite(root, siteID); err != nil {
+		return fmt.Errorf("永久删除已开始，清理 X 同步记录失败，可稍后重试：%w", err)
 	}
 	if err = services.DeleteTelegramConfig(root, siteID); err != nil {
 		return fmt.Errorf("永久删除已开始，清理 Telegram 配置失败，可稍后重试：%w", err)
@@ -1298,6 +1302,9 @@ func (l *Library) PublishSite(siteID string) (publisher.Result, error) {
 		}
 		if warning := l.autoDeploy(root, *site, articles); warning != "" {
 			result.PinnableWarning += " IPNS 已发布，但外部发布未完成：" + warning
+		}
+		if warning := l.syncPublishedX(root, *site, articles); warning != "" {
+			result.PinnableWarning += " 站点已发布，但 X 同步未完成：" + warning
 		}
 		result.TelegramWarning = l.syncPublishedTelegram(root, *site, articles, raw)
 	} else {

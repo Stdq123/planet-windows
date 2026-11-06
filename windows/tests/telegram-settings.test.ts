@@ -175,11 +175,29 @@ test("unreadable Telegram configuration can be cleared only after loading and co
   expect(ui.calls.find(call => call[0] === "Library.ConfigureTelegram")).toEqual(["Library.ConfigureTelegram", "s", "@news", "replacement-secret"]);
 });
 
-test("publication displays Telegram and pinning warnings together without marking publication failed", async () => {
-  const ui = await setup({ handle: method => method === "Library.PublishSite" ? { cid: "test-cid", ipns: "test-ipns", revision: 1, pending: false, pinnableWarning: "固定服务暂时不可用", telegramWarning: "Telegram 同步未完成" } : undefined });
+test("Telegram and X settings remain available for the same selected site", async () => {
+  const ui = await setup({ handle: method => method === "Library.XSyncInfo" ? { configured: false, autoSync: false, posts: [] } : undefined });
+  const menu = ui.element("#workspace-menu");
+  expect(menu.querySelector("#telegram-settings")).not.toBeNull();
+  expect(menu.querySelector("#x-sync-settings")).not.toBeNull();
+  await ui.open();
+  expect(ui.element<HTMLDialogElement>("#telegram-dialog").open).toBe(true);
+  ui.click("#telegram-close"); ui.click("#x-sync-settings");
+  await waitFor(() => !ui.element<HTMLButtonElement>("#x-sync-close").disabled);
+  expect(ui.element<HTMLDialogElement>("#telegram-dialog").open).toBe(false);
+  expect(ui.element<HTMLDialogElement>("#x-sync-dialog").open).toBe(true);
+  expect(ui.calls.filter(call => ["Library.TelegramInfo", "Library.XSyncInfo"].includes(call[0]))).toEqual([["Library.TelegramInfo", "s"], ["Library.XSyncInfo", "s"]]);
+  expect(ui.calls.some(call => ["Library.RetryTelegram", "Library.SyncXArticle", "Library.PublishSite"].includes(call[0]))).toBe(false);
+});
+
+test("publication displays X, Telegram and pinning warnings together without marking publication failed", async () => {
+  const ui = await setup({ handle: method => method === "Library.PublishSite" ? { cid: "test-cid", ipns: "test-ipns", revision: 1, pending: false, pinnableWarning: "固定服务暂时不可用。站点已发布，但 X 同步未完成", telegramWarning: "Telegram 同步未完成" } : undefined });
   ui.click("#publish-site"); await waitFor(() => ui.alerts.length === 1);
   expect(ui.element("#error").textContent).toContain("固定服务暂时不可用");
+  expect(ui.element("#error").textContent).toContain("X 同步未完成");
   expect(ui.element("#error").textContent).toContain("Telegram 同步未完成");
+  expect(ui.alerts[0]).toContain("固定服务暂时不可用");
+  expect(ui.alerts[0]).toContain("X 同步未完成");
   expect(ui.alerts[0]).toContain("Telegram 同步未完成");
   expect(ui.element("#save-state").textContent).toContain("已发布");
 });

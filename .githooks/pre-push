@@ -1,5 +1,9 @@
 #!/bin/sh
 set -eu
 repo_root=$(git rev-parse --show-toplevel)
+# Fixture tests create separate repositories; inherited hook Git paths must not
+# redirect their commands into this checkout, especially from linked worktrees.
+git_local_env=$(git rev-parse --local-env-vars)
+unset $git_local_env
 # Use Windows PowerShell, which is also used by the application's build scripts.
 exec powershell.exe -NoProfile -File "$repo_root/scripts/check.ps1"

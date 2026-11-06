@@ -282,6 +282,22 @@ export interface Usage {
   reclaimedFiles: number;
 }
 
+/** XSyncInfo deliberately contains neither credentials nor API response bodies. */
+export interface XSyncInfo {
+  configured: boolean;
+  autoSync: boolean;
+  posts: XSyncPostInfo[];
+}
+
+export interface XSyncPostInfo {
+  articleId: string;
+  title: string;
+  status: string;
+  url: string;
+  error: string;
+  canSync: boolean;
+}
+
 // ---- Services ----
 
 /** Library exposes the local authoring functions to the application window. */
@@ -346,6 +362,10 @@ export const Library = {
   configureTelegram(siteID: string, chatID: string, token: string): Promise<void> {
     return call("Library.ConfigureTelegram", siteID, chatID, token);
   },
+  /** ConfigureXSync only stores local credentials. It never sends a post. */
+  configureXSync(siteID: string, apiKey: string, apiSecret: string, accessToken: string, accessTokenSecret: string, autoSync: boolean): Promise<void> {
+    return call("Library.ConfigureXSync", siteID, apiKey, apiSecret, accessToken, accessTokenSecret, autoSync);
+  },
   createSite(name: string, about: string): Promise<Site> {
     return call("Library.CreateSite", name, about);
   },
@@ -370,6 +390,10 @@ export const Library = {
   },
   disableTelegram(siteID: string): Promise<void> {
     return call("Library.DisableTelegram", siteID);
+  },
+  /** DisableXSync retains delivery records so reconnecting never resends old posts. */
+  disableXSync(siteID: string): Promise<void> {
+    return call("Library.DisableXSync", siteID);
   },
   downloadUpdate(version: string, sha256: string): Promise<string> {
     return call("Library.DownloadUpdate", version, sha256);
@@ -568,6 +592,9 @@ export const Library = {
   subscriptions(): Promise<Subscription[]> {
     return call("Library.Subscriptions");
   },
+  syncXArticle(siteID: string, articleID: string, retry: boolean): Promise<XSyncPostInfo> {
+    return call("Library.SyncXArticle", siteID, articleID, retry);
+  },
   telegramInfo(siteID: string): Promise<TelegramInfo> {
     return call("Library.TelegramInfo", siteID);
   },
@@ -602,5 +629,8 @@ export const Library = {
   },
   updateSiteSettings(siteID: string, name: string, about: string, doNotIndex: boolean): Promise<Site> {
     return call("Library.UpdateSiteSettings", siteID, name, about, doNotIndex);
+  },
+  xSyncInfo(siteID: string): Promise<XSyncInfo> {
+    return call("Library.XSyncInfo", siteID);
   },
 } as const;
