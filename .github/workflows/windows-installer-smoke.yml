@@ -36,6 +36,7 @@ jobs:
       - name: Audit dependencies
         run: bun run security:check
       - name: Build and audit installer
+        id: build
         run: bun run build
       - name: Test real installer in disposable Windows VM
         env:
@@ -47,13 +48,31 @@ jobs:
           & scripts/test-installer-native.ps1 -Installer $taskInstaller -ExpectedSHA256 $taskHash -ExpectedVersion $taskVersion -EvidenceDir (Join-Path $PWD 'build/native-smoke-evidence')
           $taskAudit = & scripts/audit-release.ps1 -BundleDir (Join-Path $PWD 'build/windows-amd64')
           [IO.File]::WriteAllText((Join-Path $PWD 'build/native-smoke-evidence/audit.json'), ($taskAudit -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
+      - name: Preserve failed build for diagnosis
+        if: failure() && steps.build.outcome == 'failure'
+        run: |
+          $taskEvidence = Join-Path $PWD 'build/native-smoke-evidence'
+          [IO.Directory]::CreateDirectory($taskEvidence) | Out-Null
+          $taskSevenZip = 'C:\Program Files\7-Zip\7z.exe'
+          if (Test-Path -LiteralPath $taskSevenZip) {
+            & $taskSevenZip i | Out-File -LiteralPath (Join-Path $taskEvidence '7zip-version.txt') -Encoding utf8
+          }
+          if (Test-Path -LiteralPath '.mygo/releases') {
+            foreach ($taskBundle in Get-ChildItem -Path '.mygo/releases/*/windows-amd64' -Directory) {
+              $taskCopy = Join-Path $taskEvidence ('failed-bundle-' + $taskBundle.Parent.Name)
+              Copy-Item -LiteralPath $taskBundle.FullName -Destination $taskCopy -Recurse
+              foreach ($taskInstaller in Get-ChildItem -LiteralPath $taskCopy -Filter 'planet-windows-safe-setup-*.exe' -File) {
+                & $taskSevenZip l -slt -ba $taskInstaller.FullName | Out-File -LiteralPath (Join-Path $taskCopy '7zip-listing.txt') -Encoding utf8
+              }
+            }
+          }
       - name: Retain evidence and tested installer
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: native-installer-smoke-${{ github.sha }}
           path: |
-            windows/build/native-smoke-evidence/*.json
+            windows/build/native-smoke-evidence/
             windows/build/windows-amd64/
           if-no-files-found: warn
           retention-days: 14

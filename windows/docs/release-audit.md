@@ -19,6 +19,8 @@ powershell -NoProfile -File scripts/audit-release.ps1 -BundleDir $releaseDir
 
 该命令要求本机 `C:\Program Files\7-Zip\7z.exe`；可用 `-SevenZip` 指定其他路径。它通过只读解压流计算安装包条目 SHA-256，逐个比较同目录的程序及许可文件，并输出 Authenticode 状态。出现缺失或额外 payload、重复条目、解压错误或内容不一致时以非零状态退出。签名状态仅供人工判定，`NotSigned` 不是已签名。脚本不会运行安装程序或改动注册表。
 
+7-Zip 24.09 不列出本安装包中由 NSIS `WriteUninstaller` 生成的卸载器，26.05 会显示 `Uninstall.exe` 及 `$PLUGINSDIR\update-payload\Uninstall.exe`。审计兼容两份均不可见的旧格式；可见时要求两份各一条且解压流摘要一致。该规则仅对应安装脚本已定义的卸载器，其他未知根目录条目仍会失败。云端构建失败时，手动安装测试工作流会保留失败包和 7-Zip 清单供诊断；失败材料不是可发布安装包。
+
 可用 `powershell -NoProfile -File scripts/test-release-audit.ps1` 构造一个仅含测试文本的 NSIS 文件，验证未改变的文件被接受、修改后的 payload 被拒绝；需要 MyGo 缓存中的 NSIS 3.13 和 7-Zip。这个测试不运行合成安装器，临时测试文件保留在 `.mygo/release-audit-tests/`。
 
 ## 隔离安装、覆盖安装和卸载

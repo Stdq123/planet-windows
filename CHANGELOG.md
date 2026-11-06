@@ -42,6 +42,7 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 ### Fixed
 
+- Keep installer auditing compatible with 7-Zip versions that expose NSIS-generated uninstallers, checking both copies for matching content while continuing to reject unknown or duplicate payload entries.
 - Isolate release-test Git subprocesses from push-hook environment variables so checks in linked worktrees cannot modify the source repository's refs or configuration.
 - Preserve a manually expanded article list while resizing the editor, and close article details with Escape without interfering with Chinese input composition or discarding pending tags.
 - Aligned dashboard navigation and page headings, statistic labels and values, article columns, and site/service card content across desktop window sizes.
