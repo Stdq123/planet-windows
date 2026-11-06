@@ -296,15 +296,23 @@ bun run dev
 
 ### 共享质量与安全检查
 
+仅修改[文档白名单](../docs/git-workflow.md#纯文档检查)内的文件时，只需 Git 和 Bun，在本目录运行以下命令，无需安装前端依赖或构建：
+
+```powershell
+bun run check:docs
+```
+
+该命令检查 UTF-8/LF、冲突标记、代码围栏和本地文件及标题链接，不访问外部链接。涉及代码、依赖、发行输入或其他非文档文件时，安装依赖后执行完整检查：
+
 ```powershell
 bun run check
 ```
 
-`bun run check` 是本地与 CI 共用的检查入口：依次执行 Go 格式检查、`go vet`、前端测试、禁用结果缓存的 Go 测试、TypeScript 类型检查和前端生产构建。任一步失败即停止；安装器仍需另行执行 `bun run build` 和发行验收。
+`bun run check` 是本地与 CI 共用的完整检查入口：依次执行文档检查、Go 格式检查、`go vet`、前端测试、禁用结果缓存的 Go 测试、TypeScript 类型检查和前端生产构建。任一步失败即停止；安装器仍需另行执行 `bun run build` 和发行验收。
 
 分支、提交、可选 Git hooks 与版本管理见 [Git 协作指南](../docs/git-workflow.md)。
 
-Windows CI 在 PR 和 `main` 推送时运行共享检查与依赖安全扫描。本地依赖变化和发布前也运行 `bun run security:check`；该命令需要联网查询漏洞库。
+Windows CI 在 PR 和 `main` 推送时按实际改动选择轻量文档检查或完整检查及依赖安全扫描，必需检查名称仍为 `Windows quality checks`。手动触发及无法可靠判断范围时执行完整检查。本地依赖变化和发布前也运行 `bun run security:check`；该命令需要联网查询漏洞库。
 
 ### 构建安装包与发行材料
 

@@ -5,5 +5,5 @@ repo_root=$(git rev-parse --show-toplevel)
 # redirect their commands into this checkout, especially from linked worktrees.
 git_local_env=$(git rev-parse --local-env-vars)
 unset $git_local_env
-# Use Windows PowerShell, which is also used by the application's build scripts.
-exec powershell.exe -NoProfile -File "$repo_root/scripts/check.ps1"
+# Pass Git's actual ref updates on stdin; use the same classifier as CI.
+exec bun "$repo_root/scripts/check-changes.ts" pre-push "$1"

@@ -2,7 +2,7 @@
 
 ## 当前执行方式
 
-维护者已授权恢复 Windows CI。`Windows checks` 在面向 `main` 的 PR 和 `main` 推送时运行 `bun run check` 与 `bun run security:check`，也保留手动触发。工作流使用只读权限和固定 Action SHA，同一分支的新提交取消旧任务，单个任务超时为 30 分钟。首次云端验证成功后，将 `Windows quality checks` 设为 `main` 的必需检查；不通过路径过滤跳过必需检查，避免 PR 永久等待。
+维护者已授权恢复 Windows CI。`Windows checks` 在面向 `main` 的 PR 和 `main` 推送时始终运行 `Windows quality checks`：仅修改[文档白名单](git-workflow.md#纯文档检查)时执行 `bun run check:docs`，其他改动执行 `bun run check` 与 `bun run security:check`。手动触发或无法可靠判断范围时执行完整检查。工作流使用只读权限和固定 Action SHA，同一分支的新提交取消旧任务，单个任务超时为 30 分钟。`Windows quality checks` 保持为 `main` 的必需检查，在任务内部进行分流，不通过工作流路径过滤跳过检查，避免 PR 永久等待。
 
 仓库级 Actions 与 Windows 工作流均开启。Dependabot 对 GitHub Actions、Go modules 和 Bun 每周检查版本，各生态最多保留 3 个版本更新 PR；安全更新自动 PR 对受支持的依赖启用，采用独立于版本更新的数量限制。自动 rebase 保持禁用，不配置自动合并；所有依赖升级仍需本地验证、云端检查和人工合并。
 
@@ -29,7 +29,7 @@ Dependabot 使用标准 GitHub 托管 runner 时不消耗套餐内的 Actions �
 
 ## 每次改动与依赖维护
 
-- 行为变化有相应测试，修复有能复现旧问题的回归用例；运行 `bun run check`，PR 填写命令、结果和未执行项目。
+- 行为变化有相应测试，修复有能复现旧问题的回归用例；运行 `bun run check`，纯文档改动可使用 `bun run check:docs`。PR 填写适用命令、结果和未执行项目。
 - 涉及依赖或准备发布时运行 `bun run security:check`。该检查需要访问 npm/Go 漏洞库；网络错误不能当作无漏洞。其扫描范围不含独立 Kubo 二进制和第三方模板资产。
 - 依赖更新逐项或按必要的关联包处理，阅读上游变更和安全公告，核对锁文件变化，完成回归后提交。Dependabot 配置是更新提议入口，不配置自动合并。
 - Actions 已固定到完整提交 SHA，保留只读默认权限。更新 SHA 时验证官方来源和对应版本，并由 Dependabot 提议后审查。
