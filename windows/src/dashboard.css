@@ -46,6 +46,7 @@ body:has(.shell.dashboard-mode) { overflow:hidden; }
 .dashboard-draft { grid-template-columns:18px minmax(0,1fr) 76px 18px; min-height:64px; }
 .dashboard-draft:first-child { background:var(--pw-selection); border-radius:6px; border-bottom-color:transparent; }
 .dashboard-draft:first-child:hover { background:var(--pw-active); }
+.dashboard-draft:first-child :is(.dashboard-row-meta,.dashboard-row-date) { color:var(--pw-secondary); }
 .dashboard-row-body { display:grid; gap:2px; min-width:0; }
 .dashboard-row-title { display:block; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:600 14px/22px var(--pw-font); }
 .dashboard-row-meta { display:flex; align-items:center; gap:12px; min-width:0; color:var(--pw-muted); font:400 12px/18px var(--pw-font); }

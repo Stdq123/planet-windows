@@ -7,6 +7,7 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 ### Fixed
 
 - Improved the contrast of input, select, secondary-button and radio/checkbox-card boundaries on the Windows light surfaces.
+- Improved editor placeholders, selected-row details, sidebar errors, IPFS chart labels, removed-site IDs and template-library text contrast.
 
 ## [0.0.1-alpha.2] - 2026-11-06
 

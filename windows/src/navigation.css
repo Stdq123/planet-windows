@@ -37,7 +37,7 @@
 .sidebar .sites .site-item:nth-child(n) .site-icon { flex:none; display:grid; place-items:center; width:22px; height:22px; border-radius:6px; background:var(--pw-card); color:var(--pw-secondary); font:400 12px/18px var(--pw-font); }
 .sidebar .sites .site-item.active .site-icon { color:var(--pw-accent-ink); background:var(--pw-card); }
 .sidebar .site-avatar { object-fit:cover; }
-.sidebar .site-error { color:var(--pw-amber); font-size:12px; }
+.sidebar .site-error { color:#a13f45; font-size:12px; }
 .sidebar .sites:empty::after { padding:8px; color:var(--pw-muted); font:400 12px/16px var(--pw-font); }
 #sites:empty::after { content:"还没有站点"; }
 #subscriptions:empty::after { content:"还没有订阅"; }

@@ -25,6 +25,7 @@ body { color: var(--ink); }
 .articles { padding: 8px; }
 .article-item { margin: 0 0 4px; padding: 12px 8px; border: 1px solid transparent; border-radius: 6px; }
 .article-item.active { background: var(--selection); border-color: var(--pw-line); box-shadow: none; }
+.article-item.active :is(.article-source, .article-date, .article-excerpt) { color: var(--pw-secondary); }
 .article-item:hover:not(.active) { background: var(--pw-hover); }
 .article-row-heading { order: 3; margin: 6px 0 0; }
 .article-title { font-size: 13px; line-height: 20px; font-weight: 600; color: var(--ink); }
@@ -64,7 +65,7 @@ body { color: var(--ink); }
 .editor { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 .editor .document-head { flex: none; width: min(100%, 824px); margin: 0 auto; padding: 28px 32px 12px; }
 .editor .title-input { font: 600 26px/1.4 var(--pw-font); width: 100%; height: auto; padding: 0 0 8px; color: var(--ink); border: 0; border-bottom: 1px solid transparent; border-radius: 0; background: transparent; box-shadow: none; }
-.editor .title-input::placeholder { color: #88857f; font-weight: 400; }
+.editor .title-input::placeholder { color: var(--pw-muted); font-weight: 400; }
 .editor .title-input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-bottom-color: var(--brand); }
 .editor-controls { position: relative; flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; width: min(100%, 824px); margin: 0 auto; padding: 0 32px 12px; }
 .editor-options { min-width: 0; }
@@ -99,7 +100,7 @@ body { color: var(--ink); }
 .writing-pane { overflow: visible; }
 .pane-label { display: none; }
 #content { flex: 1; min-height: 0; width: 100%; padding: 8px 0 24px; border: 0; resize: none; font: 15px/1.8 var(--pw-font); color: var(--ink); background: transparent; caret-color: var(--ink); }
-#content::placeholder { color: #88857f; }
+#content::placeholder { color: var(--pw-muted); }
 #content:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; box-shadow: none; }
 #preview { flex: 1; min-height: 0; width: 100%; border: 0; }
 .editor[data-view="split"] .document-head, .editor[data-view="split"] .editor-controls { width: 100%; }
