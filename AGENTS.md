@@ -11,7 +11,7 @@
 - Windows CI is enabled for pull requests and pushes to main, with manual dispatch available. Keep the shared quality checks and dependency security scan passing; do not bypass failures to merge. Preserve read-only permissions, pinned actions, concurrency cancellation and the 30-minute timeout.
 - Dependabot version and security update PRs are enabled. Keep weekly version checks capped at three open PRs per ecosystem, automatic rebasing disabled and automatic merging off. Review and verify dependency updates locally and in CI before merging.
 - Run `bun run security:check` for dependency changes and release preparation; online advisory/tool failures are failures, not a clean audit.
-- Follow `docs/releasing.md` for release preparation. Default output is an unapproved draft; do not bypass metadata, signature or license gates to claim a release is ready.
+- Follow `docs/releasing.md` for release preparation. Default output is an unapproved draft. Stable releases require valid first-party Authenticode signatures; an explicitly chosen unsigned prerelease may use `-Release -AllowUnsignedPrerelease`, with the generated unsigned notice and SHA-256 checksums. This option does not waive metadata, license or native Windows acceptance requirements, and never accepts invalid or untrusted signatures. Do not claim a release is ready while those requirements remain unresolved.
 - For packaging changes, also run `bun run build` and the relevant checks in `windows/docs/release-audit.md`. The shared check does not validate an installer.
 - Optional Kubo, online and external-template tests require explicit environment setup; report which were actually run.
 - Keep credentials, real Planet backups, IPNS private keys and build output out of commits and test fixtures.

@@ -35,10 +35,24 @@ function fixture(version = "0.3.0") {
   writeFileSync(join(root, "windows/scripts/audit-release.ps1"), `param([string]$BundleDir)
 $name = 'planet-windows-safe-setup-${version}-amd64.exe'
 $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $BundleDir $name)).Hash.ToLowerInvariant()
-$signature = if ($env:PLANET_RELEASE_FIXTURE -eq 'unsigned') { 'NotSigned' } else { 'Valid' }
-$reviews = if ($env:PLANET_RELEASE_FIXTURE -eq 'license') { 1 } else { 0 }
+$signature = if ($env:PLANET_RELEASE_FIXTURE -in @('unsigned', 'unsigned-license')) { 'NotSigned' } else { 'Valid' }
+$reviews = if ($env:PLANET_RELEASE_FIXTURE -in @('license', 'unsigned-license')) { 1 } else { 0 }
 if ($env:PLANET_RELEASE_FIXTURE -eq 'hash') { $hash = '0' * 64 }
-@{installer=$name; installerSha256=$hash; signatures=@(@{file='Planet Windows.exe';status=$signature},@{file=$name;status=$signature}); kuboModulesRequiringManualLicenseReview=$reviews} | ConvertTo-Json -Depth 4
+$signatures = @(@{file='Planet Windows.exe';status=$signature},@{file=$name;status=$signature})
+switch ($env:PLANET_RELEASE_FIXTURE) {
+  'app-unsigned' { $signatures[0].status = 'NotSigned' }
+  'installer-unsigned' { $signatures[1].status = 'NotSigned' }
+  'invalid-signature' { $signatures[0].status = 'HashMismatch' }
+  'untrusted-signature' { $signatures[1].status = 'NotTrusted' }
+  'unknown-signature' { $signatures[0].status = 'UnknownError' }
+  'missing-signature' { $signatures = @($signatures[0]) }
+  'empty-signatures' { $signatures = @() }
+  'duplicate-signature' { $signatures += $signatures[0] }
+  'case-duplicate-signature' { $signatures += @{file='planet windows.exe';status='Valid'} }
+  'missing-signature-status' { $signatures[0].Remove('status') }
+  'null-signature' { $signatures[0] = $null }
+}
+@{installer=$name; installerSha256=$hash; signatures=$signatures; kuboModulesRequiringManualLicenseReview=$reviews} | ConvertTo-Json -Depth 4
 `);
   const git = (...args: string[]) => {
     const result = Bun.spawnSync(["git", "-C", root, "-c", "core.hooksPath=.fixture-hooks", "-c", "commit.gpgSign=false", "-c", "tag.gpgSign=false", "-c", "user.name=Release test", "-c", "user.email=fixture@example.invalid", ...args], { env: fixtureEnv });
@@ -48,9 +62,10 @@ if ($env:PLANET_RELEASE_FIXTURE -eq 'hash') { $hash = '0' * 64 }
   git("add", ".");
   git("commit", "--quiet", "-m", "test: release fixture");
   git("tag", "-a", `v${version}`, "-m", "Test only");
-  const run = (release = true, mode = "") => Bun.spawnSync([
+  const run = (release = true, mode = "", allowUnsigned = false) => Bun.spawnSync([
     "powershell", "-NoProfile", "-File", join(root, "scripts/prepare-release.ps1"), "-BundleDir", bundle,
     ...(release ? ["-Release", "-Tag", `v${version}`] : []),
+    ...(allowUnsigned ? ["-AllowUnsignedPrerelease"] : []),
   ], { cwd: folder, env: { ...fixtureEnv, PLANET_RELEASE_FIXTURE: mode } });
   const outputs = () => {
     const path = join(root, "windows/.mygo/release-drafts");
@@ -96,6 +111,62 @@ test("prerelease materials preserve the channel and require the same audit gates
     expect(rejected.stderr.toString()).toContain("Release blocked");
   }
 });
+
+test("explicit unsigned prerelease records its policy and prominent distribution notice", () => {
+  const f = fixture("0.0.1-alpha.1");
+  const result = f.run(true, "unsigned", true);
+  if (result.exitCode !== 0) throw new Error(result.stderr.toString());
+  const output = f.outputs()[0]!;
+  const manifest = JSON.parse(readFileSync(join(output, "release-manifest.json"), "utf8"));
+  expect(manifest.mode).toBe("release");
+  expect(manifest.prerelease).toBe(true);
+  expect(manifest.unsignedPrerelease).toBe(true);
+  expect(manifest.signingPolicy).toBe("allow-unsigned-prerelease");
+  expect(manifest.firstPartySigningStatus).toBe("unsigned");
+  expect(manifest.signatures.every((entry: { status: string }) => entry.status === "NotSigned")).toBe(true);
+  const notes = readFileSync(join(output, "release-notes.md"), "utf8");
+  expect(notes).toContain("UNSIGNED PRERELEASE");
+  expect(notes.split("\n").slice(0, 3)).toEqual(["# v0.0.1-alpha.1 — 2020-01-01", "", "## UNSIGNED PRERELEASE"]);
+  expect(notes).toContain("SHA-256");
+  expect(notes).toContain("publisher identity");
+  expect(notes).toContain("Windows");
+  expect(notes).toContain("security prompts");
+  expect(notes).toContain("Released fix.");
+  expect(notes.indexOf("security prompts")).toBeLessThan(notes.indexOf("Released fix."));
+});
+
+test("unsigned prerelease opt-in distinguishes signed and partially unsigned payloads", () => {
+  for (const mode of ["", "app-unsigned", "installer-unsigned"]) {
+    const f = fixture("0.0.1-alpha.1");
+    const result = f.run(true, mode, true);
+    if (result.exitCode !== 0) throw new Error(result.stderr.toString());
+    const output = f.outputs()[0]!;
+    const manifest = JSON.parse(readFileSync(join(output, "release-manifest.json"), "utf8"));
+    expect(manifest.unsignedPrerelease).toBe(mode !== "");
+    expect(manifest.firstPartySigningStatus).toBe(mode ? "unsigned" : "valid");
+    expect(readFileSync(join(output, "release-notes.md"), "utf8").includes("UNSIGNED PRERELEASE")).toBe(mode !== "");
+  }
+});
+
+test("unsigned exception rejects stable releases and draft preparation", () => {
+  for (const [version, release] of [["0.3.0", true], ["0.0.1-alpha.1", false]] as const) {
+    const f = fixture(version);
+    const result = f.run(release, "unsigned", true);
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stderr.toString()).toContain("AllowUnsignedPrerelease requires -Release and a prerelease version");
+    expect(f.outputs()).toEqual([]);
+  }
+});
+
+for (const mode of ["unsigned-license", "invalid-signature", "untrusted-signature", "unknown-signature", "missing-signature", "empty-signatures", "duplicate-signature", "case-duplicate-signature", "missing-signature-status", "null-signature"]) {
+  test(`unsigned prerelease exception cannot bypass ${mode}`, () => {
+    const f = fixture("0.0.1-alpha.1");
+    const result = f.run(true, mode, true);
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stderr.toString()).toContain("Release blocked");
+    expect(f.outputs()).toEqual([]);
+  });
+}
 
 for (const mode of ["unsigned", "license", "hash"]) {
   test(`release preparation rejects ${mode} failures`, () => {
