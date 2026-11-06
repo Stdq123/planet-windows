@@ -32,6 +32,28 @@ test("startup shows all-sites overview without reading article bodies", async ()
   expect(calls).not.toContain("Library.Articles"); expect($("#show-dashboard").getAttribute("aria-pressed")).toBe("true");
 });
 
+test("skip link precedes navigation and focuses the active main region across modes", async () => {
+  const { $, window } = await fixture(); await until(() => !!$("#dashboard-drafts button"));
+  const skip = $<HTMLAnchorElement>("#skip-to-main");
+  expect(skip).not.toBeNull();
+  expect(window.document.body.firstElementChild).toBe(skip);
+  expect(skip.textContent).toBe("跳到主要内容");
+  const jumpTo = (selector: string) => {
+    expect(skip.getAttribute("href")).toBe(selector);
+    expect($(selector).hidden).toBe(false);
+    expect($(selector).getAttribute("tabindex")).toBe("-1");
+    skip.focus(); skip.click();
+    expect(window.document.activeElement).toBe($(selector));
+  };
+  jumpTo("#dashboard");
+  $<HTMLButtonElement>("#dashboard-drafts button").click(); await until(() => !$("#editor").hidden);
+  jumpTo("#workspace-main");
+  $<HTMLButtonElement>("#show-favorites").click();
+  jumpTo("#workspace-main");
+  $<HTMLButtonElement>("#show-dashboard").click();
+  jumpTo("#dashboard");
+});
+
 test("cross-site draft entry opens correct editor and home preserves canceled edits", async () => {
   const { window, $ } = await fixture(); await until(() => !!$("#dashboard-drafts button"));
   $<HTMLButtonElement>("#dashboard-drafts button").click(); await until(() => !$("#editor").hidden);

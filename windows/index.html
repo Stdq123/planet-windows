@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="./src/dashboard.css" />
 </head>
 <body>
+  <a id="skip-to-main" class="skip-link" href="#dashboard">跳到主要内容</a>
   <div class="shell">
     <aside class="sidebar" aria-label="主导航">
       <div class="brand"><img class="planet-mark" src="./resources/workspace/planet.svg" alt="" /><span>Planet</span></div>
@@ -53,7 +54,7 @@
         <div class="sidebar-footer"><span class="system-icon" aria-hidden="true">&#xE770;</span><span>本地工作区</span><span class="version"></span></div>
       </div>
     </aside>
-    <main id="dashboard" class="dashboard" hidden aria-labelledby="dashboard-title">
+    <main id="dashboard" class="dashboard" hidden tabindex="-1" aria-labelledby="dashboard-title">
       <div class="dashboard-inner">
         <header class="dashboard-header">
           <div class="dashboard-heading">
@@ -127,7 +128,7 @@
       <div id="articles" class="articles"></div>
       <div class="panel-note">你的内容保存在这台电脑上</div>
     </section>
-    <main class="workspace">
+    <main id="workspace-main" class="workspace" tabindex="-1" aria-labelledby="workspace-title">
       <header class="workspace-header"><div class="workspace-leading"><button id="toggle-posts" type="button" class="icon-button" aria-controls="posts-panel" aria-expanded="true" aria-label="收起文章列表" title="收起文章列表"><span class="system-icon" aria-hidden="true">&#xE700;</span></button><span class="workspace-divider"></span><div class="workspace-heading"><div id="workspace-title" class="workspace-title">欢迎来到 Planet</div></div></div><div class="header-actions"><span id="save-state" role="status"></span><button id="refresh-feed" class="secondary" hidden>刷新订阅</button><button id="new-article-header" class="primary" type="button" hidden><span class="system-icon" aria-hidden="true">&#xE70F;</span> 撰写文章</button><button id="save-draft" class="secondary" title="保存到本机（Ctrl+S），不会公开发布" hidden>保存草稿</button><button id="save" class="primary" title="保存后自动公开发布整个站点及其已保存附件" disabled>保存并发布</button><details id="workspace-menu" class="workspace-menu"><summary aria-label="更多操作" title="更多操作"><span class="system-icon" aria-hidden="true">&#xE712;</span></summary><div class="workspace-menu-content"><button id="show-publication" type="button" hidden>发布信息</button><button id="publish-site" disabled>发布到 IPFS</button><button id="edit-site" disabled>站点设置</button><button id="site-profile" disabled>域名与社交资料</button><button id="podcast-settings" disabled>播客设置</button><button id="deployment-settings" disabled>SSH / Cloudflare 发布</button><button id="telegram-settings" disabled>Telegram 同步</button><button id="select-template" disabled>选择模板</button><button id="template-settings" disabled>模板设置</button><button id="pinnable-settings" disabled>固定服务</button><button id="service-settings" disabled>Filebase / 统计</button><button id="x-sync-settings" type="button" disabled>X 同步</button><button id="export-site" disabled>导出网页</button><button id="export-planet" disabled>备份</button><button id="pin-subscription" hidden>固定离线</button><button id="mark-feed-read" hidden>全部标为已读</button><button id="unfollow" hidden>取消订阅</button><button id="delete-article" hidden>删除文章</button><button id="remove-site" disabled>移除站点</button></div></details></div></header>
 
       <div id="library-notice" class="library-notice" role="status" hidden><span id="library-message"></span><button id="retry-library" type="button" class="secondary" hidden>重新加载</button></div>

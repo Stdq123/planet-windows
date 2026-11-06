@@ -121,7 +121,7 @@ dialog .podcast-categories input { width:auto; margin:0; }
 .template-list { display:flex; flex-direction:column; gap:5px; overflow:auto; }
 .template-choice { text-align:left; display:flex; flex-direction:column; gap:3px; padding:11px 12px; border:1px solid transparent; border-radius:8px; background:transparent; color:inherit; cursor:pointer; }
 .template-choice small { color:#777d88; font-size:11px; }
-.template-choice[aria-selected="true"] { background:#eaf2ff; border-color:#c5dafe; color:#175ab8; }
+.template-choice[aria-pressed="true"] { background:#eaf2ff; border-color:#c5dafe; color:#175ab8; }
 .template-preview-panel { min-width:0; display:flex; flex-direction:column; border:1px solid #dce0e7; border-radius:9px; overflow:hidden; background:#fff; }
 .template-preview-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:11px 14px; border-bottom:1px solid #e9ebef; font-size:13px; }
 .template-preview-heading span { color:#818794; font-size:11px; }

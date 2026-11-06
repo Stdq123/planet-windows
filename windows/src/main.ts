@@ -51,6 +51,11 @@ const publicGateway = $<HTMLSelectElement>("#public-gateway"), copyPublishedURL 
 const workspaceMenu = $<HTMLDetailsElement>("#workspace-menu");
 const postsPanel = $("#posts-panel"), shell = $(".shell"), togglePosts = $<HTMLButtonElement>("#toggle-posts");
 const workspace = $(".workspace"), metadata = $("#editor-metadata"), metadataToggle = $("#toggle-metadata");
+const skipToMain = $<HTMLAnchorElement>("#skip-to-main");
+skipToMain.addEventListener("click", event => {
+  event.preventDefault();
+  (workspace.hidden ? $("#dashboard") : workspace).focus();
+});
 let editorView: "write" | "preview" | "split" = "write";
 function syncMetadataLayout() {
   if (metadata.hidden) return;
@@ -467,6 +472,7 @@ function updateView() {
   const overview = mode === "dashboard";
   shell.classList.toggle("dashboard-mode", overview);
   workspace.hidden = overview;
+  skipToMain.setAttribute("href", overview ? "#dashboard" : "#workspace-main");
   dashboard.setActive(overview);
   dashboard.setPublicationStatus(publicationStates);
   $("#show-dashboard").classList.toggle("active", overview);
@@ -1159,7 +1165,7 @@ const templateGallery=$<HTMLDialogElement>("#template-gallery"), templateList=$(
 let gallerySiteID="", gallerySelected="", galleryRevision=0, galleryItems:Builtin[]=[];
 async function showTemplatePreview(item:Builtin) {
   gallerySelected=item.id; const revision=++galleryRevision;
-  for(const button of templateList.querySelectorAll<HTMLButtonElement>(".template-choice")) button.setAttribute("aria-selected",String(button.dataset.templateId===item.id));
+  for(const button of templateList.querySelectorAll<HTMLButtonElement>(".template-choice")) button.setAttribute("aria-pressed",String(button.dataset.templateId===item.id));
   $("#template-preview-name").textContent=item.name; $("#template-preview-description").textContent=`${item.description}，build ${item.build}`;
   $("#template-gallery-result").textContent="正在生成预览…";templateFrame.srcdoc="";templateApply.disabled=true;
   try { const html=await Library.builtinTemplatePreview(item.id); if(revision!==galleryRevision || !templateGallery.open)return; templateFrame.srcdoc=html;$("#template-gallery-result").textContent="";templateApply.disabled=false; }
@@ -1169,7 +1175,7 @@ selectTemplate.addEventListener("click", async () => {
   if (!site || saving) return; gallerySiteID=site.id; gallerySelected="";templateList.replaceChildren();templateFrame.srcdoc="";templateApply.disabled=true;$("#template-gallery-result").textContent="正在读取模板…";openDialog(templateGallery);
   const revision=++galleryRevision;
   try { galleryItems=await Library.builtinTemplates();if(revision!==galleryRevision || !templateGallery.open)return;
-    for(const item of galleryItems) { const button=document.createElement("button");button.type="button";button.className="template-choice";button.dataset.templateId=item.id;button.setAttribute("aria-selected","false");const name=document.createElement("strong"),description=document.createElement("small");name.textContent=item.name;description.textContent=item.description;button.append(name,description);button.addEventListener("click",()=>void showTemplatePreview(item));templateList.append(button); }
+    for(const item of galleryItems) { const button=document.createElement("button");button.type="button";button.className="template-choice";button.dataset.templateId=item.id;button.setAttribute("aria-pressed","false");const name=document.createElement("strong"),description=document.createElement("small");name.textContent=item.name;description.textContent=item.description;button.append(name,description);button.addEventListener("click",()=>void showTemplatePreview(item));templateList.append(button); }
     const initial=galleryItems.find(item=>item.name===site?.templateName) ?? galleryItems[0];if(initial) void showTemplatePreview(initial);else $("#template-gallery-result").textContent="没有可用的内置模板。";
   } catch(e) {if(revision===galleryRevision && templateGallery.open)$("#template-gallery-result").textContent=`读取失败：${String(e)}`;}
 });
