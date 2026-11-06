@@ -122,15 +122,10 @@ body:has(.shell.dashboard-mode) { overflow:hidden; }
   .shell.dashboard-mode { grid-template-columns:192px minmax(0,1fr); }
   .dashboard-inner { padding:24px; }
   .dashboard-columns { grid-template-columns:minmax(0,1fr); gap:16px; }
-  .dashboard-secondary { display:contents; }
-  .dashboard-sites-section { grid-row:1; }
-  .dashboard-sites-section .dashboard-section-heading { display:none; }
   #dashboard-sites { grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; max-height:168px; padding:1px; }
   .dashboard-site { min-height:72px; padding:8px 12px; border:1px solid var(--pw-line); border-radius:6px; background:var(--pw-card); }
   .dashboard-site-detail { display:none; }
-  .dashboard-primary { grid-row:2; }
   .dashboard-publishing-note { display:none; }
-  .dashboard-analytics { grid-row:3; }
   .dashboard-articles:not(.is-expanded) > .dashboard-row:nth-child(n+4) { display:none; }
 }
 @media (max-width:940px) {
