@@ -4,6 +4,17 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 ## [Unreleased]
 
+- No unreleased changes.
+
+## [0.0.1-alpha.1] - 2026-11-06
+
+### Known limitations
+
+- This is an experimental, unsigned Windows x64 prerelease. The application and installer have no Authenticode publisher signature; SHA-256 checks confirm file integrity only.
+- Native silent installation, same-package reinstallation, refusal of locked or modified files, and uninstall with data preservation have passed on Windows Server 2025. Full Windows 10/11 GUI, WebView2 failure handling, Chinese input, interrupted upgrades and power-loss recovery remain unverified. These are explicitly accepted alpha limitations, not passed checks; see the [acceptance scope](https://github.com/Stdq123/planet-windows/blob/main/docs/acceptance-0.0.1-alpha.1.md).
+- Use a fresh Windows user profile for alpha testing. Earlier `0.2.0`/`0.3.0` development installations cannot downgrade to this version. Real Mac backup round trips and live external-service integrations remain unverified; keep original backups.
+- No production update feed is preconfigured. Download this alpha manually from GitHub Releases. Corresponding source, rebuild instructions, SHA-256 checksums and the final package audit accompany the release.
+
 ### Security
 
 - Updated Markdown rendering to reject encoded and automatic script URLs ([GO-2026-5320](https://pkg.go.dev/vuln/GO-2026-5320)), with a regression test covering links and images.
@@ -28,7 +39,7 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 - Retain all five bundled templates and their pinned upstream sources, attribution and available license texts, and remove the project's template pending-review release gate. This does not assign new licenses to upstream assets.
 - Complete four missing Kubo notice entries using pinned source and nested-license evidence, with exact module and file checks that reject changed or unsupported inputs.
-- Set the first public prerelease target to `0.0.1-alpha.1`, resetting the untagged development numbering. Release preparation, update manifests and the installer now support SemVer prereleases with numeric identifier ordering. Stable installations skip prerelease updates; prerelease installations can update to later prereleases or stable versions. Existing `0.2.0`/`0.3.0` development installations reject this target as a downgrade; use an isolated, fresh Windows user profile for alpha testing. The applicable signing policy, license review and native Windows acceptance must be satisfied before publication.
+- Set the first public prerelease to `0.0.1-alpha.1`, resetting the untagged development numbering. Release preparation, update manifests and the installer support SemVer prereleases with numeric identifier ordering. Stable installations skip prerelease updates; prerelease installations can update to later prereleases or stable versions. Existing `0.2.0`/`0.3.0` development installations reject this version as a downgrade; use an isolated, fresh Windows user profile for alpha testing.
 - Allow explicitly selected unsigned prereleases through `release:prepare -Release -AllowUnsignedPrerelease`, with actual signing status, SHA-256 checksums and an unsigned distribution notice. Stable releases still require valid Authenticode signatures; invalid signatures remain blocked. Checksums do not authenticate publisher identity, and the exception does not waive license review or native Windows acceptance.
 - Documentation-only pushes and pull requests now run lightweight encoding, Markdown and local-link checks without application tests or a frontend build; code, mixed changes and manual CI runs retain the full quality checks.
 - Renamed the Chinese overview navigation, heading, refresh label and loading/error messages to “写作台”.
