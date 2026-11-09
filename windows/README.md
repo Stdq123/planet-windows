@@ -35,7 +35,7 @@
 
 ### 写作台
 
-![所有站点启动概览的空工作区](../docs/screenshots/workspace-dashboard-empty.png)
+![写作台的空工作区，提供创建站点和导入备份的入口](../docs/screenshots/workspace-dashboard-empty.png)
 
 启动后默认显示写作台，汇总所有站点的文章、私密草稿和订阅未读数量，以及最近修改的草稿、文章与各站点发布状态。可在顶部选择站点开始写作，或点击草稿继续编辑；侧栏“写作台”可随时返回，未保存的修改仍会先提示确认。没有站点时，可创建新站点或导入 `.planet` 备份。
 
@@ -47,7 +47,7 @@
 
 ![Planet Windows 的订阅列表、文章列表和含图片的文章阅读界面](../docs/screenshots/subscription-reader.png)
 
-在 Planet Windows 中阅读 olivida.eth 的订阅文章。
+在 Planet Windows 中阅读「沿途手记」示例订阅。
 
 1. 点击侧栏“订阅”旁的 **+**。
 2. 输入 RSS、Atom 或 JSON Feed 地址，也可以输入支持的网站首页（例如 `https://olivida.eth.limo`）、IPNS 地址或 ENS 名称（例如 `olivida.eth`），然后点击“添加”。
