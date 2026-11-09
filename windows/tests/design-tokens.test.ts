@@ -49,3 +49,13 @@ test("the converged scales expose every promised step", async () => {
   expect(resolved(window, "transition-duration", "--duration-fast")).toBe("120ms");
   await window.happyDOM.close();
 });
+
+test("components read the converged scale instead of off-ladder literals", async () => {
+  const window = await styledDocument();
+  const document = window.document;
+  // Former 9px eyebrow sits on the xs floor.
+  expect(window.getComputedStyle(document.querySelector(".eyebrow")!).fontSize).toBe("11px");
+  // Former 9px menu corner converges to the lg step.
+  expect(window.getComputedStyle(document.querySelector(".workspace-menu-content")!).borderRadius).toBe("8px");
+  await window.happyDOM.close();
+});

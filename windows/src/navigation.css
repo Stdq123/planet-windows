@@ -7,17 +7,17 @@
 .sidebar .nav-section + .nav-section { margin-top:28px; }
 .sidebar .section-label { min-height:28px; margin:0; padding:0; color:var(--pw-muted); letter-spacing:0; }
 .sidebar .section-label h2 { margin:0; font:400 12px/18px var(--pw-font); }
-.sidebar .section-label .icon-button { width:28px; height:28px; margin:0; padding:0; color:var(--pw-secondary); border-radius:6px; }
+.sidebar .section-label .icon-button { width:28px; height:28px; margin:0; padding:0; color:var(--pw-secondary); border-radius:var(--radius-md); }
 .sidebar #show-favorites { margin:0; }
 .sidebar .sites { gap:0; }
 .sidebar .smart-action, .sidebar .site-item, .sidebar-bottom #show-ipfs-status, .sidebar-tools summary, .sidebar-tools .sidebar-action {
   display:flex; align-items:center; gap:12px; width:100%; min-width:0; min-height:36px; margin:0; padding:8px;
-  border:0; border-radius:6px; background:transparent; color:var(--pw-secondary); font:400 13px/20px var(--pw-font); text-align:left;
+  border:0; border-radius:var(--radius-md); background:transparent; color:var(--pw-secondary); font:400 13px/20px var(--pw-font); text-align:left;
   transition:background-color 120ms, color 120ms;
 }
 .sidebar .smart-action span { color:inherit; margin:0; }
 .sidebar .nav-label { flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
-.sidebar .system-icon, .sidebar #show-unread > .system-icon { flex:none; width:18px; height:18px; margin:0; font-size:16px; color:var(--pw-secondary); }
+.sidebar .system-icon, .sidebar #show-unread > .system-icon { flex:none; width:18px; height:18px; margin:0; font-size:var(--text-lg); color:var(--pw-secondary); }
 .sidebar .design-icon { flex:none; display:inline-block; vertical-align:middle; }
 .sidebar .nav-chevron { margin-left:auto; width:16px; height:16px; transition:transform 120ms; }
 .sidebar .smart-action:hover, .sidebar .site-item:hover, .sidebar-bottom #show-ipfs-status:hover, .sidebar-tools summary:hover, .sidebar-tools .sidebar-action:hover, .sidebar .section-label .icon-button:hover { background:var(--pw-hover); color:var(--pw-ink); }
@@ -31,13 +31,13 @@
 .sidebar .active .smart-count, .sidebar .active .subscription-count { color:var(--pw-accent-ink); background:transparent; }
 .sidebar #show-search { margin:8px 0 0; background:var(--pw-card); border:.5px solid var(--pw-control-line); color:var(--pw-muted); }
 .sidebar #show-search:hover { background:var(--pw-hover); }
-.sidebar kbd { padding:0 4px; border:.5px solid var(--pw-line); border-radius:4px; color:var(--pw-muted); font:400 12px/18px var(--pw-font); }
+.sidebar kbd { padding:0 4px; border:.5px solid var(--pw-line); border-radius:var(--radius-sm); color:var(--pw-muted); font:400 12px/18px var(--pw-font); }
 .shell.dashboard-mode .sidebar #show-search { display:none; }
 .sidebar .sites .site-item { gap:10px; padding-block:7px; }
-.sidebar .sites .site-item:nth-child(n) .site-icon { flex:none; display:grid; place-items:center; width:22px; height:22px; border-radius:6px; background:var(--pw-card); color:var(--pw-secondary); font:400 12px/18px var(--pw-font); }
+.sidebar .sites .site-item:nth-child(n) .site-icon { flex:none; display:grid; place-items:center; width:22px; height:22px; border-radius:var(--radius-md); background:var(--pw-card); color:var(--pw-secondary); font:400 12px/18px var(--pw-font); }
 .sidebar .sites .site-item.active .site-icon { color:var(--pw-accent-ink); background:var(--pw-card); }
 .sidebar .site-avatar { object-fit:cover; }
-.sidebar .site-error { color:var(--pw-danger); font-size:12px; }
+.sidebar .site-error { color:var(--pw-danger); font-size:var(--text-sm); }
 .sidebar .sites:empty::after { padding:8px; color:var(--pw-muted); font:400 12px/16px var(--pw-font); }
 #sites:empty::after { content:"还没有站点"; }
 #subscriptions:empty::after { content:"还没有订阅"; }
@@ -45,8 +45,8 @@
 .sidebar-bottom .sidebar-tools { margin:0; position:relative; }
 .sidebar-tools summary::after, .sidebar-tools[open] summary::after { content:none; }
 .sidebar-tools[open] summary .nav-chevron { transform:rotate(180deg); }
-.sidebar .sidebar-tools-content { position:absolute; z-index:30; bottom:calc(100% + 8px); left:0; width:max(100%,216px); max-width:calc(100vw - 32px); margin:0; padding:8px; border:.5px solid var(--pw-line); border-radius:8px; background:var(--pw-card); box-shadow:var(--pw-popover-shadow); max-height:min(432px,60vh); overflow:auto; }
-.sidebar-tools .sidebar-action { font-size:12px; line-height:16px; }
+.sidebar .sidebar-tools-content { position:absolute; z-index:30; bottom:calc(100% + 8px); left:0; width:max(100%,216px); max-width:calc(100vw - 32px); margin:0; padding:8px; border:.5px solid var(--pw-line); border-radius:var(--radius-lg); background:var(--pw-card); box-shadow:var(--pw-popover-shadow); max-height:min(432px,60vh); overflow:auto; }
+.sidebar-tools .sidebar-action { font-size:var(--text-sm); line-height:16px; }
 .sidebar-tools .gateway-setting { margin:16px 8px 8px; gap:8px; color:var(--pw-muted); }
 .sidebar .gateway-setting legend { padding:0; margin-bottom:8px; font:500 12px/16px var(--pw-font); color:var(--pw-muted); }
 .sidebar .gateway-setting .choice-group { display:grid; grid-template-columns:1fr; gap:8px; }
@@ -55,7 +55,7 @@
 .sidebar .gateway-setting .choice-group label:has(:checked) { background:var(--pw-selection); color:var(--pw-accent-ink); border-color:var(--pw-accent); }
 .sidebar .gateway-setting input { width:16px; height:16px; margin:0; accent-color:var(--pw-accent); }
 .sidebar .sidebar-footer { display:flex; align-items:center; gap:8px; border-top:.5px solid var(--pw-line); margin:8px 0 0; padding:12px 8px 0; color:var(--pw-muted); font:400 12px/18px var(--pw-font); }
-.sidebar-footer .version { margin-left:auto; color:inherit; font-size:12px; font-variant-numeric:tabular-nums; }
+.sidebar-footer .version { margin-left:auto; color:inherit; font-size:var(--text-sm); font-variant-numeric:tabular-nums; }
 .sidebar :is(button,summary,input):focus-visible { outline:2px solid var(--pw-accent); outline-offset:-2px; box-shadow:none; }
 @media (prefers-reduced-motion:reduce) { .sidebar *, .sidebar *::before { transition:none!important; } }
 @media (forced-colors:active) { .sidebar .smart-action.active, .sidebar .site-item.active { outline:1px solid Highlight; } .sidebar .smart-action.active::before, .sidebar .site-item.active::before { border-left-color:Highlight; } }
