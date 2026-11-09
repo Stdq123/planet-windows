@@ -30,9 +30,9 @@ Requires Windows x64 and WebView2 Runtime. Install into an empty folder, then op
 - **Read:** follow RSS, Atom, JSON Feed and supported IPNS / ENS sites; save favorites and pin subscriptions for offline reading.
 - **Customize:** use Plain, 8-bit, Grid, Platinum or Sepia, and import or export supported Planet backups.
 
-![Planet Windows showing subscriptions, articles and a post with inline images](docs/screenshots/subscription-reader.png)
+![Planet Windows showing subscriptions, an article list and a post with an illustration](docs/screenshots/subscription-reader.png)
 
-Reading olivida.eth in Planet Windows. See the [usage guide](windows/README.md) for supported formats, service integrations and their limits.
+Reading a sample subscription in Planet Windows. See the [usage guide](windows/README.md) for supported formats, service integrations and their limits.
 
 ## Get started
 
