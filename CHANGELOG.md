@@ -4,7 +4,15 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 ## [Unreleased]
 
-- No unreleased changes.
+### Fixed
+
+- Improved the contrast of input, select, secondary-button and radio/checkbox-card boundaries on the Windows light surfaces.
+- Improved editor placeholders, selected-row details, sidebar errors, IPFS chart labels, removed-site IDs and template-library text contrast.
+- Unified error and destructive-action colors, added non-color selection indicators to navigation, article rows, the first draft and editor view controls, and aligned template selection with the graphite palette.
+- Kept the last loaded dashboard visible when a background refresh fails, with an error message and an available refresh action to retry.
+- Restored the saved public gateway in the visible radio group at startup so its selected option matches the links in use.
+- Aligned the compact dashboard's visual and keyboard order: at widths up to 1100px, drafts and recent articles now precede site status and analytics; the site-status heading and create-site action remain visible.
+- Marked rejected form fields with a danger-colored boundary in site, article and X sync settings, including converted radio-card choices, so the field behind an error message is visible without relying on focus alone.
 
 ## [0.0.1-alpha.2] - 2026-11-06
 

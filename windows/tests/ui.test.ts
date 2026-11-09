@@ -263,8 +263,21 @@ test("saved gateway is restored when the app starts", async () => {
   (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":case "Library.Articles":return [];default:throw new Error(method);}}};
   await import("../src/main.ts?gateway-restored"); enterFirstSite(window);
   await waitFor(()=>window.document.querySelector<HTMLInputElement>("#published-url")?.value!=="");
-  expect(window.document.querySelector<HTMLSelectElement>("#public-gateway")!.value).toBe("dweb.link");
+  const select=window.document.querySelector<HTMLSelectElement>("#public-gateway")!;
+  const choices=window.document.querySelector<HTMLElement>('.choice-group[data-select="public-gateway"]')!;
+  window.document.querySelector<HTMLDetailsElement>(".sidebar-tools")!.open=true;
+  expect(select.value).toBe("dweb.link");
+  expect(select.hidden).toBe(true);
+  expect(choices.querySelectorAll("input:checked")).toHaveLength(1);
+  expect(choices.querySelector<HTMLInputElement>("input:checked")!.value).toBe(select.value);
   expect(window.document.querySelector<HTMLInputElement>("#published-url")!.value).toBe("https://dweb.link/ipns/k51example/");
+  expect(window.localStorage.getItem("planet.publicGateway")).toBe("dweb.link");
+  choices.querySelector<HTMLInputElement>('input[value="aleph"]')!.click();
+  expect(select.value).toBe("aleph");
+  expect(choices.querySelectorAll("input:checked")).toHaveLength(1);
+  expect(choices.querySelector<HTMLInputElement>("input:checked")!.value).toBe("aleph");
+  expect(window.document.querySelector<HTMLInputElement>("#published-url")!.value).toBe("https://ipfs.aleph.cloud/ipns/k51example/");
+  expect(window.localStorage.getItem("planet.publicGateway")).toBe("aleph");
 });
 
 test("unsupported eth.sucks identity is not copied as a misleading address", async () => {

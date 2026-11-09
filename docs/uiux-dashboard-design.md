@@ -1,5 +1,7 @@
 # 工作区概览 UI/UX 设计与验收
 
+> 已被 2026-11-06 的石墨写作台取代，仅作历史记录；当前设计以 [docs/uiux/figma-writing-workspace.md](uiux/figma-writing-workspace.md) 与 [windows/src/design-tokens.css](../windows/src/design-tokens.css) 为准。本文保留早期琥珀色概览迭代的设计和当时验收，其 8px 网格、48px 控件基线、旧焦点、旧断点及旧测试结果不能作为当前实现的验收证据。当前参数偏差与最小映射见[设计规范偏差记录](design-spec-exceptions.md)。
+
 本次范围是所有站点启动概览、共享侧栏，以及概览打开的搜索与创建入口。保持浅色侧栏，使用现有 Go/MyGo/TypeScript，不引入 React 或另一套组件库。
 
 ## 检查依据与问题

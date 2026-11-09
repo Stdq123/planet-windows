@@ -11,7 +11,16 @@ test("template gallery previews and applies a bundled template, with manual impo
  window.document.querySelector<HTMLButtonElement>("#select-template")!.click();await waitFor(()=>window.document.querySelectorAll(".template-choice").length===2);
  expect(window.document.querySelector("#template-gallery")!.hasAttribute("open")).toBe(true);
  expect(window.document.querySelector<HTMLIFrameElement>("#template-preview")!.getAttribute("sandbox")).toBe("");
+ const plain=window.document.querySelector<HTMLButtonElement>('[data-template-id="plain"]')!;
+ const grid=window.document.querySelector<HTMLButtonElement>('[data-template-id="grid"]')!;
+ expect(plain.getAttribute("aria-pressed")).toBe("true");
+ expect(grid.getAttribute("aria-pressed")).toBe("false");
+ expect(window.document.querySelector("#template-list [aria-selected]")).toBeNull();
  window.document.querySelector<HTMLButtonElement>('[data-template-id="grid"]')!.click();await waitFor(()=>window.document.querySelector<HTMLIFrameElement>("#template-preview")!.srcdoc.includes("Preview grid"));
+ expect(plain.getAttribute("aria-pressed")).toBe("false");
+ expect(grid.getAttribute("aria-pressed")).toBe("true");
+ grid.click();await waitFor(()=>window.document.querySelector<HTMLIFrameElement>("#template-preview")!.srcdoc.includes("Preview grid"));
+ expect(grid.getAttribute("aria-pressed")).toBe("true");
  window.document.querySelector<HTMLButtonElement>("#template-apply")!.click();await waitFor(()=>selected==="grid");
  window.document.querySelector<HTMLButtonElement>("#select-template")!.click();await waitFor(()=>window.document.querySelectorAll(".template-choice").length===2);
  window.document.querySelector<HTMLButtonElement>("#template-import")!.click();await waitFor(()=>manual===1);

@@ -18,6 +18,7 @@ async function setup(configured = false, posts: Post[] = [], failInfo = false) {
   const state = {configured, autoSync: false, posts};
   const saves: unknown[][] = [], syncs: unknown[][] = [], calls: string[] = [];
   let saveDelay: Promise<void> | undefined;
+  let saveError = "";
   (globalThis as any).mygo = {call: async (method: string, ...args: any[]) => {
     calls.push(method);
     switch (method) {
@@ -27,7 +28,7 @@ async function setup(configured = false, posts: Post[] = [], failInfo = false) {
         if (failInfo) throw Error("无法读取同步记录");
         return structuredClone({...state, posts: state.posts.map(post => ({...post, canSync: state.configured && post.canSync}))});
       case "Library.ConfigureXSync":
-        saves.push(args); await saveDelay; state.configured = true; state.autoSync = args[5]; return;
+        saves.push(args); await saveDelay; if(saveError)throw Error(saveError); state.configured = true; state.autoSync = args[5]; return;
       case "Library.DisableXSync": state.configured = false; state.autoSync = false; return;
       case "Library.SyncXArticle": {
         syncs.push(args); const entry = state.posts.find(post => post.articleId === args[1])!;
@@ -52,7 +53,7 @@ async function setup(configured = false, posts: Post[] = [], failInfo = false) {
   const syncButton = (id: string) => form.querySelector<HTMLButtonElement>(`[data-article-id="${id}"] button`)!;
   await waitFor(() => window.document.querySelector<HTMLButtonElement>("#x-sync-close")?.disabled === false);
   return {window, form, dialog, state, saves, syncs, calls, input, submit, syncButton,
-    delaySave: (promise: Promise<void>) => { saveDelay = promise; }};
+    delaySave: (promise: Promise<void>) => { saveDelay = promise; },failSave: (message: string) => { saveError = message; }};
 }
 
 test("X credentials save locally, clear after success and close, and never send posts on save", async () => {
@@ -83,6 +84,51 @@ test("saved X credentials can stay blank but partial replacement is rejected", a
   await waitFor(() => ui.saves.length === 1 && !ui.form.querySelector<HTMLButtonElement>('[type="submit"]')!.disabled);
   expect(ui.saves[0]).toEqual(["s", "", "", "", "", true]);
   expect(ui.syncs).toHaveLength(0);
+});
+
+test("missing X credentials are associated with the first empty field and clear on correction", async () => {
+  const ui=await setup(true),result=ui.window.document.querySelector("#x-sync-result")!;
+  const hint=ui.window.document.createElement("span");hint.id="x-secret-hint";hint.textContent="已有说明";ui.input("apiSecret").after(hint);ui.input("apiSecret").setAttribute("aria-describedby",hint.id);
+  ui.input("apiKey").value="partial-test";ui.submit();
+  expect(ui.input("apiKey").hasAttribute("aria-invalid")).toBe(false);
+  for(const name of ["apiSecret","accessToken","accessTokenSecret"])expect(ui.input(name).getAttribute("aria-invalid")).toBe("true");
+  expect(ui.input("apiSecret").getAttribute("aria-describedby")).toBe("x-secret-hint x-sync-result");expect(ui.window.document.activeElement).toBe(ui.input("apiSecret"));expect(ui.input("apiKey").value).toBe("partial-test");
+  for(const name of ["apiSecret","accessToken","accessTokenSecret"]){ui.input(name).value=`${name}-test`;ui.input(name).dispatchEvent(new ui.window.Event("input",{bubbles:true}));}
+  expect(ui.form.querySelector('[aria-invalid="true"]')).toBeNull();expect(ui.input("apiSecret").getAttribute("aria-describedby")).toBe("x-secret-hint");expect(result.textContent).toBe("");
+  ui.submit();await waitFor(()=>ui.saves.length===1 && !ui.input("apiKey").disabled);
+  ui.input("apiKey").value="partial-test";ui.submit();expect(ui.form.querySelector('[aria-invalid="true"]')).not.toBeNull();
+  ui.window.document.querySelector<HTMLButtonElement>("#x-sync-close")!.click();ui.window.document.querySelector<HTMLButtonElement>("#x-sync-settings")!.click();await waitFor(()=>!ui.input("apiKey").disabled);
+  expect(ui.form.querySelector('[aria-invalid="true"]')).toBeNull();expect(ui.input("apiSecret").getAttribute("aria-describedby")).toBe("x-secret-hint");
+});
+
+test("X save failures retain values and only map known missing-credential errors",async()=>{
+  const ui=await setup(true),result=ui.window.document.querySelector("#x-sync-result")!;
+  ui.failSave("请填写 X 的四项凭据");ui.submit();await waitFor(()=>ui.saves.length===1 && !ui.input("apiKey").disabled);
+  expect(ui.input("apiKey").getAttribute("aria-invalid")).toBe("true");expect(ui.window.document.activeElement).toBe(ui.input("apiKey"));
+  for(const name of ["apiKey","apiSecret","accessToken","accessTokenSecret"])ui.input(name).value=`${name}-test`;
+  ui.failSave("网络暂不可用");ui.submit();await waitFor(()=>ui.saves.length===2 && !ui.input("apiKey").disabled);
+  expect(result.textContent).toContain("网络暂不可用");expect(ui.form.querySelector('[aria-invalid="true"]')).toBeNull();expect(ui.input("apiKey").value).toBe("apiKey-test");
+  ui.failSave("X 凭据配置无效");ui.submit();await waitFor(()=>ui.saves.length===3 && !ui.input("apiKey").disabled);
+  expect(result.textContent).toContain("X 凭据配置无效");expect(ui.form.querySelector('[aria-invalid="true"]')).toBeNull();
+});
+
+test("malformed X credential content identifies only the field that needs correction",async()=>{
+  const ui=await setup(false);
+  for(const name of ["apiKey","apiSecret","accessToken","accessTokenSecret"])ui.input(name).value=`${name}-test`;
+  ui.input("accessToken").value="token with space";ui.submit();
+  expect(ui.saves).toHaveLength(0);expect(ui.form.querySelectorAll('[aria-invalid="true"]')).toHaveLength(1);expect(ui.input("accessToken").getAttribute("aria-invalid")).toBe("true");expect(ui.window.document.activeElement).toBe(ui.input("accessToken"));expect(ui.input("accessToken").value).toBe("token with space");
+  ui.input("accessToken").value="corrected-token";ui.submit();await waitFor(()=>ui.saves.length===1 && !ui.input("apiKey").disabled);
+  expect(ui.form.querySelector('[aria-invalid="true"]')).toBeNull();
+});
+
+test("disabling X clears rejected replacement errors without replacing the success status",async()=>{
+  const ui=await setup(true),result=ui.window.document.querySelector("#x-sync-result")!;
+  ui.input("apiKey").value="partial-test";ui.submit();
+  expect(ui.form.querySelectorAll('[aria-invalid="true"]')).toHaveLength(3);
+  ui.window.document.querySelector<HTMLButtonElement>("#x-sync-disable")!.click();
+  await waitFor(()=>!ui.state.configured && !ui.input("apiKey").disabled);
+  expect(result.textContent).toContain("已停用");expect(ui.form.querySelectorAll('[aria-invalid="true"]').length).toBe(0);
+  for(const name of ["apiKey","apiSecret","accessToken","accessTokenSecret"]){expect(ui.input(name).value).toBe("");expect(ui.input(name).hasAttribute("aria-describedby")).toBe(false);}
 });
 
 test("X history needs explicit sync and uncertain or failed retries require confirmation", async () => {

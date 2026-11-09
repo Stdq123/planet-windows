@@ -45,6 +45,47 @@ test("dashboard read failures stay distinct from empty data and retry", async ()
   expect($("#dashboard-content").hidden).toBe(false);
 });
 
+test("failed background refresh retains the last dashboard and offers a working retry", async () => {
+  let tries = 0, rejectRefresh!: (reason: Error) => void;
+  const { controller, root, $ } = await fixture({ load: () => {
+    tries++;
+    if (tries === 2) return new Promise<DashboardSnapshot>((_, reject) => { rejectRefresh = reject; });
+    return Promise.resolve(tries === 1 ? snapshot : { ...snapshot, articleCount: 10 });
+  } });
+  controller.setActive(true); await tick();
+  const draft = $("#dashboard-drafts button"), article = $("#dashboard-articles button"), site = $("#dashboard-sites button");
+  const refresh = $<HTMLButtonElement>("#dashboard-refresh"), feedback = $("#dashboard-feedback");
+  refresh.click();
+  expect(root.getAttribute("aria-busy")).toBe("true");
+  expect(refresh.disabled).toBe(true);
+  expect($("#dashboard-content").hidden).toBe(false);
+
+  rejectRefresh(new Error("offline")); await tick();
+  expect($("#dashboard-content").hidden).toBe(false);
+  expect($("#dashboard-drafts button")).toBe(draft);
+  expect($("#dashboard-articles button")).toBe(article);
+  expect($("#dashboard-sites button")).toBe(site);
+  expect($("[data-count='articles']").textContent).toBe("9");
+  expect(feedback.hidden).toBe(false);
+  expect(feedback.getAttribute("role")).toBe("status");
+  expect(feedback.textContent).toContain("请重试");
+  expect(feedback.textContent).toContain("已有内容不会被更改");
+  expect(root.getAttribute("aria-busy")).toBe("false");
+  expect(refresh.disabled).toBe(false);
+  // Filtering must still read the retained snapshot, not merely leave stale nodes on screen.
+  $<HTMLButtonElement>("#dashboard-article-filters [data-site-filter='a']").click();
+  expect($("#dashboard-articles .dashboard-row-title").textContent).toBe(snapshot.recentArticles[0].title);
+
+  refresh.click(); await tick();
+  expect(tries).toBe(3);
+  expect($("[data-count='articles']").textContent).toBe("10");
+  expect($("#dashboard-content").hidden).toBe(false);
+  expect(feedback.hidden).toBe(true);
+  expect(feedback.textContent).toBe("");
+  expect(root.getAttribute("aria-busy")).toBe("false");
+  expect(refresh.disabled).toBe(false);
+});
+
 test("late dashboard snapshots cannot overwrite a newer entry", async () => {
   let resolve!: (value: DashboardSnapshot) => void;
   let calls = 0;

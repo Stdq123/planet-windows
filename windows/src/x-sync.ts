@@ -1,5 +1,6 @@
 import { Library, type XSyncInfo, type XSyncPostInfo } from "./mygo";
 import { openDialog, rememberDialog } from "./ui";
+import { createFormErrors } from "./form-errors";
 
 type XSyncContext = {
   getSiteID: () => string | null;
@@ -12,6 +13,7 @@ export function initXSync(context: XSyncContext) {
   const el = <T extends HTMLElement>(selector: string) => doc.querySelector<T>(selector)!;
   const open = el<HTMLButtonElement>("#x-sync-settings"), dialog = el<HTMLDialogElement>("#x-sync-dialog");
   const form = el<HTMLFormElement>("#x-sync-form"), result = el("#x-sync-result"), posts = el("#x-sync-posts");
+  const formErrors = createFormErrors(form, result);
   const save = form.querySelector<HTMLButtonElement>('[type="submit"]')!;
   const disable = el<HTMLButtonElement>("#x-sync-disable"), close = el<HTMLButtonElement>("#x-sync-close");
   // This component guards active operations itself; a failed load must remain dismissible.
@@ -65,7 +67,7 @@ export function initXSync(context: XSyncContext) {
     busy = true; context.setBusy(true); update();
     try { await action(id, valid); }
     catch (error) { if (valid()) result.textContent = `操作失败：${error instanceof Error ? error.message : String(error)}`; }
-    finally { busy = false; context.setBusy(false); update(); }
+    finally { busy = false; context.setBusy(false); update(); formErrors.focusFirst(); }
   }
 
   async function sync(post: XSyncPostInfo) {
@@ -112,12 +114,25 @@ export function initXSync(context: XSyncContext) {
   for (const event of ["input", "change"]) form.addEventListener(event, update);
   form.addEventListener("submit", event => {
     event.preventDefault(); if (!current() || locked() || !baseline) return;
+    result.textContent = ""; if (!formErrors.validate()) return;
     const values = secrets.map(input => input.value.trim());
-    if (values.some(Boolean) && !values.every(Boolean) || !baseline.configured && !values.every(Boolean)) { result.textContent = "请填写四项凭据；已有配置时可全部留空以保留原凭据。"; return; }
+    if (values.some(Boolean) && !values.every(Boolean) || !baseline.configured && !values.every(Boolean)) {
+      formErrors.show(secrets.filter((_, index) => !values[index]).map(field => ({field, message: "请填写四项凭据；已有配置时可全部留空以保留原凭据。"}))); return;
+    }
+    const invalid = secrets.filter((_, index) => !!values[index] && !/^[!-~]{1,4096}$/.test(values[index]!));
+    if (invalid.length) { formErrors.show(invalid.map(field => ({field, message: "X 凭据只能包含不带空格的可打印 ASCII 字符，且不能超过 4096 个字符。"}))); return; }
     const automatic = auto.checked;
     void operation(async (id, valid) => {
       result.textContent = "正在保存 X 同步配置…";
-      await Library.configureXSync(id, values[0]!, values[1]!, values[2]!, values[3]!, automatic);
+      try { await Library.configureXSync(id, values[0]!, values[1]!, values[2]!, values[3]!, automatic); }
+      catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (valid() && ["请填写 X 的四项凭据", "请完整填写 X 的四项凭据"].includes(message)) {
+          const missing = secrets.filter((_, index) => !values[index]);
+          if (missing.length) formErrors.show(missing.map(field => ({field, message: `操作失败：${message}`})));
+        }
+        throw error;
+      }
       clearSecrets(); if (!valid() || !baseline) return;
       baseline.configured = true; baseline.autoSync = automatic; rememberDialog(dialog);
       await refreshSaved(id, valid, automatic ? "已保存。仅启用后新建的文章会在发布成功后自动同步；历史文章需手动同步。" : "已保存。可在下方手动同步文章。");
@@ -128,6 +143,7 @@ export function initXSync(context: XSyncContext) {
     if (!doc.defaultView!.confirm("停用 X 同步并删除本机保存的凭据？已发送记录会保留，已同步的文章不会重复发布。")) return;
     void operation(async (id, valid) => {
       await Library.disableXSync(id); clearSecrets(); if (!valid()) return;
+      formErrors.clear();
       // Stopping does not depend on readable article records; keep this result if refresh fails.
       loadFailed = false;
       if (baseline) { baseline.configured = false; baseline.autoSync = false; }
