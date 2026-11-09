@@ -7,7 +7,7 @@ require (
 	github.com/egoist/mygo v0.7.4
 	github.com/ensdomains/go-ens/v4 v4.0.0
 	github.com/ethereum/go-ethereum v1.17.5
-	github.com/flosch/pongo2/v6 v6.0.0
+	github.com/flosch/pongo2/v6 v6.1.0
 	github.com/ipfs/go-cid v0.6.2
 	github.com/mmcdole/gofeed v1.5.0
 	github.com/yuin/goldmark v1.8.7
