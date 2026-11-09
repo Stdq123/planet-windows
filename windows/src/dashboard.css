@@ -12,7 +12,7 @@ body:has(.shell.dashboard-mode) { overflow:hidden; }
 .dashboard-heading { min-width:0; }
 .dashboard-subtitle { margin-top:4px!important; color:var(--pw-secondary); font-size:var(--text-sm); line-height:18px; }
 .dashboard-actions { display:flex; flex:none; align-items:center; gap:var(--space-4); }
-.dashboard .primary,.dashboard .secondary { display:inline-flex; align-items:center; justify-content:center; gap:var(--space-2); min-height:36px; padding:7px 16px; border:1px solid var(--pw-line); border-radius:var(--radius-md); font:500 13px/20px var(--pw-font); box-shadow:none; transition:background-color 120ms,border-color 120ms; }
+.dashboard .primary,.dashboard .secondary { display:inline-flex; align-items:center; justify-content:center; gap:var(--space-2); min-height:36px; padding:7px 16px; border:1px solid var(--pw-line); border-radius:var(--radius-md); font:500 13px/20px var(--pw-font); box-shadow:none; transition:background-color var(--duration-fast) var(--ease-standard),border-color var(--duration-fast) var(--ease-standard); }
 .dashboard .primary { color:var(--pw-brand-ink); background:var(--pw-brand); border-color:transparent; }
 .dashboard .primary:hover:not(:disabled) { background:var(--pw-brand-hover); }
 .dashboard .primary:active:not(:disabled) { background:var(--pw-brand-active); }
@@ -40,7 +40,7 @@ body:has(.shell.dashboard-mode) { overflow:hidden; }
 .dashboard-icon-button:hover { background:var(--pw-hover); }
 .dashboard-icon-button .system-icon { width:16px; height:16px; font-size:var(--text-md); }
 .dashboard-list { display:grid; min-width:0; }
-.dashboard-row { display:grid; align-items:center; gap:var(--space-3); width:100%; min-width:0; padding:10px 12px; border:0; border-bottom:1px solid var(--pw-line); border-radius:0; background:transparent; text-align:left; color:var(--pw-ink); font:inherit; transition:background-color 120ms; }
+.dashboard-row { display:grid; align-items:center; gap:var(--space-3); width:100%; min-width:0; padding:10px 12px; border:0; border-bottom:1px solid var(--pw-line); border-radius:0; background:transparent; text-align:left; color:var(--pw-ink); font:inherit; transition:background-color var(--duration-fast) var(--ease-standard); }
 .dashboard-row:hover { background:var(--pw-hover); }
 .dashboard-row:active { background:var(--pw-active); }
 .dashboard-draft { grid-template-columns:18px minmax(0,1fr) 76px 18px; min-height:64px; }

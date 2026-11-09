@@ -13,13 +13,13 @@
 .sidebar .smart-action, .sidebar .site-item, .sidebar-bottom #show-ipfs-status, .sidebar-tools summary, .sidebar-tools .sidebar-action {
   display:flex; align-items:center; gap:var(--space-3); width:100%; min-width:0; min-height:36px; margin:0; padding:8px;
   border:0; border-radius:var(--radius-md); background:transparent; color:var(--pw-secondary); font:400 13px/20px var(--pw-font); text-align:left;
-  transition:background-color 120ms, color 120ms;
+  transition:background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
 }
 .sidebar .smart-action span { color:inherit; margin:0; }
 .sidebar .nav-label { flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 .sidebar .system-icon, .sidebar #show-unread > .system-icon { flex:none; width:18px; height:18px; margin:0; font-size:var(--text-lg); color:var(--pw-secondary); }
 .sidebar .design-icon { flex:none; display:inline-block; vertical-align:middle; }
-.sidebar .nav-chevron { margin-left:auto; width:16px; height:16px; transition:transform 120ms; }
+.sidebar .nav-chevron { margin-left:auto; width:16px; height:16px; transition:transform var(--duration-fast) var(--ease-standard); }
 .sidebar .smart-action:hover, .sidebar .site-item:hover, .sidebar-bottom #show-ipfs-status:hover, .sidebar-tools summary:hover, .sidebar-tools .sidebar-action:hover, .sidebar .section-label .icon-button:hover { background:var(--pw-hover); color:var(--pw-ink); }
 .sidebar .smart-action:active, .sidebar .site-item:active, .sidebar-bottom #show-ipfs-status:active, .sidebar-tools summary:active, .sidebar-tools .sidebar-action:active { background:var(--pw-active); }
 .sidebar .smart-action.active, .sidebar .site-item.active { color:var(--pw-accent-ink); background:var(--pw-selection); }
