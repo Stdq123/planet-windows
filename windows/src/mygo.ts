@@ -41,6 +41,34 @@ export interface Config {
   highestSHA256?: string;
 }
 
+export interface DashboardEntry {
+  id: string;
+  siteId: string;
+  siteName: string;
+  title: string;
+  modified: string;
+}
+
+export interface DashboardSite {
+  id: string;
+  name: string;
+  articleCount: number;
+  draftCount: number;
+  lastPublished?: string;
+  hasPublished: boolean;
+  publishPending: boolean;
+}
+
+export interface DashboardSnapshot {
+  siteCount: number;
+  articleCount: number;
+  draftCount: number;
+  unreadCount: number;
+  sites: DashboardSite[];
+  recentArticles: DashboardEntry[];
+  recentDrafts: DashboardEntry[];
+}
+
 export interface DeploymentInfo {
   configured: boolean;
   name: string;
@@ -141,6 +169,7 @@ export interface Result {
   revision: number;
   pending: boolean;
   pinnableWarning?: string;
+  telegramWarning?: string;
 }
 
 export interface SearchResult {
@@ -223,6 +252,14 @@ export interface Subscription {
   offlineSnapshot?: string;
 }
 
+export interface TelegramInfo {
+  configured: boolean;
+  chatId: string;
+  chatTitle: string;
+  syncedCount: number;
+  pending: boolean;
+}
+
 export interface UpdateCheckInfo {
   version: string;
   sha256: string;
@@ -243,6 +280,22 @@ export interface Usage {
   managedFiles: number;
   reclaimableFiles: number;
   reclaimedFiles: number;
+}
+
+/** XSyncInfo deliberately contains neither credentials nor API response bodies. */
+export interface XSyncInfo {
+  configured: boolean;
+  autoSync: boolean;
+  posts: XSyncPostInfo[];
+}
+
+export interface XSyncPostInfo {
+  articleId: string;
+  title: string;
+  status: string;
+  url: string;
+  error: string;
+  canSync: boolean;
 }
 
 // ---- Services ----
@@ -305,8 +358,19 @@ export const Library = {
   configureService(siteID: string, kind: string, name: string, token: string): Promise<void> {
     return call("Library.ConfigureService", siteID, kind, name, token);
   },
+  /** ConfigureTelegram only resolves the target. Publication is a separate action. */
+  configureTelegram(siteID: string, chatID: string, token: string): Promise<void> {
+    return call("Library.ConfigureTelegram", siteID, chatID, token);
+  },
+  /** ConfigureXSync only stores local credentials. It never sends a post. */
+  configureXSync(siteID: string, apiKey: string, apiSecret: string, accessToken: string, accessTokenSecret: string, autoSync: boolean): Promise<void> {
+    return call("Library.ConfigureXSync", siteID, apiKey, apiSecret, accessToken, accessTokenSecret, autoSync);
+  },
   createSite(name: string, about: string): Promise<Site> {
     return call("Library.CreateSite", name, about);
+  },
+  dashboard(): Promise<DashboardSnapshot> {
+    return call("Library.Dashboard");
   },
   deleteArticle(siteID: string, articleID: string): Promise<void> {
     return call("Library.DeleteArticle", siteID, articleID);
@@ -323,6 +387,13 @@ export const Library = {
   },
   disableDeployment(siteID: string, kind: string): Promise<void> {
     return call("Library.DisableDeployment", siteID, kind);
+  },
+  disableTelegram(siteID: string): Promise<void> {
+    return call("Library.DisableTelegram", siteID);
+  },
+  /** DisableXSync retains delivery records so reconnecting never resends old posts. */
+  disableXSync(siteID: string): Promise<void> {
+    return call("Library.DisableXSync", siteID);
   },
   downloadUpdate(version: string, sha256: string): Promise<string> {
     return call("Library.DownloadUpdate", version, sha256);
@@ -442,6 +513,9 @@ export const Library = {
   restoreSite(siteID: string): Promise<Site> {
     return call("Library.RestoreSite", siteID);
   },
+  retryTelegram(siteID: string): Promise<number> {
+    return call("Library.RetryTelegram", siteID);
+  },
   revealDownloadedUpdate(): Promise<void> {
     return call("Library.RevealDownloadedUpdate");
   },
@@ -518,6 +592,12 @@ export const Library = {
   subscriptions(): Promise<Subscription[]> {
     return call("Library.Subscriptions");
   },
+  syncXArticle(siteID: string, articleID: string, retry: boolean): Promise<XSyncPostInfo> {
+    return call("Library.SyncXArticle", siteID, articleID, retry);
+  },
+  telegramInfo(siteID: string): Promise<TelegramInfo> {
+    return call("Library.TelegramInfo", siteID);
+  },
   /** TemplateSettings returns supported settings, including imported values. */
   templateSettings(siteID: string): Promise<Record<string, string>> {
     return call("Library.TemplateSettings", siteID);
@@ -549,5 +629,8 @@ export const Library = {
   },
   updateSiteSettings(siteID: string, name: string, about: string, doNotIndex: boolean): Promise<Site> {
     return call("Library.UpdateSiteSettings", siteID, name, about, doNotIndex);
+  },
+  xSyncInfo(siteID: string): Promise<XSyncInfo> {
+    return call("Library.XSyncInfo", siteID);
   },
 } as const;

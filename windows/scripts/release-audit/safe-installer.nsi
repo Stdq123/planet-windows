@@ -13,6 +13,8 @@ Unicode true
 !error "VERSION is required"
 !endif
 !include "MUI2.nsh"
+!define MUI_ICON "${__FILEDIR__}\..\..\resources\icon.ico"
+!define MUI_UNICON "${__FILEDIR__}\..\..\resources\icon.ico"
 Name "Planet Windows"
 OutFile "${OUTPUT}"
 InstallDir "$LOCALAPPDATA\Programs\Planet Windows"

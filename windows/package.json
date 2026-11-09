@@ -8,6 +8,7 @@
     "generate": "mygo generate",
     "test": "bun test",
     "check": "powershell -NoProfile -File ../scripts/check.ps1",
+    "check:docs": "bun ../scripts/check-docs.ts",
     "release:check": "bun ../scripts/release-metadata.ts --release",
     "release:prepare": "powershell -NoProfile -File ../scripts/prepare-release.ps1",
     "security:check": "powershell -NoProfile -File ../scripts/security-check.ps1",

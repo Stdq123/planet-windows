@@ -62,7 +62,7 @@ if ($manualCount -gt 0) { Write-Warning "Kubo license evidence contains $manualC
 $notice = New-Object System.Text.StringBuilder
 [void]$notice.AppendLine('Third-party license materials for Planet Windows (windows/amd64).')
 [void]$notice.AppendLine('Generated from the linked Go modules and frontend runtime; assess additional obligations before distribution.')
-[void]$notice.AppendLine('Kubo ships separately; see KUBO-BUILDINFO.txt and KUBO-DEPENDENCY-LICENSES.txt. The latter includes entries requiring manual review.')
+[void]$notice.AppendLine("Kubo ships separately; see KUBO-BUILDINFO.txt and KUBO-DEPENDENCY-LICENSES.txt. Unresolved module evidence entries: $manualCount. Collection alone is not distribution approval.")
 function Add-License([string]$Title, [string]$Path) {
     [void]$notice.AppendLine()
     [void]$notice.AppendLine(('=' * 72))
@@ -75,6 +75,7 @@ Add-License ("mygo-runtime " + $runtimePackage.version + ': LICENSE') $runtimeLi
 Add-License 'Built-in Planet templates: pinned sources and license status' (Join-Path $projectRoot 'internal/templateinstall/builtins/TEMPLATE-NOTICES.txt')
 Add-License '8-bit template: upstream icon attribution' (Join-Path $projectRoot 'internal/templateinstall/builtins/gamedb/ATTRIBUTION.md')
 Add-License 'Sepia template: LICENSE' (Join-Path $projectRoot 'internal/templateinstall/builtins/sepia/LICENSE')
+Add-License 'normalize.css v8.0.1 used by Sepia: MIT license; source https://github.com/necolas/normalize.css/blob/fc091cce1534909334c1911709a39c22d406977b/LICENSE.md' (Join-Path $projectRoot 'docs/licenses/normalize-css-8.0.1-LICENSE.txt')
 $modules = @($lines | Where-Object { $_ -and $_ -notlike 'windows|*' } | Sort-Object -Unique)
 if ($modules.Count -eq 0) { throw 'No Go dependency modules were found.' }
 foreach ($line in $modules) {

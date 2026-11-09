@@ -20,21 +20,23 @@ go build -o update-manifest.exe ./cmd/update-manifest
 
 ## 签署和部署
 
-先准备最终安装包，然后在离线环境生成新的清单文件：
+先准备通过发行检查的最终安装包，然后在离线环境生成新的清单文件。下面以未来从 `0.0.1-alpha.1` 升级到 `0.0.1-alpha.2` 为例，不表示这两个版本已经发布：
 
 ```powershell
 .\update-manifest.exe sign `
   -private-key D:\offline-secrets\planet-update.key `
   -installer D:\release\Planet-Setup.exe `
   -url https://downloads.example.com/Planet-Setup.exe `
-  -version 0.3.0 `
-  -minimum-version 0.2.0 `
+  -version 0.0.1-alpha.2 `
+  -minimum-version 0.0.1-alpha.1 `
   -valid-days 7 `
   -out D:\release\update.json
 ```
 
-`-minimum-version` 默认为 `0.2.0`，`-valid-days` 默认为 7，可设置 1–30 天。版本必须是三个无前导零的非负整数，每段不超过 4294967295；最低版本不能高于发布版本。安装包必须非空且不大于 512 MiB。URL 必须使用 HTTPS，路径以 `.exe` 结尾，不能包含用户凭据或片段。`-out` 必须指向尚不存在的文件。
+`-minimum-version` 默认为 `0.2.0`，为 `0.0.1` 系列生成清单时必须显式指定经过验证的最低版本。`-valid-days` 默认为 7，可设置 1–30 天。版本主体必须是三个无前导零的非负整数，每段不超过 4294967295，可带 SemVer 预发布后缀；纯数字预发布标识不能有前导零，不接受 `+` 构建元数据。最低版本不能高于发布版本。安装包必须非空且不大于 512 MiB。URL 必须使用 HTTPS，路径以 `.exe` 结尾，不能包含用户凭据或片段。`-out` 必须指向尚不存在的文件。
+
+更新器与安装器使用相同的版本排序：`0.0.1-alpha.2 < 0.0.1-alpha.10 < 0.0.1`。预发布版可以获取更高版本的预发布或稳定版；已安装稳定版的更新检查跳过预发布。当前 `0.0.1-alpha.1` 目标低于早期 `0.2.0`/`0.3.0` 开发快照，不能通过清单把它作为这些安装的升级推送。开发快照迁移仍需另行验证，见 [升级与恢复](safe-upgrade.md)。
 
 工具流式计算安装包 SHA-256 和大小，并对原始 JSON 载荷签名；`update.json` 包含 base64 编码的载荷和签名。将**完全相同的安装包**及清单通过可信的部署流程上传至 HTTPS 服务。客户端要求清单地址和安装包地址同源，包括主机和端口；工具本身不知道客户端配置的清单地址，部署前需要检查。有效期从签署时间开始计算，过期后须生成并部署新的清单。
 
-该工具不生成或验证安装包的 Authenticode 签名。更新清单签名用于验证清单和指定的安装包摘要，Windows 安装包的发布者身份与系统信任仍需单独配置和验证。
+该工具不生成或验证安装包的 Authenticode 签名。更新清单签名用于验证清单和指定的安装包摘要，Windows 安装包的发布者身份与系统信任仍需单独配置和验证。稳定版要求有效 Authenticode 签名；维护者明确选择未签名预发布时，可按 [发行流程](../../docs/releasing.md#未签名预发布) 使用 `-Release -AllowUnsignedPrerelease`，保留显著的未签名提示、实际签名状态及 SHA-256 摘要。摘要不能证明发布者身份，Ed25519 清单签名也不等同于 Windows 对程序发布者的信任。此例外不接受无效签名，不豁免许可和原生 Windows 验收；生成清单不代表获准分发。

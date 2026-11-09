@@ -4,7 +4,14 @@ param(
     [Parameter(Mandatory = $true)][string]$InstallerName
 )
 $ErrorActionPreference = 'Stop'
-if ([IO.Path]::GetFileName($InstallerName) -ne $InstallerName -or $InstallerName -notmatch '^planet-windows-safe-setup-[0-9]+\.[0-9]+\.[0-9]+-amd64\.exe$') { throw 'Invalid installer name.' }
+foreach ($taskModule in @('Utility', 'Management', 'Security')) {
+    Import-Module (Join-Path $PSHOME "Modules/Microsoft.PowerShell.$taskModule/Microsoft.PowerShell.$taskModule.psd1") -Force -ErrorAction Stop
+}
+if ([IO.Path]::GetFileName($InstallerName) -cne $InstallerName -or $InstallerName -cnotmatch '^planet-windows-safe-setup-([0-9A-Za-z.-]+)-amd64\.exe$') { throw 'Invalid installer name.' }
+$taskVersion = $Matches[1]
+$taskParsedVersion = & bun (Join-Path $PSScriptRoot '../../scripts/release-version.ts') $taskVersion
+if ($LASTEXITCODE -ne 0) { throw 'Invalid installer name.' }
+if (($taskParsedVersion | ConvertFrom-Json).version -cne $taskVersion) { throw 'Invalid installer name.' }
 $source = (Resolve-Path -LiteralPath $BundleDir).Path
 if (-not (Test-Path -LiteralPath $source -PathType Container)) { throw 'Bundle directory not found.' }
 [IO.Directory]::CreateDirectory($BuildDir) | Out-Null

@@ -9,7 +9,9 @@ $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Utility/Microsoft.PowerShell.Utility.psd1') -Force -ErrorAction Stop
 $projectRoot = [System.IO.Directory]::GetParent($PSScriptRoot).FullName
 if (-not $ReleaseVersion) { $ReleaseVersion = ([IO.File]::ReadAllText((Join-Path $projectRoot 'release.json')) | ConvertFrom-Json).version }
-if ($ReleaseVersion -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') { throw 'Invalid release version.' }
+$taskParsedVersion = & bun (Join-Path $projectRoot '../scripts/release-version.ts') $ReleaseVersion
+if ($LASTEXITCODE -ne 0) { throw 'Invalid release version.' }
+if (($taskParsedVersion | ConvertFrom-Json).version -cne $ReleaseVersion) { throw 'Invalid release version.' }
 $payloadPath = (Resolve-Path -LiteralPath $PayloadDir).Path
 $outputPath = [System.IO.Path]::GetFullPath($OutputFile)
 if (Test-Path -LiteralPath $outputPath) { throw "Refusing to overwrite existing file: $outputPath" }

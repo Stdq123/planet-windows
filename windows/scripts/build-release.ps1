@@ -5,7 +5,11 @@ Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Management/Micros
 Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Security/Microsoft.PowerShell.Security.psd1') -Force -ErrorAction Stop
 $taskProjectRoot = [System.IO.Directory]::GetParent($PSScriptRoot).FullName
 $taskReleaseVersion=([IO.File]::ReadAllText((Join-Path $taskProjectRoot 'release.json')) | ConvertFrom-Json).version
-if ($taskReleaseVersion -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') { throw 'Invalid release version.' }
+$taskParsedVersion = & bun (Join-Path $taskProjectRoot '../scripts/release-version.ts') $taskReleaseVersion
+if ($LASTEXITCODE -ne 0) { throw 'Invalid release version.' }
+# Windows PowerShell can strip quotes from native arguments; validate the value
+# that will actually be embedded and used in file names, not an altered copy.
+if (($taskParsedVersion | ConvertFrom-Json).version -cne $taskReleaseVersion) { throw 'Invalid release version.' }
 $taskBuildId = [Guid]::NewGuid().ToString('N')
 $taskStageRoot = Join-Path $taskProjectRoot ('.mygo/build-staging/' + $taskBuildId)
 $taskReleaseRoot = Join-Path $taskProjectRoot ('.mygo/releases/' + $taskBuildId + '/windows-amd64')
@@ -38,7 +42,7 @@ try {
         $taskObservedExit=$taskVersionProcess.ExitCode
         $taskObservedVersion=$taskVersionProcess.StandardOutput.ReadToEnd().Trim()
         [IO.File]::WriteAllText($taskVersionOutput,$taskObservedVersion,[Text.UTF8Encoding]::new($false))
-        if ($taskObservedExit -ne 0 -or $taskObservedVersion -ne $taskReleaseVersion) { throw "Built app version check failed: exit=[$taskObservedExit], observed=[$taskObservedVersion], expected=[$taskReleaseVersion]." }
+        if ($taskObservedExit -ne 0 -or $taskObservedVersion -cne $taskReleaseVersion) { throw "Built app version check failed: exit=[$taskObservedExit], observed=[$taskObservedVersion], expected=[$taskReleaseVersion]." }
     } finally { if($taskVersionProcess){$taskVersionProcess.Dispose()}; $env:APPDATA=$taskPreviousAppData; $env:LOCALAPPDATA=$taskPreviousLocal }
     $taskFiles = @('Planet Windows.exe','ipfs.exe','icon.png','kubo-LICENSE.txt','kubo-LICENSE-MIT.txt','kubo-LICENSE-APACHE.txt','LICENSE-PLANET.txt','THIRD-PARTY-NOTICES.txt','KUBO-BUILDINFO.txt','KUBO-DEPENDENCY-LICENSES.txt')
     foreach ($taskName in $taskFiles) {

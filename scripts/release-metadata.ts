@@ -1,17 +1,14 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { parseReleaseVersion } from "./release-version";
 
 export function releaseMetadata(
   versionFile: string,
   changelog: string,
   options: { release?: boolean; tag?: string; today?: string } = {},
 ) {
-  const version = JSON.parse(versionFile)?.version;
-  if (typeof version !== "string" || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)
-    || version.split(".").some(part => Number(part) > 4294967295)) {
-    throw new Error("Invalid app version: expected three uint32 numbers without leading zeroes.");
-  }
+  const { version, prerelease } = parseReleaseVersion(JSON.parse(versionFile)?.version);
   const tag = `v${version}`;
   if (options.release && options.tag !== tag) throw new Error(`Release tag must be exactly ${tag}.`);
 
@@ -36,7 +33,7 @@ export function releaseMetadata(
     }
   }
   return {
-    version, tag, date, mode: options.release ? "release" : "draft",
+    version, tag, date, prerelease, mode: options.release ? "release" : "draft",
     notes: options.release ? `# ${tag} — ${date}\n\n${body}\n`
       : `# DRAFT — ${tag}\n\nUnreleased working-tree snapshot; not an approved release.\n\n${body}\n`,
   };

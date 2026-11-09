@@ -34,9 +34,30 @@ test("draft output uses Unreleased and clearly identifies its status", () => {
   expect(result.notes).not.toContain("Preserves saved articles");
 });
 
-test("app-compatible numeric versions are required", () => {
-  for (const version of ["01.2.3", "1.2", "1.2.3-beta", "4294967296.0.0", 3, null]) {
+test("release versions reject ambiguous or unsupported identifiers", () => {
+  for (const version of ["01.2.3", "1.2", "1.2.3-alpha.01", "1.2.3-", "1.2.3-a..1", "1.2.3+build", "1.2.3-测试", "1.2.3-alpha\n", "4294967296.0.0", 3, null]) {
     expect(() => releaseMetadata(JSON.stringify({ version }), changelog)).toThrow("version");
+  }
+});
+
+test("prerelease metadata retains the full version in the tag and release notes", () => {
+  const version = "0.0.1-alpha.1";
+  const text = changelog.replaceAll("0.3.0", version);
+  const result = releaseMetadata(JSON.stringify({ version }), text, { ...options, tag: `v${version}` });
+  expect(result.version).toBe(version);
+  expect(result.tag).toBe(`v${version}`);
+  expect(result.prerelease).toBe(true);
+  expect(result.notes).toContain(`# v${version}`);
+  expect(() => releaseMetadata(JSON.stringify({ version }), text, { ...options, tag: "v0.0.1" })).toThrow("tag");
+});
+
+test("stable and prerelease draft metadata explicitly distinguish release channels", () => {
+  expect(releaseMetadata(versionFile, changelog).prerelease).toBe(false);
+  for (const version of ["0.0.1-alpha.1", "1.2.3-beta", "1.2.3-rc-1", "1.2.3-alpha.99999999999999999999"]) {
+    const result = releaseMetadata(JSON.stringify({ version }), changelog);
+    expect(result.prerelease).toBe(true);
+    expect(result.version).toBe(version);
+    expect(result.mode).toBe("draft");
   }
 });
 

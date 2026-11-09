@@ -218,6 +218,46 @@ func TestSignedCheckAndVerifiedDownload(t *testing.T) {
 		t.Fatal("download differs", e)
 	}
 }
+
+func TestPrereleaseUpdatePolicyAndReplayProtection(t *testing.T) {
+	for _, tc := range []struct {
+		name, current, target, minimum, highest string
+		allowed                                 bool
+	}{
+		{"alpha upgrade", "0.0.1-alpha.1", "0.0.1-alpha.2", "0.0.1-alpha.1", "", true},
+		{"numeric identifier ordering", "0.0.1-alpha.2", "0.0.1-alpha.10", "0.0.1-alpha.1", "0.0.1-alpha.2", true},
+		{"stable promotion", "0.0.1-alpha.2", "0.0.1", "0.0.1-alpha.1", "0.0.1-alpha.2", true},
+		{"stable must not opt into alpha", "0.0.1", "0.0.2-alpha.1", "0.0.1", "", false},
+		{"alpha downgrade", "0.0.1-alpha.10", "0.0.1-alpha.2", "0.0.1-alpha.1", "", false},
+		{"replayed alpha", "0.0.1-alpha.1", "0.0.1-alpha.2", "0.0.1-alpha.1", "0.0.1-alpha.10", false},
+		{"stable minimum excludes alpha", "0.0.1-alpha.1", "0.0.1-alpha.2", "0.0.1", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, r, client, manifest, _, key := fixture(t)
+			r.Version, r.MinimumVersion = tc.target, tc.minimum
+			cfg.HighestVersion, cfg.HighestSHA256 = tc.highest, r.SHA256
+			*manifest = signed(t, key, r)
+			got, err := client.Check(context.Background(), cfg, tc.current, time.Now())
+			if (err == nil) != tc.allowed || (err == nil && got.Version != tc.target) {
+				t.Fatalf("Check() = %q, %v; allowed=%v", got.Version, err, tc.allowed)
+			}
+		})
+	}
+}
+
+func TestSignedPrereleaseDownload(t *testing.T) {
+	cfg, r, client, manifest, body, key := fixture(t)
+	r.Version, r.MinimumVersion = "0.0.1-alpha.2", "0.0.1-alpha.1"
+	*manifest = signed(t, key, r)
+	path, err := client.Download(context.Background(), cfg, "0.0.1-alpha.1", r, t.TempDir(), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil || string(got) != string(*body) || !strings.Contains(filepath.Base(path), "0.0.1-alpha.2") {
+		t.Fatalf("prerelease installer bytes/name: %q, %v", path, err)
+	}
+}
 func TestManifestRejectsTamperingExpiryReplayAndForeignTargets(t *testing.T) {
 	for _, kind := range []string{"signature", "expired", "future", "long-validity", "app", "platform", "downgrade", "replay", "same-version-other-hash", "origin", "min-version", "huge", "duplicate", "trailing"} {
 		t.Run(kind, func(t *testing.T) {

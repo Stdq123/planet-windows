@@ -1,11 +1,14 @@
 import { Library, type Article, type Draft, type Site, type Subscription, type Item, type KuboStatus, type SearchResult, type Builtin } from "./mygo";
 import { initUpdates } from "./updates";
+import { initXSync } from "./x-sync";
+import { createFormErrors } from "./form-errors";
+import { createDashboard } from "./dashboard";
 import release from "../release.json";
 import { refreshDue } from "./auto-refresh";
 import { gatewayKey, planetShareURL, selectedGateway, sitePublicURL } from "./gateway";
 import { localGatewayResource } from "./local-gateway";
 import { feedArticleBase, feedReaderDocument } from "./feed-reader";
-import { hasDialogChanges, openDialog, prepareChoices, prepareDialogs, readingStyles, rememberDialog } from "./ui";
+import { hasDialogChanges, openDialog, prepareChoices, prepareDialogs, readingStyles, rememberDialog, syncChoices } from "./ui";
 
 prepareChoices(document);
 prepareDialogs(document);
@@ -22,6 +25,7 @@ const title = $<HTMLInputElement>("#title"), content = $<HTMLTextAreaElement>("#
 const preview = $<HTMLIFrameElement>("#preview"), saveButton = $<HTMLButtonElement>("#save");
 const newArticle = $<HTMLButtonElement>("#new-article"), dialog = $<HTMLDialogElement>("#site-dialog");
 const form = $<HTMLFormElement>("#site-form"), emptyAction = $<HTMLButtonElement>("#empty-action");
+const siteFormErrors = createFormErrors(form, $("#site-settings-result"));
 const subscriptionsEl = $("#subscriptions"), feedDialog = $<HTMLDialogElement>("#feed-dialog"), feedForm = $<HTMLFormElement>("#feed-form");
 const reader = $("#reader"), readerTitle = $("#reader-title"), readerDate = $("#reader-date"), readerPreview = $<HTMLIFrameElement>("#reader-preview");
 const ownReader = $("#own-reader"), ownReaderPreview=$<HTMLIFrameElement>("#own-reader-preview");
@@ -34,6 +38,8 @@ const exportPlanet = $<HTMLButtonElement>("#export-planet"), importPlanet = $<HT
 const selectTemplate = $<HTMLButtonElement>("#select-template");
 const templateSettingsButton = $<HTMLButtonElement>("#template-settings"), templateSettingsDialog = $<HTMLDialogElement>("#template-settings-dialog"), templateSettingsForm = $<HTMLFormElement>("#template-settings-form");
 const pinnableButton=$<HTMLButtonElement>("#pinnable-settings"), pinnableDialog=$<HTMLDialogElement>("#pinnable-dialog"), pinnableForm=$<HTMLFormElement>("#pinnable-form"), pinnableResult=$("#pinnable-result");
+const telegramButton=$<HTMLButtonElement>("#telegram-settings"), telegramDialog=$<HTMLDialogElement>("#telegram-dialog"), telegramForm=$<HTMLFormElement>("#telegram-form"), telegramResult=$("#telegram-result");
+const telegramChat=telegramForm.querySelector<HTMLInputElement>('[name="chatId"]')!, telegramToken=telegramForm.querySelector<HTMLInputElement>('[name="token"]')!;
 const serviceButton=$<HTMLButtonElement>("#service-settings"),serviceDialog=$<HTMLDialogElement>("#service-dialog"),serviceForm=$<HTMLFormElement>("#service-form"),serviceResult=$("#service-result");
 const editSite = $<HTMLButtonElement>("#edit-site");
 const removeSite = $<HTMLButtonElement>("#remove-site");
@@ -47,7 +53,20 @@ const publicGateway = $<HTMLSelectElement>("#public-gateway"), copyPublishedURL 
 const workspaceMenu = $<HTMLDetailsElement>("#workspace-menu");
 const postsPanel = $("#posts-panel"), shell = $(".shell"), togglePosts = $<HTMLButtonElement>("#toggle-posts");
 const workspace = $(".workspace"), metadata = $("#editor-metadata"), metadataToggle = $("#toggle-metadata");
+const skipToMain = $<HTMLAnchorElement>("#skip-to-main");
+skipToMain.addEventListener("click", event => {
+  event.preventDefault();
+  (workspace.hidden ? $("#dashboard") : workspace).focus();
+});
 let editorView: "write" | "preview" | "split" = "write";
+function syncMetadataLayout() {
+  if (metadata.hidden) return;
+  const bounds = editor.getBoundingClientRect();
+  if (bounds.height <= 0) return;
+  // Leave room for the popover shadow inside the editor's clipped surface.
+  const available = bounds.bottom - metadata.getBoundingClientRect().top - 32;
+  metadata.style.maxHeight = `${Math.max(0, Math.min(440, Math.floor(available)))}px`;
+}
 function syncEditorView() {
   const canSplit = workspace.clientWidth >= 960;
   const view = editorView === "split" && !canSplit ? "write" : editorView;
@@ -56,12 +75,26 @@ function syncEditorView() {
   $("#preview-pane").hidden = view === "write";
   $("#view-split").hidden = !canSplit;
   for (const choice of ["write", "preview", "split"]) $("#view-" + choice).setAttribute("aria-pressed", String(view === choice));
+  syncMetadataLayout();
 }
-for (const choice of ["write", "preview", "split"] as const) $("#view-" + choice).addEventListener("click", () => { editorView = choice; syncEditorView(); });
+for (const choice of ["write", "preview", "split"] as const) $("#view-" + choice).addEventListener("click", () => {
+  editorView = choice;
+  if (choice === "preview") setMetadataOpen(false);
+  syncEditorView();
+});
 function setMetadataOpen(open: boolean) {
   metadata.hidden = !open; metadataToggle.setAttribute("aria-expanded", String(open));
+  if (open) syncMetadataLayout();
 }
 metadataToggle.addEventListener("click", () => setMetadataOpen(!!metadata.hidden));
+$("#close-metadata").addEventListener("click", () => { setMetadataOpen(false); metadataToggle.focus(); });
+document.addEventListener("click", event => {
+  if (!metadata.hidden && !metadata.contains(event.target as Node) && !metadataToggle.contains(event.target as Node)) setMetadataOpen(false);
+}, true);
+window.addEventListener("keydown", event => {
+  if (event.key !== "Escape" || event.defaultPrevented || event.isComposing || event.keyCode === 229 || metadata.hidden || document.querySelector("dialog[open]")) return;
+  event.preventDefault(); setMetadataOpen(false); metadataToggle.focus();
+});
 new window.ResizeObserver(syncEditorView).observe(workspace);
 function setPostsCollapsed(collapsed: boolean) {
   postsPanel.hidden = collapsed;
@@ -86,7 +119,10 @@ for (const menu of [workspaceMenu, $<HTMLDetailsElement>(".sidebar-tools")]) {
   });
 }
 const publicationDialog = $<HTMLDialogElement>("#publication-dialog");
-$("#show-publication").addEventListener("click", () => openDialog(publicationDialog));
+$("#show-publication").addEventListener("click", () => {
+  if (publicationDialog.open) return;
+  openDialog(publicationDialog);
+});
 $("#close-publication").addEventListener("click", () => publicationDialog.close());
 
 const ipfsDialog = $<HTMLDialogElement>("#ipfs-status-dialog"), ipfsRefresh = $<HTMLButtonElement>("#refresh-ipfs-status");
@@ -190,6 +226,7 @@ $("#close-ipfs-status").addEventListener("click", () => ipfsDialog.close());
 ipfsDialog.addEventListener("close", () => { ipfsStatusRevision++; clearTimeout(ipfsTimer); ipfsRefresh.disabled = false; ipfsStatus=null; updateIPFSResource(); ipfsOpenSite.hidden=true; ipfsOpenSite.removeAttribute("href"); });
 try { publicGateway.value = selectedGateway(window.localStorage.getItem(gatewayKey)); }
 catch { publicGateway.value = "ipfs.io"; }
+syncChoices(publicGateway.parentElement!);
 const addAttachment = $<HTMLButtonElement>("#add-attachment"), attachmentList = $("#attachment-list"), attachmentHelp = $("#attachment-help");
 const tagInput=$<HTMLInputElement>("#tag-input"), addTag=$<HTMLButtonElement>("#add-tag"), tagList=$("#tag-list");
 const importedWarning = $("#imported-warning");
@@ -207,6 +244,11 @@ let editing = false, dirty = false, saving = false, previewRevision = 0, preview
 let libraryLoading = false, libraryFailed: string[] = [];
 let refreshTimer: ReturnType<typeof setInterval> | undefined;
 let editorTags=new Map<string,string>(), savedTagSignature="[]";
+const xSync = initXSync({
+  getSiteID: () => subscription || site?.imported ? null : site?.id ?? null,
+  isBusy: () => saving,
+  setBusy: busy => { if (busy) navigationRevision++; saving = busy; title.disabled = busy; content.disabled = busy; updateView(); },
+});
 
 function tagSignature(): string { return JSON.stringify([...editorTags.entries()].sort(([a],[b])=>a.localeCompare(b))); }
 function tagJSON(): string { return JSON.stringify(Object.fromEntries(editorTags)); }
@@ -240,6 +282,8 @@ let busyMessage = "";
 let editingSiteID = "";
 let editingTemplateSiteID = "";
 let pinnableSiteID="", pinnableConfigured=false;
+let telegramSiteID="", telegramRevision=0, telegramLoading=false, telegramBusy=false, telegramLoadFailed=false;
+let telegramCurrent: {configured:boolean;chatId:string;chatTitle:string;syncedCount:number;pending:boolean}|null=null;
 const sepiaFields: Array<[string,string,string]> = [
   ["backgroundColor","背景色","#F4F1EC"], ["foregroundColor","文字颜色","#000000"], ["foregroundSecondaryColor","次要文字","#999999"],
   ["highlightColor","强调色","#FF4500"], ["linkColor","链接颜色","#778087"], ["linkHoverColor","链接悬停","#4D5256"],
@@ -248,6 +292,49 @@ const sepiaFields: Array<[string,string,string]> = [
 ];
 type PublicationState = { running: boolean; pending: boolean; status: "idle" | "published" | "failed"; error: string; changes: number; publishedChanges: number; generation: number };
 const publicationStates = new Map<string, PublicationState>();
+function isDashboard() { return !site && !subscription && !favoritesView && !smartView && !editing; }
+const dashboard = createDashboard($("#dashboard"), {
+  load: Library.dashboard, serviceInfo: Library.serviceInfo, stats: Library.plausibleStatsRange,
+  openSite: id => openDashboardTarget(id),
+  openEntry: (kind, id, entryID) => openDashboardTarget(id, kind, entryID),
+  compose: id => openDashboardTarget(id, "compose"),
+  search: () => $("#show-search").click(),
+  createSite: () => $("#new-site").click(), importSite: () => importPlanet.click(),
+  unread: () => $("#show-unread").click(), node: () => $("#show-ipfs-status").click(),
+});
+async function openDashboardTarget(siteID: string, kind?: "draft" | "article" | "compose", entryID = "") {
+  if (!canLeave()) return;
+  const revision = ++navigationRevision;
+  try {
+    let target = sites.find(entry => entry.id === siteID);
+    if (!target) {
+      const siteRevision = ++sitesRevision;
+      const loaded = await Library.sites();
+      if (revision !== navigationRevision || siteRevision !== sitesRevision) return;
+      sites = loaded; target = sites.find(entry => entry.id === siteID);
+    }
+    if (!target) throw new Error("站点已移除");
+    const [loadedArticles, loadedDrafts] = await Promise.all([Library.articles(siteID), kind === "draft" ? Library.drafts(siteID) : Promise.resolve([] as Draft[])]);
+    if (revision !== navigationRevision) return;
+    const selectedDraft = loadedDrafts.find(entry => entry.id === entryID), selectedArticle = loadedArticles.find(entry => entry.id === entryID);
+    if (kind === "draft" && !selectedDraft || kind === "article" && !selectedArticle) throw new Error("内容已移除");
+    site = target; articles = loadedArticles; drafts = loadedDrafts; article = null; draft = null;
+    subscription = null; item = null; favoritesView = false; smartView = null; editing = false; dirty = false; draftsView = kind === "draft";
+    clearError(); updateView();
+    if (kind === "draft") { selectDraft(selectedDraft!); title.focus(); }
+    else if (kind === "article") { selectArticle(selectedArticle!); workspaceTitle.tabIndex = -1; workspaceTitle.focus(); }
+    else if (kind === "compose") startArticle();
+    else { workspaceTitle.tabIndex = -1; workspaceTitle.focus(); }
+  } catch (error) { if (revision === navigationRevision) throw error; }
+}
+$("#show-dashboard").addEventListener("click", () => {
+  if (!canLeave()) return;
+  const alreadyHome = isDashboard();
+  navigationRevision++; readerRevision++; previewRevision++;
+  site = null; subscription = null; item = null; article = null; draft = null; articles = []; drafts = [];
+  draftsView = false; favoritesView = false; smartView = null; editing = false; dirty = false;
+  clearError(); updateView(); if (alreadyHome) void dashboard.refresh(); $("#dashboard-title").focus();
+});
 function publicationState(siteID: string): PublicationState {
   let state = publicationStates.get(siteID);
   if (!state) { state = { running: false, pending: false, status: "idle", error: "", changes: 0, publishedChanges: 0, generation: 0 }; publicationStates.set(siteID, state); }
@@ -269,6 +356,7 @@ async function reloadSubscriptions(): Promise<boolean> {
   const revision=++subscriptionsRevision, loaded=await Library.subscriptions();
   if (revision!==subscriptionsRevision) return false;
   subscriptions=loaded;
+  if (isDashboard()) void dashboard.refresh();
   if (subscription) {
     const updated=loaded.find(entry=>entry.url===subscription?.url);
     if (!updated) { subscription=null; item=null; readerRevision++; }
@@ -374,15 +462,25 @@ function renderArticles() {
   }
 }
 let previousMode = "browsing";
-function layoutMode() { return editing ? "editing" : article || item ? "reading" : "browsing"; }
+function layoutMode() { return isDashboard() ? "dashboard" : editing ? "editing" : article || item ? "reading" : "browsing"; }
 window.addEventListener("resize", () => {
-  setPostsCollapsed(editing || layoutMode() === "reading" && window.innerWidth < 1100);
+  if (editing) syncEditorView();
+  else setPostsCollapsed(layoutMode() === "reading" && window.innerWidth < 1100);
 });
 function updateView() {
   const mode = layoutMode();
+  const overview = mode === "dashboard";
+  shell.classList.toggle("dashboard-mode", overview);
+  workspace.hidden = overview;
+  skipToMain.setAttribute("href", overview ? "#dashboard" : "#workspace-main");
+  dashboard.setActive(overview);
+  dashboard.setPublicationStatus(publicationStates);
+  $("#show-dashboard").classList.toggle("active", overview);
+  $("#show-dashboard").setAttribute("aria-pressed", String(overview));
   if (mode !== previousMode) {
     setPostsCollapsed(editing || mode === "reading" && window.innerWidth < 1100);
-    if (editing) { editorView = "write"; setMetadataOpen(false); }
+    setMetadataOpen(false);
+    if (editing) editorView = "write";
     previousMode = mode;
   }
   shell.classList.toggle("editing-mode", editing);
@@ -413,7 +511,11 @@ function updateView() {
   selectTemplate.hidden = !!subscription; selectTemplate.disabled = !site || saving;
   templateSettingsButton.hidden = !!subscription; templateSettingsButton.disabled = !site || site.templateName !== "Sepia" || saving;
   pinnableButton.hidden=!!subscription; pinnableButton.disabled=!site || saving;
+  telegramButton.hidden=!!subscription; telegramButton.disabled=!site || saving;
+  if(telegramDialog.open && site?.id!==telegramSiteID)telegramDialog.close();
+  updateTelegramControls();
   serviceButton.hidden=!!subscription; serviceButton.disabled=!site || saving;
+  xSync.update();
   editSite.hidden = !!subscription; editSite.disabled = !site || saving;
   const profileButton=$<HTMLButtonElement>("#site-profile");profileButton.hidden=!!subscription;profileButton.disabled=!site || !!site.imported || saving;profileButton.title=site?.imported ? "导入站点暂不支持修改公开资料" : "";
   const podcastButton=$<HTMLButtonElement>("#podcast-settings");podcastButton.hidden=!!subscription;podcastButton.disabled=!site || !!site.imported || saving;
@@ -487,8 +589,11 @@ function updateView() {
   const unpublished = !!site && ((site.contentRevision ?? 0) > (site.publishedRevision ?? 0) || !!site.publishPending || !!publication && publication.changes > publication.publishedChanges);
   saveState.textContent = saving ? busyMessage || "正在处理…" : publication?.running ? `${current}${current ? "，" : ""}正在发布已保存内容…` : publication?.status === "failed" ? `${current}${current ? "，" : ""}发布未确认` : unpublished ? `${current}${current ? "，" : ""}站点更改尚未发布` : publication?.status === "published" ? `${current}${current ? "，" : ""}${dirty ? "已发布上次保存的内容" : "已发布"}` : current;
   saveState.title = publication?.error || saveState.textContent;
-  $("#metadata-count").textContent = editorTags.size || (draft?.attachments?.length ?? article?.attachments?.length) ? ` · ${editorTags.size} 个标签 / ${draft?.attachments?.length ?? article?.attachments?.length ?? 0} 个附件` : "";
+  const attachmentCount = attachmentList.childElementCount;
+  $("#metadata-count").textContent = editorTags.size || attachmentCount ? `${editorTags.size} 个标签 / ${attachmentCount} 个附件` : "";
   const notice = $("#library-notice"), retry = $<HTMLButtonElement>("#retry-library");
+  if (overview) $(".dashboard-header").after(notice, errorEl);
+  else { $(".workspace-header").after(notice); workspace.append(errorEl); }
   notice.hidden = !libraryLoading && libraryFailed.length === 0;
   notice.dataset.state = libraryLoading ? "loading" : "error";
   $("#library-message").textContent = libraryLoading ? "正在读取本地内容…" : `${libraryFailed.join("、")}未能加载。已读取的内容仍可使用。`;
@@ -498,6 +603,7 @@ function updateView() {
     empty.querySelector("p")!.textContent = libraryLoading ? "你的站点和订阅正在加载。" : "请重新加载；已有内容不会被更改。";
     emptyAction.hidden = true;
   }
+  syncMetadataLayout();
 }
 async function selectSite(item: Site) {
   if (item.id === site?.id && !articleLoadFailures.has(item.id)) return;
@@ -545,6 +651,7 @@ async function setSubscriptionRead(address:string,key:string,value:boolean) {
     const current=subscriptions.find(entry=>entry.url===address)?.feed.items.find(entry=>(entry.key || entry.id || entry.link)===key);
     if(current) current.read=value;
     if(subscription?.url===address && item && (item.key || item.id || item.link)===key) item.read=value;
+    if (isDashboard()) void dashboard.refresh();
   } catch(error) { showError(`保存阅读状态失败：${error instanceof Error ? error.message : String(error)}`); }
   finally {pendingRead.delete(operation);updateView();}
 }
@@ -556,8 +663,10 @@ function selectArticle(item: Article) {
 }
 $("#edit-article").addEventListener("click",()=>{if(!site || !article || saving)return;navigationRevision++;editing=true;dirty=false;title.value=article.title;content.value=article.content;setEditorTags(article.tags);clearError();updateView();void renderPreview();});
 const articleSettingsDialog=$<HTMLDialogElement>("#article-settings-dialog"),articleSettingsForm=$<HTMLFormElement>("#article-settings-form");
+const articleFormErrors=createFormErrors(articleSettingsForm,$("#article-settings-result"));
 $("#article-settings").addEventListener("click",()=>{
   if(!site || site.imported || !article || saving)return;
+  articleFormErrors.clear();
   articleSettingsForm.querySelector<HTMLInputElement>('[name="slug"]')!.value=article.slug || "";
   articleSettingsForm.querySelector<HTMLSelectElement>('[name="articleType"]')!.value=String(article.articleType || 0);
   articleSettingsForm.querySelector<HTMLInputElement>('[name="externalLink"]')!.value=article.externalLink || "";
@@ -569,17 +678,24 @@ $("#close-article-settings").addEventListener("click",()=>{if(!saving)articleSet
 articleSettingsDialog.addEventListener("cancel",event=>{if(saving)event.preventDefault();});
 articleSettingsForm.addEventListener("submit",async event=>{
   event.preventDefault();if(!site || site.imported || !article || saving)return;
+  $("#article-settings-result").textContent="";if(!articleFormErrors.validate())return;
   const siteID=site.id,articleID=article.id,slug=articleSettingsForm.querySelector<HTMLInputElement>('[name="slug"]')!.value.trim();
   const type=Number(articleSettingsForm.querySelector<HTMLSelectElement>('[name="articleType"]')!.value),external=articleSettingsForm.querySelector<HTMLInputElement>('[name="externalLink"]')!.value.trim();
   const included=articleSettingsForm.querySelector<HTMLInputElement>('[name="inNavigation"]')!.checked,weight=Number(articleSettingsForm.querySelector<HTMLInputElement>('[name="weight"]')!.value);
-  if(!Number.isSafeInteger(weight) || weight < -2147483648 || weight > 2147483647){$("#article-settings-result").textContent="请输入有效的整数权重。";return;}
+  if(!Number.isSafeInteger(weight) || weight < -2147483648 || weight > 2147483647){articleFormErrors.show([{field:articleSettingsForm.querySelector<HTMLInputElement>('[name="weight"]')!,message:"请输入有效的整数权重。"}]);return;}
   const controls=Array.from(articleSettingsForm.querySelectorAll<HTMLInputElement|HTMLSelectElement|HTMLButtonElement>("input,select,button"));controls.forEach(control=>control.disabled=true);saving=true;updateView();
   try {
     const saved=await Library.updateArticleSettings(siteID,articleID,slug,type,external,included,weight);
     articles=articles.map(entry=>entry.id===articleID ? saved : entry);if(site?.id===siteID && article?.id===articleID)article=saved;
     markLocalChange(siteID);articleSettingsDialog.close();clearError();void queuePublication(siteID);
-  } catch(error){$("#article-settings-result").textContent=`保存失败：${error instanceof Error ? error.message : String(error)}`;}
-  finally{controls.forEach(control=>control.disabled=false);saving=false;updateView();}
+  } catch(error){
+    const message=error instanceof Error ? error.message : String(error),text=`保存失败：${message}`;
+    const fieldName:Record<string,string>={"自定义路径只能包含小写字母、数字或连字符，且不能使用保留名称":"slug","自定义路径与其他文章冲突":"slug","文章类型无效":"articleType","外部链接必须是有效的 HTTP 或 HTTPS 地址":"externalLink"};
+    const name=fieldName[message];
+    if(name)articleFormErrors.show([{field:articleSettingsForm.querySelector<HTMLInputElement|HTMLSelectElement>(`[name="${name}"]`)!,message:text}]);
+    else $("#article-settings-result").textContent=text;
+  }
+  finally{controls.forEach(control=>control.disabled=false);saving=false;updateView();articleFormErrors.focusFirst();}
 });
 $("#share-own-article").addEventListener("click",async()=>{
   if(!site?.ipns || !site.lastPublishedCID || !article)return;
@@ -674,16 +790,17 @@ async function queuePublication(siteID: string, manual = false) {
         if (sites.some(entry=>entry.id===siteID)) { sitesRevision++; sites = sites.map(entry => entry.id === siteID ? { ...entry, ipns: result.ipns, lastPublishedCID: result.cid, contentRevision: Math.max(entry.contentRevision ?? 0, result.revision), publishedRevision: result.revision, publishPending: result.pending } : entry); }
         if (site?.id === siteID) site = sites.find(entry => entry.id === siteID) ?? site;
         if (!state.pending && state.changes === changes) state.publishedChanges = changes;
-        state.status = "published"; state.error = result.pinnableWarning ?? "";
-        if (result.pinnableWarning && site?.id===siteID) showError(result.pinnableWarning);
-        if (manual && !state.pending) window.alert(`发布请求已完成。\n\nIPNS：${result.ipns}\nCID：${result.cid}\n\n网络传播可能需要时间；请保持应用运行以提供内容。${result.pinnableWarning ? `\n\n${result.pinnableWarning}` : ""}`);
+        const warning = [result.pinnableWarning, result.telegramWarning].filter(Boolean).join("\n\n");
+        state.status = "published"; state.error = warning;
+        if (warning && site?.id===siteID) showError(warning);
+        if (manual && !state.pending) window.alert(`发布请求已完成。\n\nIPNS：${result.ipns}\nCID：${result.cid}\n\n网络传播可能需要时间；请保持应用运行以提供内容。${warning ? `\n\n${warning}` : ""}`);
       } catch (e) {
         state.status = "failed";
         state.error = `文章已保存，但站点发布未确认：${e instanceof Error ? e.message : String(e)}。可点击“发布到 IPFS”重试。`;
         if (site?.id === siteID && !state.pending) showError(state.error);
       }
     } while (state.pending);
-  } finally { state.running = false; updateView(); }
+  } finally { state.running = false; updateView(); if (isDashboard()) void dashboard.refresh(); }
 }
 $("#new-site").addEventListener("click", () => { if (canLeave()) { navigationRevision++; editingSiteID=""; form.reset(); $("#site-index-setting").hidden=true;$("#site-avatar-setting").hidden=true;$("#site-identity-settings").hidden=true;$("#site-avatar-result").textContent="";$("#site-settings-result").textContent=""; form.querySelector("h2")!.textContent="创建站点";$("#site-dialog-description").textContent="为你的新空间起个名字。"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="创建站点"; openDialog(dialog); } });
 function updateSiteAvatarPreview(value?:string) {
@@ -865,7 +982,10 @@ dialog.addEventListener("cancel", event => { if (saving) event.preventDefault();
 dialog.addEventListener("close", () => { navigationRevision++; });
 form.addEventListener("submit", async (event) => {
   event.preventDefault(); if (saving) return;
-  $("#site-settings-result").textContent="";const button = form.querySelector<HTMLButtonElement>('button[type="submit"]')!; button.disabled = true;
+  $("#site-settings-result").textContent="";if(!siteFormErrors.validate())return;
+  const nameInput=form.querySelector<HTMLInputElement>('[name="name"]')!;
+  if(!nameInput.value.trim()){siteFormErrors.show([{field:nameInput,message:"请输入站点名称"}]);return;}
+  const button = form.querySelector<HTMLButtonElement>('button[type="submit"]')!; button.disabled = true;
   const revision = ++navigationRevision;
   const isUpdate=!!editingSiteID, cancel=$<HTMLButtonElement>("#cancel-site");
   saving=true; cancel.disabled=true; busyMessage=isUpdate ? "正在保存站点设置…" : "正在创建站点…"; updateView();
@@ -892,11 +1012,17 @@ form.addEventListener("submit", async (event) => {
     if (revision !== navigationRevision) { if(refreshError) showError(`站点已创建，但站点列表刷新失败：${String(refreshError)}`); updateView(); return; }
     site = created; favoritesView = false; smartView=null; subscription = null; item = null; articles = []; article = null; draft=null; drafts=[]; draftsView=false; editing = false; dirty = false; dialog.close();
     if (refreshError) showError(`站点已创建，但站点列表刷新失败：${String(refreshError)}`); else clearError(); updateView();
-  } catch (e) { $("#site-settings-result").textContent=`${isUpdate ? "保存" : "创建"}失败：${e instanceof Error ? e.message : String(e)}。请检查后重试。`; }
+  } catch (e) {
+    const message=e instanceof Error ? e.message : String(e),text=`${isUpdate ? "保存" : "创建"}失败：${message}。请检查后重试。`;
+    const fieldName:Record<string,string>={"请输入站点名称":"name","站点标识只能包含字母、数字和连字符":"siteSlug","作者名称不能超过 250 个字符":"authorName"};
+    const name=fieldName[message];
+    if(name)siteFormErrors.show([{field:form.querySelector<HTMLInputElement>(`[name="${name}"]`)!,message:text}]);
+    else $("#site-settings-result").textContent=text;
+  }
   finally {
     button.disabled = false; button.textContent = submitLabel; saving=false; cancel.disabled=false;
     for (const field of form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input,textarea")) field.disabled = false;
-    busyMessage=""; updateView();
+    busyMessage=""; updateView();siteFormErrors.focusFirst();
   }
 });
 $("#new-feed").addEventListener("click", () => { if (canLeave()) { navigationRevision++; feedForm.reset(); $("#feed-result").textContent=""; openDialog(feedDialog); } });
@@ -1057,7 +1183,7 @@ const templateGallery=$<HTMLDialogElement>("#template-gallery"), templateList=$(
 let gallerySiteID="", gallerySelected="", galleryRevision=0, galleryItems:Builtin[]=[];
 async function showTemplatePreview(item:Builtin) {
   gallerySelected=item.id; const revision=++galleryRevision;
-  for(const button of templateList.querySelectorAll<HTMLButtonElement>(".template-choice")) button.setAttribute("aria-selected",String(button.dataset.templateId===item.id));
+  for(const button of templateList.querySelectorAll<HTMLButtonElement>(".template-choice")) button.setAttribute("aria-pressed",String(button.dataset.templateId===item.id));
   $("#template-preview-name").textContent=item.name; $("#template-preview-description").textContent=`${item.description}，build ${item.build}`;
   $("#template-gallery-result").textContent="正在生成预览…";templateFrame.srcdoc="";templateApply.disabled=true;
   try { const html=await Library.builtinTemplatePreview(item.id); if(revision!==galleryRevision || !templateGallery.open)return; templateFrame.srcdoc=html;$("#template-gallery-result").textContent="";templateApply.disabled=false; }
@@ -1067,7 +1193,7 @@ selectTemplate.addEventListener("click", async () => {
   if (!site || saving) return; gallerySiteID=site.id; gallerySelected="";templateList.replaceChildren();templateFrame.srcdoc="";templateApply.disabled=true;$("#template-gallery-result").textContent="正在读取模板…";openDialog(templateGallery);
   const revision=++galleryRevision;
   try { galleryItems=await Library.builtinTemplates();if(revision!==galleryRevision || !templateGallery.open)return;
-    for(const item of galleryItems) { const button=document.createElement("button");button.type="button";button.className="template-choice";button.dataset.templateId=item.id;button.setAttribute("aria-selected","false");const name=document.createElement("strong"),description=document.createElement("small");name.textContent=item.name;description.textContent=item.description;button.append(name,description);button.addEventListener("click",()=>void showTemplatePreview(item));templateList.append(button); }
+    for(const item of galleryItems) { const button=document.createElement("button");button.type="button";button.className="template-choice";button.dataset.templateId=item.id;button.setAttribute("aria-pressed","false");const name=document.createElement("strong"),description=document.createElement("small");name.textContent=item.name;description.textContent=item.description;button.append(name,description);button.addEventListener("click",()=>void showTemplatePreview(item));templateList.append(button); }
     const initial=galleryItems.find(item=>item.name===site?.templateName) ?? galleryItems[0];if(initial) void showTemplatePreview(initial);else $("#template-gallery-result").textContent="没有可用的内置模板。";
   } catch(e) {if(revision===galleryRevision && templateGallery.open)$("#template-gallery-result").textContent=`读取失败：${String(e)}`;}
 });
@@ -1103,7 +1229,7 @@ templateSettingsButton.addEventListener("click", async () => {
       field.append(input); fields.append(field);
     }
     templateSettingsForm.querySelector<HTMLInputElement>('[name="showRef"]')!.checked=settings.showRef==="true";
-    editingTemplateSiteID=siteID; openDialog(templateSettingsDialog);
+    editingTemplateSiteID=siteID; openDialog(templateSettingsDialog, templateSettingsButton);
   } catch(e) { showError(e); } finally { saving=false; title.disabled=false; content.disabled=false; busyMessage=""; updateView(); }
 });
 $("#cancel-template-settings").addEventListener("click",()=>{if(!saving)templateSettingsDialog.close();});
@@ -1122,6 +1248,109 @@ templateSettingsForm.addEventListener("submit",async event=>{
     templateSettingsDialog.close();
   } catch(e) { showError(e); } finally { saving=false; title.disabled=false; content.disabled=false; busyMessage=""; for(const control of controls)control.disabled=false; updateView(); }
 });
+function telegramContextCurrent(id: string, revision: number): boolean {
+  return telegramDialog.open && telegramSiteID===id && site?.id===id && telegramRevision===revision;
+}
+function telegramHasUnsavedChanges(): boolean {
+  return telegramChat.value.trim()!==(telegramCurrent?.chatId ?? "") || !!telegramToken.value;
+}
+function telegramRevisionPublished(): boolean {
+  if(!site || site.id!==telegramSiteID || !site.ipns || !site.lastPublishedCID || site.publishPending || (site.contentRevision ?? 0)>(site.publishedRevision ?? 0))return false;
+  const state=publicationStates.get(site.id);
+  return !state || !state.running && !state.pending && state.changes<=state.publishedChanges;
+}
+function telegramCanAct(recover=false): boolean {
+  const available=!!telegramCurrent || recover && telegramLoadFailed && !telegramHasUnsavedChanges();
+  return !saving && !telegramBusy && !telegramLoading && available && telegramContextCurrent(telegramSiteID,telegramRevision);
+}
+function updateTelegramControls() {
+  const blocked=saving || telegramBusy || telegramLoading || !telegramContextCurrent(telegramSiteID,telegramRevision);
+  const unsaved=telegramHasUnsavedChanges();
+  telegramChat.disabled=blocked; telegramToken.disabled=blocked;
+  telegramToken.required=!telegramCurrent?.configured || telegramChat.value.trim()!==telegramCurrent.chatId;
+  telegramForm.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled=blocked || !telegramCurrent;
+  $<HTMLButtonElement>("#telegram-close").disabled=saving || telegramBusy;
+  const retry=$<HTMLButtonElement>("#telegram-retry"), disable=$<HTMLButtonElement>("#telegram-disable");
+  retry.disabled=blocked || !telegramCurrent?.configured || unsaved || !telegramRevisionPublished();
+  disable.disabled=blocked || (!telegramCurrent?.configured && !telegramLoadFailed) || unsaved;
+  disable.textContent=telegramLoadFailed ? "清除本机配置" : "停用";
+  retry.title=unsaved ? "请先保存 Telegram 配置" : !telegramRevisionPublished() ? "请先发布当前已保存内容" : "";
+  disable.title=unsaved ? "请先保存或还原 Telegram 配置" : "";
+  telegramForm.setAttribute("aria-busy",String(telegramLoading || telegramBusy));
+}
+function telegramStatus(): string {
+  if(!telegramCurrent?.configured)return "尚未配置 Telegram 同步。";
+  const info=telegramCurrent;
+  return `已连接 ${info.chatTitle || info.chatId}，已同步 ${info.syncedCount} 篇文章。${info.pending ? "上次发送结果不确定，请检查 Telegram 后再重试，重试可能产生重复消息。" : ""}${telegramRevisionPublished() ? "" : "请先发布当前已保存内容，再同步 Telegram。"}`;
+}
+async function readTelegram(id: string, revision: number, message="") {
+  const info=await Library.telegramInfo(id);
+  if(!telegramContextCurrent(id,revision))return;
+  telegramCurrent=info; telegramLoadFailed=false; telegramChat.value=info.chatId || ""; telegramToken.value="";
+  telegramResult.textContent=message ? `${message}${telegramStatus()}` : telegramStatus();
+  rememberDialog(telegramDialog);
+}
+async function loadTelegram() {
+  const id=telegramSiteID, revision=++telegramRevision;
+  telegramCurrent=null; telegramLoadFailed=false; telegramLoading=true; telegramResult.textContent="正在读取配置…"; updateTelegramControls();
+  try { await readTelegram(id,revision); }
+  catch(error) { if(telegramContextCurrent(id,revision)){telegramLoadFailed=true;telegramResult.textContent=`读取失败：${error instanceof Error ? error.message : String(error)}。可关闭后重试，或清除本机配置和同步记录后重新配置；已有 Telegram 消息不会删除。`;} }
+  finally { if(revision===telegramRevision){telegramLoading=false;updateTelegramControls();} }
+}
+async function withTelegramOperation(action: (id:string)=>Promise<string>, clearToken=false, recover=false) {
+  if(!telegramCanAct(recover))return;
+  const id=telegramSiteID, revision=telegramRevision;
+  telegramBusy=true; saving=true; navigationRevision++; updateView();
+  try {
+    const message=await action(id);
+    if(!telegramContextCurrent(id,revision))return;
+    // A successful configuration change makes the previous saved target stale.
+    telegramCurrent=null;
+    await readTelegram(id,revision,message);
+  } catch(error) {
+    if(telegramContextCurrent(id,revision))telegramResult.textContent=`操作失败：${error instanceof Error ? error.message : String(error)}`;
+  } finally {
+    if(clearToken)telegramToken.value="";
+    telegramBusy=false; saving=false; updateView();
+  }
+}
+telegramButton.addEventListener("click",()=>{
+  if(!site || saving || telegramBusy)return;
+  telegramSiteID=site.id; telegramForm.reset(); telegramCurrent=null; telegramLoadFailed=false;
+  openDialog(telegramDialog); void loadTelegram();
+});
+for(const input of [telegramChat,telegramToken])input.addEventListener("input",()=>{
+  updateTelegramControls();
+  if(telegramCurrent)telegramResult.textContent=telegramHasUnsavedChanges() ? "配置有未保存的更改，请先保存后再同步。" : telegramStatus();
+});
+$("#telegram-close").addEventListener("click",()=>{if(!telegramBusy && !saving)telegramDialog.close();});
+telegramDialog.addEventListener("cancel",event=>{if(telegramBusy || saving)event.preventDefault();});
+telegramDialog.addEventListener("close",()=>{
+  telegramRevision++; telegramSiteID=""; telegramCurrent=null; telegramLoading=false; telegramLoadFailed=false; telegramForm.reset();
+});
+telegramForm.addEventListener("submit",event=>{
+  event.preventDefault(); if(!telegramCanAct())return;
+  const chat=telegramChat.value.trim(), token=telegramToken.value.trim();
+  if(!/^(?:@[A-Za-z0-9_]+|-[1-9]\d*)$/.test(chat)){telegramResult.textContent="请输入 @频道用户名或群组 / 频道的负数 ID。";telegramChat.focus();return;}
+  if(!token && (!telegramCurrent?.configured || chat!==telegramCurrent.chatId)){telegramResult.textContent="首次配置或更换目标时，请输入机器人令牌。";telegramToken.focus();return;}
+  if(telegramCurrent?.configured && (chat!==telegramCurrent.chatId || !!token) && !window.confirm("更换机器人或群组 / 频道会清除本机同步记录，下次同步可能重新发送全部文章；已有 Telegram 消息不会删除。继续保存？"))return;
+  void withTelegramOperation(async id=>{
+    await Library.configureTelegram(id,chat,token);
+    return "已保存，未发送消息；下次站点发布成功后自动同步。";
+  },true);
+});
+$("#telegram-retry").addEventListener("click",()=>{
+  if(!telegramCanAct() || !telegramCurrent?.configured || telegramHasUnsavedChanges() || !telegramRevisionPublished())return;
+  if(!window.confirm("将向已配置的 Telegram 群组 / 频道发送所有尚未同步的文章，并更新已同步文章。若上次发送结果不确定，重试可能产生重复消息；请先检查 Telegram。继续同步？"))return;
+  void withTelegramOperation(async id=>{const count=await Library.retryTelegram(id);return `同步完成，本次处理 ${count} 篇文章。`;});
+});
+$("#telegram-disable").addEventListener("click",()=>{
+  if(!telegramCanAct(true) || (!telegramCurrent?.configured && !telegramLoadFailed) || telegramHasUnsavedChanges())return;
+  const recover=telegramLoadFailed;
+  if(!window.confirm(`${recover ? "清除当前站点的 Telegram 本机配置和同步记录" : "停用 Telegram 同步并删除本机配置和同步记录"}？已有 Telegram 消息不会删除；再次启用后可能重新发送全部文章。`))return;
+  void withTelegramOperation(async id=>{await Library.disableTelegram(id);return recover ? "已清除本机配置，可以重新配置 Telegram 同步。" : "已停用 Telegram 同步。";},false,recover);
+});
+
 function updatePinnableControls() {
   for(const id of ["#pinnable-request","#pinnable-status","#pinnable-disable"]) $<HTMLButtonElement>(id).disabled=saving || !pinnableConfigured;
   pinnableForm.querySelector<HTMLInputElement>('[name="endpoint"]')!.disabled=saving;
@@ -1138,7 +1367,7 @@ pinnableButton.addEventListener("click",async()=>{
   if(!site || saving)return;const siteID=site.id;navigationRevision++;saving=true;title.disabled=true;content.disabled=true;updateView();clearError();
   try {
     const configured=await Library.pinnableConfigured(siteID);if(site?.id!==siteID)return;
-    pinnableSiteID=siteID;pinnableConfigured=configured;pinnableForm.reset();pinnableResult.textContent=configured ? "已配置固定服务地址。" : "尚未配置固定服务。";openDialog(pinnableDialog);
+    pinnableSiteID=siteID;pinnableConfigured=configured;pinnableForm.reset();pinnableResult.textContent=configured ? "已配置固定服务地址。" : "尚未配置固定服务。";openDialog(pinnableDialog, pinnableButton);
   } catch(e){showError(e);} finally {saving=false;title.disabled=false;content.disabled=false;updatePinnableControls();updateView();}
 });
 $("#pinnable-close").addEventListener("click",()=>{if(!saving)pinnableDialog.close();});
@@ -1349,7 +1578,6 @@ async function init() {
         if (sitesRevision!==initialSites) return;
         if (navigationRevision===initialNavigation || (!site && sites.length===0)) sites=loaded;
         if (navigationRevision===initialNavigation && !editing && !dirty) {
-          if (!site && sites[0]) site=sites[0];
           if (site && (!article || articleLoadFailures.has(site.id))) {
             const initialSite=site; updateView();
             try { const entries=await Library.articles(initialSite.id); if(navigationRevision===initialNavigation && site?.id===initialSite.id && !editing && !dirty) { articles=entries; articleLoadFailures.delete(initialSite.id); } }

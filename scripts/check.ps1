@@ -25,6 +25,8 @@ try {
         }
     }
 
+    Invoke-Check 'Documentation' { bun run check:docs }
+
     Write-Host "`n== Go formatting (read-only) =="
     $taskGoFiles = @(git -c core.quotepath=false ls-files --cached --others --exclude-standard -- '*.go')
     if ($LASTEXITCODE -ne 0) { throw 'Cannot list Go source files.' }

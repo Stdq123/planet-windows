@@ -134,6 +134,37 @@ func TestRegisteredCrossVersionUpgradeAndRepeat(t *testing.T) {
 	}
 }
 
+func TestRegisteredPrereleasePromotionAndDowngrade(t *testing.T) {
+	root, source, files := registeredFixture(t)
+	if err := setRegistryStrings(uninstallKey, map[string]string{"DisplayVersion": "0.0.1-alpha.1"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, next := range []string{"0.0.1-alpha.2", "0.0.1-alpha.10", "0.0.1"} {
+		releaseVersion = next
+		if err := applyUpgrade(root, source, files); err != nil {
+			t.Fatalf("upgrade to %s: %v", next, err)
+		}
+		entry, err := readRegistryStrings(uninstallKey)
+		if err != nil || entry["DisplayVersion"] != next {
+			t.Fatalf("version registration: %v, %v", entry, err)
+		}
+		if err := checkIdenticalInstall(root, files); err != nil {
+			t.Fatalf("repeat %s: %v", next, err)
+		}
+	}
+	releaseVersion = "0.0.1-alpha.10"
+	if err := applyUpgrade(root, source, files); err == nil {
+		t.Fatal("stable-to-alpha downgrade accepted")
+	}
+	entry, err := readRegistryStrings(uninstallKey)
+	if err != nil || entry["DisplayVersion"] != "0.0.1" {
+		t.Fatalf("failed downgrade changed registration: %v, %v", entry, err)
+	}
+	if exists, err := existsKey(updateKey); err != nil || exists {
+		t.Fatalf("failed downgrade created a transaction: %v", err)
+	}
+}
+
 func TestIdenticalPayloadAtAnotherReleaseStillRequiresVersionTransition(t *testing.T) {
 	root, source, files := registeredFixture(t)
 	if e := applyUpgrade(root, source, files); e != nil {

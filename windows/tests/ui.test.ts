@@ -1,3 +1,4 @@
+import { enterFirstSite } from "./site-workflow";
 import { expect, test } from "bun:test";
 import { Window } from "happy-dom";
 
@@ -22,7 +23,7 @@ test("live article preview includes the current title as text and renders the bo
       default: throw new Error(method);
     }
   }};
-  await import("../src/main.ts?live-preview-title");
+  await import("../src/main.ts?live-preview-title"); enterFirstSite(window);
   await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#new-article")!.disabled);
   window.document.querySelector<HTMLButtonElement>("#new-article")!.click();
   const title = window.document.querySelector<HTMLInputElement>("#title")!;
@@ -47,7 +48,7 @@ test("writing mode collapses the article list and allows manual expansion before
       default: throw new Error(method);
     }
   }};
-  await import("../src/main.ts?writing-list-toggle");
+  await import("../src/main.ts?writing-list-toggle"); enterFirstSite(window);
   await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#new-article")!.disabled);
   window.document.querySelector<HTMLButtonElement>("#new-article")!.click();
   const toggle = window.document.querySelector<HTMLButtonElement>("#toggle-posts")!;
@@ -68,7 +69,7 @@ test("article list presents a safe content summary and guides selection", async 
   const site={id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z"};
   const article={id:"a",siteId:"s",title:"文章标题",content:"# 第一段\n这是一段正文内容",created:"2026-01-01T00:00:00Z",modified:"2026-01-02T00:00:00Z",tags:{}};
   (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":return [];case "Library.Articles":return [article];default:throw new Error(method);}}};
-  await import("../src/main.ts?article-list-summary");
+  await import("../src/main.ts?article-list-summary"); enterFirstSite(window);
   await waitFor(()=>!!window.document.querySelector(".article-item"));
   expect(window.document.querySelector(".article-item .article-excerpt")?.textContent).toContain("这是一段正文内容");
   expect(window.document.querySelector("#empty h2")?.textContent).toContain("选择");
@@ -83,7 +84,7 @@ test("reading layout identifies the real source and header compose opens the exi
   const site={id:"s",name:"我的真实站点",about:"",created:"2026-01-01T00:00:00Z"};
   const article={id:"a",siteId:"s",title:"真实标题",content:"正文",created:"2026-01-01T00:00:00Z",modified:"2026-01-02T00:00:00Z",tags:{}};
   (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":return [];case "Library.Articles":return [article];case "Library.Preview":return "";default:throw new Error(method);}}};
-  await import("../src/main.ts?reading-layout-source");
+  await import("../src/main.ts?reading-layout-source"); enterFirstSite(window);
   await waitFor(()=>!!window.document.querySelector(".article-item"));
   expect(window.document.querySelector(".article-item .article-source")?.textContent).toBe("我的真实站点");
   window.document.querySelector<HTMLButtonElement>(".article-item")!.click();
@@ -102,7 +103,7 @@ test("favorites view identifies itself and has a persistent selection indicator"
   Object.assign(globalThis,{window,document:window.document});
   const site={id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z"};
   (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":case "Library.Articles":return [];default:throw new Error(method);}}};
-  await import("../src/main.ts?favorites-layout-state");
+  await import("../src/main.ts?favorites-layout-state"); enterFirstSite(window);
   await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Site");
   const favorite=window.document.querySelector<HTMLButtonElement>("#show-favorites")!;favorite.click();
   expect(window.document.querySelector("#site-title")!.textContent).toBe("收藏的文章");
@@ -126,7 +127,7 @@ test("IPFS status panel displays owned node diagnostics and refreshes on demand"
       default: throw new Error(method);
     }
   }};
-  await import("../src/main.ts?ipfs-status-panel");
+  await import("../src/main.ts?ipfs-status-panel"); enterFirstSite(window);
   expect(reads).toBe(0);
   window.document.querySelector<HTMLButtonElement>("#show-ipfs-status")!.click();
   await waitFor(()=>reads===1 && window.document.querySelector("#ipfs-peer-count")?.textContent==="12");
@@ -150,7 +151,7 @@ test("IPFS status panel reports a stopped node and clears stale values", async (
       default: throw new Error(method);
     }
   }};
-  await import("../src/main.ts?ipfs-status-stopped");
+  await import("../src/main.ts?ipfs-status-stopped"); enterFirstSite(window);
   window.document.querySelector<HTMLButtonElement>("#show-ipfs-status")!.click();
   await waitFor(()=>window.document.querySelector("#ipfs-peer-count")?.textContent==="12");
   window.document.querySelector<HTMLButtonElement>("#refresh-ipfs-status")!.click();
@@ -175,7 +176,7 @@ test("IPFS panel collects traffic samples and lets the user stop and restart the
       default:throw new Error(method);
     }
   }};
-  await import("../src/main.ts?ipfs-control-chart");
+  await import("../src/main.ts?ipfs-control-chart"); enterFirstSite(window);
   await waitFor(()=>window.document.querySelector<HTMLInputElement>("#published-url")?.value!=="");
   window.document.querySelector<HTMLButtonElement>("#show-ipfs-status")!.click();
   await waitFor(()=>reads===1 && window.document.querySelector("#ipfs-gateway")?.textContent?.includes("12345")===true);
@@ -206,7 +207,7 @@ test("restarting IPFS retries saved pending publications", async () => {
       case "Library.PublishSite":if(!enabled)throw new Error("节点已关闭");published++;return {ipns:"k51test",cid:"bafytest",revision:1,pending:false};
       default:throw new Error(method);}
   }};
-  await import("../src/main.ts?ipfs-resume-publish");
+  await import("../src/main.ts?ipfs-resume-publish"); enterFirstSite(window);
   window.document.querySelector<HTMLButtonElement>("#show-ipfs-status")!.click();
   await waitFor(()=>window.document.querySelector("#ipfs-status-message")!.textContent!.includes("已关闭"));
   window.document.querySelector<HTMLButtonElement>("#toggle-ipfs")!.click();
@@ -222,7 +223,7 @@ test("open IPFS panel automatically samples traffic", async () => {
       case "Library.IPFSStatus":reads++;return {disabled:false,running:true,online:true,version:"0.38",peers:1,rateIn:10,rateOut:20,totalIn:0,totalOut:0,gateway:"http://127.0.0.1:1234"};
       default:throw new Error(method);}
   }};
-  await import("../src/main.ts?ipfs-automatic-sampling");
+  await import("../src/main.ts?ipfs-automatic-sampling"); enterFirstSite(window);
   window.document.querySelector<HTMLButtonElement>("#show-ipfs-status")!.click();
   await waitFor(()=>reads===1);
   await new Promise(resolve=>setTimeout(resolve,5200));
@@ -241,7 +242,7 @@ test("gateway selection updates and persists the published site address", async 
   (globalThis as any).mygo={call:async(method:string)=>{
     switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":case "Library.Articles":return [];default:throw new Error(method);}
   }};
-  await import("../src/main.ts?gateway-selection");
+  await import("../src/main.ts?gateway-selection"); enterFirstSite(window);
   await waitFor(()=>window.document.querySelector<HTMLInputElement>("#published-url")?.value!=="");
   const select=window.document.querySelector<HTMLSelectElement>("#public-gateway")!;
   expect(select).not.toBeNull();
@@ -260,10 +261,23 @@ test("saved gateway is restored when the app starts", async () => {
   window.localStorage.setItem("planet.publicGateway","dweb.link");Object.assign(globalThis,{window,document:window.document});
   const site={id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z",ipns:"k51example",lastPublishedCID:"bafyexample"};
   (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":case "Library.Articles":return [];default:throw new Error(method);}}};
-  await import("../src/main.ts?gateway-restored");
+  await import("../src/main.ts?gateway-restored"); enterFirstSite(window);
   await waitFor(()=>window.document.querySelector<HTMLInputElement>("#published-url")?.value!=="");
-  expect(window.document.querySelector<HTMLSelectElement>("#public-gateway")!.value).toBe("dweb.link");
+  const select=window.document.querySelector<HTMLSelectElement>("#public-gateway")!;
+  const choices=window.document.querySelector<HTMLElement>('.choice-group[data-select="public-gateway"]')!;
+  window.document.querySelector<HTMLDetailsElement>(".sidebar-tools")!.open=true;
+  expect(select.value).toBe("dweb.link");
+  expect(select.hidden).toBe(true);
+  expect(choices.querySelectorAll("input:checked")).toHaveLength(1);
+  expect(choices.querySelector<HTMLInputElement>("input:checked")!.value).toBe(select.value);
   expect(window.document.querySelector<HTMLInputElement>("#published-url")!.value).toBe("https://dweb.link/ipns/k51example/");
+  expect(window.localStorage.getItem("planet.publicGateway")).toBe("dweb.link");
+  choices.querySelector<HTMLInputElement>('input[value="aleph"]')!.click();
+  expect(select.value).toBe("aleph");
+  expect(choices.querySelectorAll("input:checked")).toHaveLength(1);
+  expect(choices.querySelector<HTMLInputElement>("input:checked")!.value).toBe("aleph");
+  expect(window.document.querySelector<HTMLInputElement>("#published-url")!.value).toBe("https://ipfs.aleph.cloud/ipns/k51example/");
+  expect(window.localStorage.getItem("planet.publicGateway")).toBe("aleph");
 });
 
 test("unsupported eth.sucks identity is not copied as a misleading address", async () => {
@@ -271,7 +285,7 @@ test("unsupported eth.sucks identity is not copied as a misleading address", asy
   window.localStorage.setItem("planet.publicGateway","eth.sucks");Object.assign(globalThis,{window,document:window.document});
   const site={id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z",ipns:"QmLegacyIdentity",lastPublishedCID:"bafyexample"};
   (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":case "Library.Articles":return [];default:throw new Error(method);}}};
-  await import("../src/main.ts?gateway-unsupported");
+  await import("../src/main.ts?gateway-unsupported"); enterFirstSite(window);
   await waitFor(()=>window.document.querySelector("#copy-status")?.textContent?.includes("暂不支持")===true);
   expect(window.document.querySelector<HTMLButtonElement>("#copy-published-url")!.disabled).toBe(true);
   expect(window.document.querySelector<HTMLInputElement>("#published-url")!.value).toBe("");
@@ -283,7 +297,7 @@ test("copying a Planet subscription article uses the selected gateway", async ()
   const sub={url:"k51example",lastUpdated:new Date().toISOString(),feed:{title:"Planet",description:"",link:"",items:[post]}};let copied="";
   Object.defineProperty(window.navigator,"clipboard",{value:{writeText:async(value:string)=>{copied=value;}},configurable:true});
   (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [];case "Library.Subscriptions":return [sub];case "Library.SubscriptionPreview":return "Text";default:throw new Error(method);}}};
-  await import("../src/main.ts?gateway-planet-share");await waitFor(()=>!!window.document.querySelector("#subscriptions .site-item"));
+  await import("../src/main.ts?gateway-planet-share"); enterFirstSite(window);await waitFor(()=>!!window.document.querySelector("#subscriptions .site-item"));
   const select=window.document.querySelector<HTMLSelectElement>("#public-gateway")!;select.value="eth.sucks";select.dispatchEvent(new window.Event("change"));
   window.document.querySelector<HTMLButtonElement>("#subscriptions .site-item")!.click();window.document.querySelector<HTMLButtonElement>(".article-item")!.click();
   window.document.querySelector<HTMLButtonElement>("#share-item")!.click();await waitFor(()=>copied!=="");
@@ -294,7 +308,7 @@ test("Filebase and Plausible credentials are configured separately and stats can
  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});
  const site={id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z"};let saved:any,statsArgs:any;
  (globalThis as any).mygo={call:async(method:string,...args:string[])=>{switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":case "Library.Articles":return [];case "Library.ServiceInfo":return {configured:false,name:""};case "Library.ConfigurePlausibleAt":saved=args;return;case "Library.PlausibleStatsRange":statsArgs=args;return {visitors:12,pageviews:34};default:throw new Error(method)}}};
- await import("../src/main.ts?service-settings");await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#service-settings")!.disabled);
+ await import("../src/main.ts?service-settings"); enterFirstSite(window);await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#service-settings")!.disabled);
  window.document.querySelector<HTMLButtonElement>("#service-settings")!.click();await waitFor(()=>window.document.querySelector<HTMLDialogElement>("#service-dialog")!.open);
  const form=window.document.querySelector<HTMLFormElement>("#service-form")!;form.querySelector<HTMLSelectElement>('[name="kind"]')!.value="plausible";form.querySelector<HTMLSelectElement>('[name="kind"]')!.dispatchEvent(new window.Event("change"));
  await new Promise(resolve=>setTimeout(resolve,20));form.querySelector<HTMLInputElement>('[name="name"]')!.value="example.com";form.querySelector<HTMLInputElement>('[name="token"]')!.value="secret";form.querySelector<HTMLInputElement>('[name="scriptId"]')!.value="pa-Test123";form.querySelector<HTMLInputElement>('[name="server"]')!.value="https://stats.example.com";
@@ -307,7 +321,7 @@ test("Filebase can retry a pin and query remote status", async () => {
  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});
  const site={id:"s",name:"Site",about:"",lastPublishedCID:"bafy-current",created:"2026-01-01T00:00:00Z"};let requests=0;
  (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":case "Library.Articles":return [];case "Library.ServiceInfo":return {configured:true,name:"site"};case "Library.RequestFilebasePin":requests++;return;case "Library.FilebaseStatus":return {status:"queued",pin:{cid:"bafy-current"}};default:throw new Error(method)}}};
- window.confirm=()=>true;await import("../src/main.ts?filebase-status");await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#service-settings")!.disabled);window.document.querySelector<HTMLButtonElement>("#service-settings")!.click();
+ window.confirm=()=>true;await import("../src/main.ts?filebase-status"); enterFirstSite(window);await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#service-settings")!.disabled);window.document.querySelector<HTMLButtonElement>("#service-settings")!.click();
  await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#service-pin")!.disabled);window.document.querySelector<HTMLButtonElement>("#service-pin")!.click();await waitFor(()=>requests===1);
  await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#service-pin-status")!.disabled);window.document.querySelector<HTMLButtonElement>("#service-pin-status")!.click();await waitFor(()=>window.document.querySelector("#service-result")?.textContent?.includes("queued")===true);
 });
@@ -316,7 +330,7 @@ test("partial Plausible disable reports the site needs republication", async () 
  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});
  const site={id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z"};window.confirm=()=>true;
  (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":case "Library.Articles":return [];case "Library.ServiceInfo":return {configured:false,name:""};case "Library.ConfigureService":throw new Error("站点跟踪已停用，但本机服务凭据未能清理，请重试");default:throw new Error(method)}}};
- await import("../src/main.ts?plausible-partial");await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#service-settings")!.disabled);window.document.querySelector<HTMLButtonElement>("#service-settings")!.click();
+ await import("../src/main.ts?plausible-partial"); enterFirstSite(window);await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#service-settings")!.disabled);window.document.querySelector<HTMLButtonElement>("#service-settings")!.click();
  const kind=window.document.querySelector<HTMLSelectElement>('#service-form [name="kind"]')!;await waitFor(()=>!kind.disabled);kind.value="plausible";kind.dispatchEvent(new window.Event("change"));
  await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#service-disable")!.disabled);window.document.querySelector<HTMLButtonElement>("#service-disable")!.click();await waitFor(()=>window.document.querySelector("#service-result")?.textContent?.includes("凭据未能清理")===true);
  expect(window.document.querySelector("#save-state")?.textContent).toContain("站点更改尚未发布");
@@ -326,7 +340,7 @@ test("Plausible tracking can be configured without a stats API key", async()=>{
  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});
  const site={id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z"};let saved:any;
  (globalThis as any).mygo={call:async(method:string,...args:string[])=>{switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":case "Library.Articles":return [];case "Library.ServiceInfo":return {configured:false,name:""};case "Library.ConfigurePlausibleAt":saved=args;return;default:throw new Error(method)}}};
- await import("../src/main.ts?plausible-no-key");await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#service-settings")!.disabled);window.document.querySelector<HTMLButtonElement>("#service-settings")!.click();const form=window.document.querySelector<HTMLFormElement>("#service-form")!,kind=form.querySelector<HTMLSelectElement>('[name="kind"]')!;await waitFor(()=>!kind.disabled);kind.value="plausible";kind.dispatchEvent(new window.Event("change"));await waitFor(()=>!kind.disabled);
+ await import("../src/main.ts?plausible-no-key"); enterFirstSite(window);await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#service-settings")!.disabled);window.document.querySelector<HTMLButtonElement>("#service-settings")!.click();const form=window.document.querySelector<HTMLFormElement>("#service-form")!,kind=form.querySelector<HTMLSelectElement>('[name="kind"]')!;await waitFor(()=>!kind.disabled);kind.value="plausible";kind.dispatchEvent(new window.Event("change"));await waitFor(()=>!kind.disabled);
  form.querySelector<HTMLInputElement>('[name="name"]')!.value="example.com";form.querySelector<HTMLInputElement>('[name="scriptId"]')!.value="pa-Test123";form.dispatchEvent(new window.Event("submit",{bubbles:true,cancelable:true}));await waitFor(()=>!!saved);expect(saved).toEqual(["s","example.com","","pa-Test123","https://plausible.io"]);expect(window.document.querySelector<HTMLButtonElement>("#service-stats")!.disabled).toBe(true);
 });
 
@@ -334,7 +348,7 @@ test("unsaved Plausible destination or key cannot query saved credentials", asyn
  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});
  const site={id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z"};let calls=0;
  (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":case "Library.Articles":return [];case "Library.ServiceInfo":return {configured:true,name:"example.com",server:"https://stats.example.com"};case "Library.PlausibleStatsRange":calls++;return {visitors:1,pageviews:1};default:throw new Error(method)}}};
- await import("../src/main.ts?plausible-unsaved-destination");await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#service-settings")!.disabled);window.document.querySelector<HTMLButtonElement>("#service-settings")!.click();
+ await import("../src/main.ts?plausible-unsaved-destination"); enterFirstSite(window);await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#service-settings")!.disabled);window.document.querySelector<HTMLButtonElement>("#service-settings")!.click();
  const form=window.document.querySelector<HTMLFormElement>("#service-form")!,kind=form.querySelector<HTMLSelectElement>('[name="kind"]')!;await waitFor(()=>!kind.disabled);kind.value="plausible";kind.dispatchEvent(new window.Event("change"));const stats=window.document.querySelector<HTMLButtonElement>("#service-stats")!;await waitFor(()=>!stats.disabled);
  stats.click();await waitFor(()=>calls===1 && !stats.disabled);expect(window.document.querySelector("#service-result")?.textContent).toContain("访客 1");
  const server=form.querySelector<HTMLInputElement>('[name="server"]')!;server.value="https://other.example";server.dispatchEvent(new window.Event("input"));expect(stats.disabled).toBe(true);expect(window.document.querySelector("#service-result")?.textContent).not.toContain("访客 1");stats.click();expect(calls).toBe(1);
@@ -350,7 +364,7 @@ test("Sepia template settings load and save without publishing", async () => {
 		case "Library.SaveTemplateSettings":sent=JSON.parse(args[1]!);return {...site,templateSettings:sent,contentRevision:1};
 		case "Library.PublishSite":publications++;return {};default:throw new Error(method);
 	}}};
-	await import("../src/main.ts?sepia-settings");await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#template-settings")!.disabled);
+	await import("../src/main.ts?sepia-settings"); enterFirstSite(window);await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#template-settings")!.disabled);
 	window.document.querySelector<HTMLButtonElement>("#template-settings")!.click();await waitFor(()=>window.document.querySelector<HTMLDialogElement>("#template-settings-dialog")!.open);
 	const form=window.document.querySelector<HTMLFormElement>("#template-settings-form")!,background=form.querySelector<HTMLInputElement>('[name="backgroundColor"]')!;
 	expect(background.value).toBe("#123456");background.value="#654321";
@@ -367,7 +381,7 @@ test("pending template settings save prevents conflicting edits and cancellation
 		case "Library.SaveTemplateSettings":await new Promise<void>(resolve=>{release=resolve});return {...site,contentRevision:1};
 		default:throw new Error(method);
 	}}};
-	await import("../src/main.ts?sepia-settings-pending");await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#template-settings")!.disabled);
+	await import("../src/main.ts?sepia-settings-pending"); enterFirstSite(window);await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#template-settings")!.disabled);
 	window.document.querySelector<HTMLButtonElement>("#template-settings")!.click();await waitFor(()=>window.document.querySelector<HTMLDialogElement>("#template-settings-dialog")!.open);
 	const form=window.document.querySelector<HTMLFormElement>("#template-settings-form")!,dialog=window.document.querySelector<HTMLDialogElement>("#template-settings-dialog")!;
 	form.dispatchEvent(new window.Event("submit",{bubbles:true,cancelable:true}));await waitFor(()=>!!release);
@@ -388,7 +402,7 @@ test("Pinnable configuration requires explicit input and shows pin status", asyn
 		case "Library.PinnableStatus":return {status:"pinned",last_known_cid:"bafytest"};
 		default:throw new Error(method);
 	}}};
-	await import("../src/main.ts?pinnable-settings");await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#pinnable-settings")!.disabled);
+	await import("../src/main.ts?pinnable-settings"); enterFirstSite(window);await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#pinnable-settings")!.disabled);
 	window.document.querySelector<HTMLButtonElement>("#pinnable-settings")!.click();await waitFor(()=>window.document.querySelector<HTMLDialogElement>("#pinnable-dialog")!.open);
 	expect(requests).toBe(0);const form=window.document.querySelector<HTMLFormElement>("#pinnable-form")!;
 	form.querySelector<HTMLInputElement>('[name="endpoint"]')!.value="https://pinnable.xyz/pin/test-123";form.dispatchEvent(new window.Event("submit",{bubbles:true,cancelable:true}));
@@ -407,7 +421,7 @@ test("Pinnable failure is shown without claiming IPNS publication failed", async
 		case "Library.PublishSite":return {ipns:"k51test",cid:"bafytest",revision:1,pending:false,pinnableWarning:"站点已发布，但 Pinnable 固定请求失败"};
 		default:throw new Error(method);
 	}}};
-	await import("../src/main.ts?pinnable-warning");await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#new-article")!.disabled);
+	await import("../src/main.ts?pinnable-warning"); enterFirstSite(window);await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#new-article")!.disabled);
 	window.document.querySelector<HTMLButtonElement>("#new-article")!.click();window.document.querySelector<HTMLInputElement>("#title")!.value="Test";window.document.querySelector<HTMLButtonElement>("#save")!.click();
 	await waitFor(()=>window.document.querySelector("#error")?.textContent?.includes("Pinnable 固定请求失败")===true);
 	expect(window.document.querySelector("#site-address")?.textContent).toContain("k51test");expect(window.document.querySelector("#error")?.textContent).not.toContain("站点发布未确认");
@@ -417,7 +431,7 @@ test("Pinnable status warns when service identity or version differs", async () 
 	const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});
 	const site={id:"s",name:"Site",about:"",ipns:"k51site",lastPublishedCID:"bafycurrent",created:"2026-01-01T00:00:00Z"};
 	(globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":case "Library.Articles":return [];case "Library.PinnableConfigured":return true;case "Library.PinnableStatus":return {status:"pinned",last_known_ipns:"k51other",last_known_cid:"bafyold"};default:throw new Error(method);}}};
-	await import("../src/main.ts?pinnable-mismatch");await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#pinnable-settings")!.disabled);
+	await import("../src/main.ts?pinnable-mismatch"); enterFirstSite(window);await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#pinnable-settings")!.disabled);
 	window.document.querySelector<HTMLButtonElement>("#pinnable-settings")!.click();await waitFor(()=>window.document.querySelector<HTMLDialogElement>("#pinnable-dialog")!.open);
 	window.document.querySelector<HTMLButtonElement>("#pinnable-status")!.click();await waitFor(()=>window.document.querySelector("#pinnable-result")?.textContent?.includes("IPNS 与当前站点不一致")===true);
 	expect(window.document.querySelector("#pinnable-result")?.textContent).toContain("不是当前发布版本");expect(window.document.querySelector("#pinnable-result")?.textContent).not.toContain("当前版本已固定");
@@ -432,7 +446,7 @@ test("permanent site deletion requires the site ID and preserves other sites", a
 		case "Library.PermanentlyDeleteSite":requested=args[0]!;items=[];return;default:throw new Error(method);
 	}}};
 	window.prompt=(message?:string)=>{promptText=message ?? "";return answer;};
-	await import("../src/main.ts?permanent-delete");await waitFor(()=>window.document.querySelector("#sites")?.textContent?.includes("Keep site")===true);
+	await import("../src/main.ts?permanent-delete"); enterFirstSite(window);await waitFor(()=>window.document.querySelector("#sites")?.textContent?.includes("Keep site")===true);
 	window.document.querySelector<HTMLButtonElement>("#show-removed-sites")!.click();await waitFor(()=>window.document.querySelector("#removed-site-list")?.textContent?.includes("Old site")===true);
 	const button=()=>Array.from(window.document.querySelectorAll<HTMLButtonElement>("#removed-site-list button")).find(b=>b.textContent==="永久删除")!;
 	button().click();await new Promise(r=>setTimeout(r,20));expect(requested).toBe("");expect(promptText).toContain("私钥");
@@ -444,7 +458,7 @@ test("interrupted permanent deletion offers retry instead of restore", async () 
 	const entry={id:"delete",name:"Old site",about:"",removed:true,created:"2026-01-01T00:00:00Z"};let pending=false,calls=0;
 	(globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":case "Library.Subscriptions":return [];case "Library.RemovedSites":return [{...entry,deletionPending:pending}];
 		case "Library.PermanentlyDeleteSite":calls++;if(calls===1){pending=true;throw new Error("file locked")};return;default:throw new Error(method);}}};
-	window.prompt=()=>"delete";await import("../src/main.ts?permanent-delete-retry");window.document.querySelector<HTMLButtonElement>("#show-removed-sites")!.click();
+	window.prompt=()=>"delete";await import("../src/main.ts?permanent-delete-retry"); enterFirstSite(window);window.document.querySelector<HTMLButtonElement>("#show-removed-sites")!.click();
 	await waitFor(()=>window.document.querySelector("#removed-site-list")?.textContent?.includes("Old site")===true);
 	Array.from(window.document.querySelectorAll<HTMLButtonElement>("#removed-site-list button")).find(b=>b.textContent==="永久删除")!.click();
 	await waitFor(()=>window.document.querySelector("#removed-site-list")?.textContent?.includes("继续清理")===true);
@@ -465,7 +479,7 @@ test("saved drafts accept private attachments without publishing", async () => {
     default:throw new Error(method);
   }}};
   window.confirm=()=>true;
-  await import("../src/main.ts?draft-attachments");await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#show-drafts")!.disabled);
+  await import("../src/main.ts?draft-attachments"); enterFirstSite(window);await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#show-drafts")!.disabled);
   window.document.querySelector<HTMLButtonElement>("#show-drafts")!.click();await waitFor(()=>window.document.querySelector("#articles")?.textContent?.includes("Draft")===true);
   window.document.querySelector<HTMLButtonElement>("#articles button")!.click();
   const add=window.document.querySelector<HTMLButtonElement>("#add-attachment")!;expect(add.disabled).toBe(false);add.click();
@@ -486,7 +500,7 @@ test("draft can stage and undo removal of an existing article attachment", async
     case "Library.SetDraftExistingAttachmentRemoved":draft={...draft,removedAttachments:args[3]?[args[2]]:[]};return draft;
     case "Library.PublishSite":publications++;return {};default:throw new Error(method);
   }}};window.confirm=()=>true;
-  await import("../src/main.ts?draft-existing-attachment");await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#show-drafts")!.disabled);
+  await import("../src/main.ts?draft-existing-attachment"); enterFirstSite(window);await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#show-drafts")!.disabled);
   window.document.querySelector<HTMLButtonElement>("#show-drafts")!.click();await waitFor(()=>window.document.querySelector("#articles")?.textContent?.includes("Draft")===true);
   window.document.querySelector<HTMLButtonElement>("#articles button")!.click();
   const button=()=>window.document.querySelector<HTMLButtonElement>("#attachment-list .remove-attachment")!;
@@ -508,7 +522,7 @@ test("unfollowing a subscription removes it after confirmation", async () => {
     }
   }};
   window.confirm=(message?:string)=>{confirmation=message ?? "";return true;};
-  await import("../src/main.ts?unfollow");
+  await import("../src/main.ts?unfollow"); enterFirstSite(window);
   await waitFor(()=>window.document.querySelector("#subscriptions")?.textContent?.includes("News")===true);
   window.document.querySelector<HTMLButtonElement>("#subscriptions button")!.click();
   const remove=window.document.querySelector<HTMLButtonElement>("#unfollow");
@@ -529,7 +543,7 @@ test("a late refresh response cannot restore an unfollowed subscription in the s
       default:throw new Error(`Unexpected call: ${method}`);
     }
   }};
-  window.confirm=()=>true;await import("../src/main.ts?unfollow-race");
+  window.confirm=()=>true;await import("../src/main.ts?unfollow-race"); enterFirstSite(window);
   await waitFor(()=>window.document.querySelector("#subscriptions")?.textContent?.includes("News")===true);
   window.document.querySelector<HTMLButtonElement>("#subscriptions button")!.click();
   window.document.querySelector<HTMLButtonElement>("#refresh-feed")!.click();await waitFor(()=>!!release);
@@ -544,7 +558,7 @@ test("newest subscription reload also updates the selected reader", async () => 
   let calls=0,releaseOld:(()=>void)|undefined,releaseNew:(()=>void)|undefined;
   (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [];case "Library.Subscriptions":{calls++;if(calls===2){await new Promise<void>(r=>{releaseOld=r});return [oldA,b];}if(calls===3){await new Promise<void>(r=>{releaseNew=r});return [newA,b];}return [oldA,b];}
     case "Library.RefreshSubscription":return newA;case "Library.PinSubscription":return;default:throw new Error(method);}}};
-  await import("../src/main.ts?subscription-reload-selection");await waitFor(()=>window.document.querySelector("#subscriptions")?.textContent?.includes("Feed A")===true);
+  await import("../src/main.ts?subscription-reload-selection"); enterFirstSite(window);await waitFor(()=>window.document.querySelector("#subscriptions")?.textContent?.includes("Feed A")===true);
   const pick=(name:string)=>Array.from(window.document.querySelectorAll<HTMLButtonElement>("#subscriptions button")).find(x=>x.textContent?.includes(name))!.click();
   pick("Feed A");window.document.querySelector<HTMLButtonElement>("#refresh-feed")!.click();await waitFor(()=>!!releaseOld);
   pick("Feed B");window.document.querySelector<HTMLButtonElement>("#pin-subscription")!.click();await waitFor(()=>!!releaseNew);
@@ -562,7 +576,7 @@ test("saving a new draft keeps previously saved drafts visible", async () => {
       case "Library.SaveDraft":{const d={id:"b",siteId:"s",title:args[3],content:args[4],created:"2026-01-01T00:00:00Z",modified:"2026-01-01T00:00:00Z"};drafts=[...drafts,d];return d;}
       default:throw new Error(`Unexpected call: ${method}`);}
   }};
-  await import("../src/main.ts?draft-existing");await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#new-article")!.disabled);
+  await import("../src/main.ts?draft-existing"); enterFirstSite(window);await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#new-article")!.disabled);
   window.document.querySelector<HTMLButtonElement>("#new-article")!.click();window.document.querySelector<HTMLInputElement>("#title")!.value="New draft";
   window.document.querySelector<HTMLButtonElement>("#save-draft")!.click();await waitFor(()=>window.document.querySelector("#articles")?.textContent?.includes("New draft")===true);
   expect(window.document.querySelector("#articles")?.textContent).toContain("Existing draft");
@@ -580,7 +594,7 @@ test("late initialization cannot redirect a new site's article to an older site"
       case "Library.PublishSite":return {ipns:"name",cid:"cid",revision:1,pending:false};
       default:throw new Error(`Unexpected call: ${method}`);}
   }};
-  await import("../src/main.ts?init-site-race");await waitFor(()=>!!release);
+  await import("../src/main.ts?init-site-race"); enterFirstSite(window);await waitFor(()=>!!release);
   window.document.querySelector<HTMLButtonElement>("#new-site")!.click();
   const form=window.document.querySelector<HTMLFormElement>("#site-form")!;form.querySelector<HTMLInputElement>('input[name="name"]')!.value="New";form.dispatchEvent(new window.Event("submit",{bubbles:true,cancelable:true}));
   await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="New");window.document.querySelector<HTMLButtonElement>("#new-article")!.click();
@@ -600,7 +614,7 @@ test("late initial article list cannot appear under a newly created site", async
       case "Library.CreateSite":sites=[old,created];return created;case "Library.Preview":return "";
       default:throw new Error(`Unexpected call: ${method}`);}
   }};
-  await import("../src/main.ts?init-posts-race");await waitFor(()=>!!release);
+  await import("../src/main.ts?init-posts-race"); enterFirstSite(window);await waitFor(()=>!!release);
   window.document.querySelector<HTMLButtonElement>("#new-site")!.click();const form=window.document.querySelector<HTMLFormElement>("#site-form")!;
   form.querySelector<HTMLInputElement>('input[name="name"]')!.value="New";form.dispatchEvent(new window.Event("submit",{bubbles:true,cancelable:true}));
   await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="New");release!();await new Promise(resolve=>setTimeout(resolve,40));
@@ -617,7 +631,7 @@ test("site settings update persists and marks the site unpublished", async () =>
       default:throw new Error(`Unexpected call: ${method}`);
     }
   }};
-  await import("../src/main.ts?site-settings"); await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Old");
+  await import("../src/main.ts?site-settings"); enterFirstSite(window); await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Old");
   const button=window.document.querySelector<HTMLButtonElement>("#edit-site"); expect(button).not.toBeNull(); button!.click();
   const form=window.document.querySelector<HTMLFormElement>("#site-form")!;
   const name=form.querySelector<HTMLInputElement>('input[name="name"]')!, about=form.querySelector<HTMLTextAreaElement>('textarea[name="about"]')!;
@@ -633,7 +647,7 @@ test("pending site settings prevent cancellation and conflicting template change
   const initial={id:"s",name:"Imported",about:"",created:"2026-01-01T00:00:00Z",imported:true};let release:(()=>void)|undefined,selected=0;
   (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [initial];case "Library.Subscriptions":case "Library.Articles":return [];
     case "Library.UpdateSite":await new Promise<void>(r=>{release=r});return {...initial,name:"Updated",contentRevision:1};case "Library.SelectTemplate":selected++;return {...initial,templateId:"template-1",templateName:"Plain",contentRevision:2};default:throw new Error(method);}}};
-  await import("../src/main.ts?settings-concurrent");await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Imported");
+  await import("../src/main.ts?settings-concurrent"); enterFirstSite(window);await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Imported");
   window.document.querySelector<HTMLButtonElement>("#edit-site")!.click();const form=window.document.querySelector<HTMLFormElement>("#site-form")!;form.querySelector<HTMLInputElement>('input[name="name"]')!.value="Updated";form.dispatchEvent(new window.Event("submit",{bubbles:true,cancelable:true}));await waitFor(()=>!!release);
   expect(window.document.querySelector<HTMLButtonElement>("#cancel-site")!.disabled).toBe(true);expect(window.document.querySelector<HTMLButtonElement>("#select-template")!.disabled).toBe(true);
   expect(form.querySelector<HTMLInputElement>('input[name="name"]')!.disabled).toBe(true);expect(form.querySelector<HTMLTextAreaElement>('textarea[name="about"]')!.disabled).toBe(true);
@@ -647,7 +661,7 @@ test("same-revision publication address survives a late site settings response",
   (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [initial];case "Library.Subscriptions":case "Library.Articles":return [];
     case "Library.UpdateSite":await new Promise<void>(r=>{releaseSettings=r});return {...initial,name:"Updated",contentRevision:1,publishedRevision:0,publishPending:true};
     case "Library.PublishSite":publishes++;if(publishes===1){await new Promise<void>(r=>{releasePublish=r});return {ipns:"k51",cid:"bafy0",revision:0,pending:true};}throw new Error("second publish failed");default:throw new Error(method);}}};
-  window.confirm=()=>true;window.alert=()=>{};await import("../src/main.ts?settings-equal-revision");await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Site");
+  window.confirm=()=>true;window.alert=()=>{};await import("../src/main.ts?settings-equal-revision"); enterFirstSite(window);await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Site");
   window.document.querySelector<HTMLButtonElement>("#publish-site")!.click();await waitFor(()=>!!releasePublish);window.document.querySelector<HTMLButtonElement>("#edit-site")!.click();
   const form=window.document.querySelector<HTMLFormElement>("#site-form")!;form.querySelector<HTMLInputElement>('input[name="name"]')!.value="Updated";form.dispatchEvent(new window.Event("submit",{bubbles:true,cancelable:true}));await waitFor(()=>!!releaseSettings);
   releasePublish!();await waitFor(()=>publishes===2);await waitFor(()=>window.document.querySelector<HTMLInputElement>("#published-url")!.value.includes("k51"));releaseSettings!();await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Updated");
@@ -662,7 +676,7 @@ test("late site settings response keeps a newer publication result", async () =>
     case "Library.UpdateSite":await new Promise<void>(r=>{releaseSettings=r});return {...initial,name:"Updated",contentRevision:2,publishedRevision:0,publishPending:true};
     case "Library.PublishSite":publishes++;if(publishes===1){await new Promise<void>(r=>{releasePublish=r});return {ipns:"k51",cid:"bafy1",revision:1,pending:true};}return {ipns:"k51",cid:"bafy2",revision:2,pending:false};
     default:throw new Error(method);}}};
-  await import("../src/main.ts?settings-publication-merge");await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Site");
+  await import("../src/main.ts?settings-publication-merge"); enterFirstSite(window);await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Site");
   window.document.querySelector<HTMLButtonElement>("#new-article")!.click();const title=window.document.querySelector<HTMLInputElement>("#title")!;title.value="Post";title.dispatchEvent(new window.Event("input"));window.document.querySelector<HTMLButtonElement>("#save")!.click();await waitFor(()=>!!releasePublish);
   await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#edit-site")!.disabled);window.document.querySelector<HTMLButtonElement>("#edit-site")!.click();const form=window.document.querySelector<HTMLFormElement>("#site-form")!;form.querySelector<HTMLInputElement>('input[name="name"]')!.value="Updated";form.dispatchEvent(new window.Event("submit",{bubbles:true,cancelable:true}));await waitFor(()=>!!releaseSettings);
   releasePublish!();await waitFor(()=>publishes===2);await waitFor(()=>window.document.querySelector<HTMLInputElement>("#published-url")!.value.includes("k51"));
@@ -680,7 +694,7 @@ test("site removal is recoverable and does not republish on restore", async () =
     case "Library.RemoveSite":removed=true;return;case "Library.RemovedSites":return removed?[site]:[];case "Library.RestoreSite":removed=false;return site;
     case "Library.PublishSite":publishes++;return {ipns:"k51",cid:"bafy",revision:1,pending:false};default:throw new Error(method);
   }}};
-  window.confirm=(message?:string)=>{confirmation=message ?? "";return true;};await import("../src/main.ts?site-removal");
+  window.confirm=(message?:string)=>{confirmation=message ?? "";return true;};await import("../src/main.ts?site-removal"); enterFirstSite(window);
   await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Site");
   const button=(id:string)=>window.document.querySelector<HTMLButtonElement>(`#${id}`)!;
   expect(button("remove-site")).not.toBeNull();button("remove-site").click();await waitFor(()=>removed && !window.document.querySelector("#sites")?.textContent?.includes("Site"));
@@ -693,7 +707,7 @@ test("successful site removal remains clear if the list refresh fails", async ()
   const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});
   const site={id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z"};let calls=0;
   (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":calls++;if(calls===1)return [site];throw new Error("list unavailable");case "Library.Subscriptions":case "Library.Articles":return [];case "Library.RemoveSite":return;default:throw new Error(method);}}};
-  window.confirm=()=>true;await import("../src/main.ts?remove-list-failure");await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Site");window.document.querySelector<HTMLButtonElement>("#remove-site")!.click();
+  window.confirm=()=>true;await import("../src/main.ts?remove-list-failure"); enterFirstSite(window);await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Site");window.document.querySelector<HTMLButtonElement>("#remove-site")!.click();
   await waitFor(()=>window.document.querySelector("#error")?.textContent?.includes("list unavailable")===true);
   expect(window.document.querySelector("#sites")?.textContent).not.toContain("Site");expect(window.document.querySelector("#error")?.textContent).toContain("已移除");
 });
@@ -704,7 +718,7 @@ test("site removal disables the editor while the operation is pending", async ()
   let release:(()=>void)|undefined;
   (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":return [];case "Library.Articles":return [article];case "Library.PreviewArticle":return "";
     case "Library.RemoveSite":await new Promise<void>(r=>{release=r});return;default:throw new Error(method);}}};
-  window.confirm=()=>true;await import("../src/main.ts?remove-editor-race");await waitFor(()=>window.document.querySelector("#articles")?.textContent?.includes("Post")===true);
+  window.confirm=()=>true;await import("../src/main.ts?remove-editor-race"); enterFirstSite(window);await waitFor(()=>window.document.querySelector("#articles")?.textContent?.includes("Post")===true);
   window.document.querySelector<HTMLButtonElement>("#articles button")!.click();window.document.querySelector<HTMLButtonElement>("#remove-site")!.click();await waitFor(()=>!!release);
   expect(window.document.querySelector<HTMLInputElement>("#title")!.disabled).toBe(true);expect(window.document.querySelector<HTMLTextAreaElement>("#content")!.disabled).toBe(true);
   release!();
@@ -716,7 +730,7 @@ test("site restoration disables the previous site's editor while pending", async
   let release:(()=>void)|undefined;
   (globalThis as any).mygo={call:async(method:string,...args:string[])=>{switch(method){case "Library.Sites":return [a];case "Library.Subscriptions":return [];case "Library.Articles":return args[0]==="a"?[article]:[];case "Library.PreviewArticle":return "";
     case "Library.RemovedSites":return [b];case "Library.RestoreSite":await new Promise<void>(r=>{release=r});return b;default:throw new Error(method);}}};
-  await import("../src/main.ts?restore-editor-race");await waitFor(()=>window.document.querySelector("#articles")?.textContent?.includes("Post")===true);
+  await import("../src/main.ts?restore-editor-race"); enterFirstSite(window);await waitFor(()=>window.document.querySelector("#articles")?.textContent?.includes("Post")===true);
   window.document.querySelector<HTMLButtonElement>("#articles button")!.click();window.document.querySelector<HTMLButtonElement>("#show-removed-sites")!.click();await waitFor(()=>!!window.document.querySelector("#removed-site-list button"));
   window.document.querySelector<HTMLButtonElement>("#removed-site-list button")!.click();await waitFor(()=>!!release);
   expect(window.document.querySelector<HTMLInputElement>("#title")!.disabled).toBe(true);expect(window.document.querySelector<HTMLTextAreaElement>("#content")!.disabled).toBe(true);release!();
@@ -727,7 +741,7 @@ test("restored site can reload its articles after a temporary read failure", asy
   const b={id:"b",name:"Restored",about:"",created:"2026-01-01T00:00:00Z"},article={id:"p",siteId:"b",title:"Recovered article",content:"Body",created:"2026-01-01T00:00:00Z",modified:"2026-01-01T00:00:00Z"};let reads=0;
   (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":case "Library.Subscriptions":return [];case "Library.RemovedSites":return [b];case "Library.RestoreSite":return b;
     case "Library.Articles":reads++;if(reads===1)throw new Error("temporary failure");return [article];default:throw new Error(method);}}};
-  await import("../src/main.ts?restore-retry");await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#show-removed-sites")!.disabled);
+  await import("../src/main.ts?restore-retry"); enterFirstSite(window);await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#show-removed-sites")!.disabled);
   window.document.querySelector<HTMLButtonElement>("#show-removed-sites")!.click();await waitFor(()=>!!window.document.querySelector("#removed-site-list button"));
   window.document.querySelector<HTMLButtonElement>("#removed-site-list button")!.click();await waitFor(()=>window.document.querySelector("#error")?.textContent?.includes("temporary failure")===true);
   window.document.querySelector<HTMLButtonElement>("#sites button")!.click();await waitFor(()=>window.document.querySelector("#articles")?.textContent?.includes("Recovered article")===true);
@@ -740,7 +754,7 @@ test("creating a site locks cancellation and destructive navigation until its li
   let removed=false,calls=0,release:(()=>void)|undefined;
   (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":{calls++;if(calls===2){await new Promise<void>(r=>{release=r});return [a,b];}return removed?[b]:[a];}
     case "Library.Subscriptions":case "Library.Articles":return [];case "Library.CreateSite":return b;case "Library.RemoveSite":removed=true;return;default:throw new Error(method);}}};
-  window.confirm=()=>true;await import("../src/main.ts?removed-sites-stale");await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Old");
+  window.confirm=()=>true;await import("../src/main.ts?removed-sites-stale"); enterFirstSite(window);await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Old");
   window.document.querySelector<HTMLButtonElement>("#new-site")!.click();const form=window.document.querySelector<HTMLFormElement>("#site-form")!;form.querySelector<HTMLInputElement>('input[name="name"]')!.value="New";form.dispatchEvent(new window.Event("submit",{bubbles:true,cancelable:true}));await waitFor(()=>!!release);
   const dialog=window.document.querySelector<HTMLDialogElement>("#site-dialog")!;
   expect(window.document.querySelector<HTMLButtonElement>("#cancel-site")!.disabled).toBe(true);
@@ -761,7 +775,7 @@ test("new site remains selectable if another site's publication finishes during 
     case "Library.PublishSite":await new Promise<void>(r=>{releasePublish=r});return {ipns:"k51",cid:"bafy",revision:1,pending:false};
     case "Library.CreateSite":return b;default:throw new Error(method);
   }}};
-  await import("../src/main.ts?create-during-publish");await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Old");
+  await import("../src/main.ts?create-during-publish"); enterFirstSite(window);await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Old");
   window.document.querySelector<HTMLButtonElement>("#new-article")!.click();const title=window.document.querySelector<HTMLInputElement>("#title")!;title.value="Post";title.dispatchEvent(new window.Event("input"));window.document.querySelector<HTMLButtonElement>("#save")!.click();await waitFor(()=>!!releasePublish);
   window.document.querySelector<HTMLButtonElement>("#new-site")!.click();const form=window.document.querySelector<HTMLFormElement>("#site-form")!;form.querySelector<HTMLInputElement>('input[name="name"]')!.value="New";form.dispatchEvent(new window.Event("submit",{bubbles:true,cancelable:true}));await waitFor(()=>!!releaseSites);
   releasePublish!();await waitFor(()=>window.document.querySelector("#save-state")?.textContent?.includes("正在发布")===false);releaseSites!();await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="New");
@@ -772,7 +786,7 @@ test("created site stays accessible when refreshing the site list fails", async 
   const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});
   const created={id:"new",name:"New",about:"",created:"2026-01-01T00:00:00Z"};let calls=0;
   (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":calls++;if(calls===1)return [];throw new Error("list unavailable");case "Library.Subscriptions":return [];case "Library.CreateSite":return created;default:throw new Error(method);}}};
-  await import("../src/main.ts?create-list-failure");await new Promise(r=>setTimeout(r,20));window.document.querySelector<HTMLButtonElement>("#new-site")!.click();const form=window.document.querySelector<HTMLFormElement>("#site-form")!;form.querySelector<HTMLInputElement>('input[name="name"]')!.value="New";form.dispatchEvent(new window.Event("submit",{bubbles:true,cancelable:true}));
+  await import("../src/main.ts?create-list-failure"); enterFirstSite(window);await new Promise(r=>setTimeout(r,20));window.document.querySelector<HTMLButtonElement>("#new-site")!.click();const form=window.document.querySelector<HTMLFormElement>("#site-form")!;form.querySelector<HTMLInputElement>('input[name="name"]')!.value="New";form.dispatchEvent(new window.Event("submit",{bubbles:true,cancelable:true}));
   await waitFor(()=>window.document.querySelector("#error")?.textContent?.includes("list unavailable")===true);
   expect(window.document.querySelector("#site-title")?.textContent).toBe("New");expect(window.document.querySelector("#sites")?.textContent).toContain("New");expect(window.document.querySelector("#error")?.textContent).toContain("已创建");
 });
@@ -788,7 +802,7 @@ test("imported site remains selectable if another site's publication finishes du
     case "Library.PublishSite":await new Promise<void>(r=>{releasePublish=r});return {ipns:"k51",cid:"bafy",revision:1,pending:false};
     case "Library.ImportPlanet":return b;default:throw new Error(method);
   }}};
-  await import("../src/main.ts?import-during-publish");await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Old");
+  await import("../src/main.ts?import-during-publish"); enterFirstSite(window);await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Old");
   window.document.querySelector<HTMLButtonElement>("#new-article")!.click();const title=window.document.querySelector<HTMLInputElement>("#title")!;title.value="Post";title.dispatchEvent(new window.Event("input"));window.document.querySelector<HTMLButtonElement>("#save")!.click();await waitFor(()=>!!releasePublish);
   window.document.querySelector<HTMLButtonElement>("#import-planet")!.click();await waitFor(()=>!!releaseSites);releasePublish!();await waitFor(()=>window.document.querySelector("#save-state")?.textContent?.includes("正在发布")===false);releaseSites!();await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Imported");
   expect(window.document.querySelector("#sites")?.textContent).toContain("Imported");
@@ -799,7 +813,7 @@ test("selecting a template updates the imported site without a second list reque
   const initial={id:"s",name:"Imported",about:"",created:"2026-01-01T00:00:00Z",imported:true};let siteCalls=0;
   (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":siteCalls++;if(siteCalls>1)throw new Error("list unavailable");return [initial];case "Library.Subscriptions":case "Library.Articles":return [];
     case "Library.SelectTemplate":return {...initial,templateId:"template-1",templateName:"Plain",contentRevision:1};default:throw new Error(method);}}};
-  window.alert=()=>{};await import("../src/main.ts?template-update");await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Imported");
+  window.alert=()=>{};await import("../src/main.ts?template-update"); enterFirstSite(window);await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Imported");
   window.document.querySelector<HTMLButtonElement>("#new-article")!.click();window.document.querySelector<HTMLButtonElement>("#select-template")!.click();
   window.document.querySelector<HTMLButtonElement>("#template-import")!.click();
   await waitFor(()=>window.document.querySelector("#imported-warning")?.textContent?.includes("通过检查")===true);
@@ -819,7 +833,7 @@ test("private draft is reopened and publishes only when requested", async () => 
       default:throw new Error(`Unexpected call: ${method}`);
     }
   }};
-  await import("../src/main.ts?private-drafts");
+  await import("../src/main.ts?private-drafts"); enterFirstSite(window);
   const button=(id:string)=>window.document.querySelector<HTMLButtonElement>(`#${id}`)!;
   await waitFor(()=>!button("new-article").disabled);button("new-article").click();
   const title=window.document.querySelector<HTMLInputElement>("#title")!,content=window.document.querySelector<HTMLTextAreaElement>("#content")!;
@@ -835,7 +849,7 @@ test("leaving an edited draft after discarding clears the unsaved marker", async
   const site={id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z"};
   const draft={id:"d",siteId:"s",title:"Draft",content:"Saved",created:"2026-01-01T00:00:00Z",modified:"2026-01-01T00:00:00Z"};
   (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":case "Library.Articles":return [];case "Library.Drafts":return [draft];case "Library.Preview":return "";default:throw new Error(method);}}};
-  window.confirm=()=>true;await import("../src/main.ts?draft-discard");await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#show-drafts")!.disabled);
+  window.confirm=()=>true;await import("../src/main.ts?draft-discard"); enterFirstSite(window);await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#show-drafts")!.disabled);
   window.document.querySelector<HTMLButtonElement>("#show-drafts")!.click();await waitFor(()=>window.document.querySelector("#articles")?.textContent?.includes("Draft")===true);
   window.document.querySelector<HTMLButtonElement>("#articles button")!.click();const content=window.document.querySelector<HTMLTextAreaElement>("#content")!;content.value="Unsaved";content.dispatchEvent(new window.Event("input"));
   window.document.querySelector<HTMLButtonElement>("#show-drafts")!.click();expect(window.document.querySelector("#save-state")?.textContent).not.toContain("未保存");
@@ -883,7 +897,7 @@ test("saving and deleting an article restores site actions", async () => {
   }};
   window.confirm = (message?: string) => { confirmation = message ?? ""; return true; };
   window.alert = () => {};
-  await import("../src/main.ts");
+  await import("../src/main.ts"); enterFirstSite(window);
   const button = (id: string) => window.document.querySelector<HTMLButtonElement>(`#${id}`)!;
   await waitFor(() => !button("new-article").disabled);
   button("new-article").click();
@@ -972,7 +986,7 @@ test("restart retries saved pending publications", async () => {
       default: throw new Error(`Unexpected call: ${method}`);
     }
   }};
-  await import("../src/main.ts?restart");
+  await import("../src/main.ts?restart"); enterFirstSite(window);
   await waitFor(() => calls === 1);
   expect(calls).toBe(1);
   await waitFor(() => window.document.querySelector<HTMLInputElement>("#published-url")?.value === "https://ipfs.io/ipns/k51retry/");
@@ -995,7 +1009,7 @@ test("saving cancels an older pending site switch and still publishes", async ()
       default:throw new Error(`Unexpected call: ${method}`);
     }
   }};
-  await import("../src/main.ts?navigation-race");
+  await import("../src/main.ts?navigation-race"); enterFirstSite(window);
   await waitFor(()=>!!window.document.querySelector(".article-item"));
   window.document.querySelector<HTMLButtonElement>(".article-item")!.click();
   window.document.querySelector<HTMLButtonElement>("#edit-article")!.click();
@@ -1021,7 +1035,7 @@ test("pending publication is recovered even when subscriptions cannot load", asy
   const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});
   const site={id:"pending",name:"Pending",about:"",created:"2026-01-01T00:00:00Z",contentRevision:1,publishedRevision:0,publishPending:true};let calls=0;
   (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":throw new Error("subscriptions failed");case "Library.Articles":return [];case "Library.PublishSite":calls++;return {ipns:"k51",cid:"bafy",revision:1,pending:false};default:throw new Error(`Unexpected ${method}`)}}};
-  await import("../src/main.ts?subscription-error");await waitFor(()=>calls===1);expect(calls).toBe(1);
+  await import("../src/main.ts?subscription-error"); enterFirstSite(window);await waitFor(()=>calls===1);expect(calls).toBe(1);
 });
 
 test("changes during publication trigger a follow-up snapshot", async () => {
@@ -1035,7 +1049,7 @@ test("changes during publication trigger a follow-up snapshot", async () => {
     case "Library.PublishSite":{count++;const revision=site.contentRevision;if(count===1)await new Promise<void>(resolve=>{release=resolve});const pending=revision!==site.contentRevision;site.publishedRevision=revision;site.publishPending=pending;return {ipns:"k51",cid:"bafy",revision,pending};}
     default:throw new Error(`Unexpected ${method}`);
   }}};
-  window.confirm=()=>true;window.alert=()=>{};await import("../src/main.ts?mutation-race");
+  window.confirm=()=>true;window.alert=()=>{};await import("../src/main.ts?mutation-race"); enterFirstSite(window);
   await waitFor(()=>!!window.document.querySelector(".article-item"));window.document.querySelector<HTMLButtonElement>(".article-item")!.click();
   window.document.querySelector<HTMLButtonElement>("#publish-site")!.click();await waitFor(()=>!!release);
   window.document.querySelector<HTMLButtonElement>(".remove-attachment")!.click();await waitFor(()=>!!releaseAttachment);
@@ -1055,7 +1069,7 @@ test("imported articles expose attachment editing", async () => {
     case "Library.RemoveAttachment":post={...post,attachments:post.attachments.filter(name=>name!=="old.txt")};return post;
     default:throw new Error(`Unexpected ${method}`);
   }}};
-  window.confirm=()=>true; await import("../src/main.ts?imported-attachments"); await waitFor(()=>!!window.document.querySelector(".article-item")); window.document.querySelector<HTMLButtonElement>(".article-item")!.click();window.document.querySelector<HTMLButtonElement>("#edit-article")!.click();
+  window.confirm=()=>true; await import("../src/main.ts?imported-attachments"); enterFirstSite(window); await waitFor(()=>!!window.document.querySelector(".article-item")); window.document.querySelector<HTMLButtonElement>(".article-item")!.click();window.document.querySelector<HTMLButtonElement>("#edit-article")!.click();
   expect(window.document.querySelector<HTMLButtonElement>("#add-attachment")!.disabled).toBe(false);
   window.document.querySelector<HTMLButtonElement>(".remove-attachment")!.click(); await waitFor(()=>!window.document.querySelector("#attachment-list")?.textContent?.includes("old.txt"));
   window.document.querySelector<HTMLButtonElement>("#add-attachment")!.click(); await waitFor(()=>window.document.querySelector("#attachment-list")?.textContent?.includes("new.txt")===true);
@@ -1071,7 +1085,7 @@ test("saved article preview shows and removes a local image", async () => {
  case "Library.RemoveAttachment":post={...post,attachments:[]};return post;
  default:throw new Error(`Unexpected ${method} ${args}`);
  }}};
- window.confirm=()=>true;await import("../src/main.ts?local-image-preview");await waitFor(()=>!!window.document.querySelector(".article-item"));window.document.querySelector<HTMLButtonElement>(".article-item")!.click();window.document.querySelector<HTMLButtonElement>("#edit-article")!.click();
+ window.confirm=()=>true;await import("../src/main.ts?local-image-preview"); enterFirstSite(window);await waitFor(()=>!!window.document.querySelector(".article-item"));window.document.querySelector<HTMLButtonElement>(".article-item")!.click();window.document.querySelector<HTMLButtonElement>("#edit-article")!.click();
  const frame=window.document.querySelector<HTMLIFrameElement>("#preview")!;await waitFor(()=>frame.srcdoc.includes("data:image/png;base64,aW1hZ2U="));expect(frame.srcdoc).toContain("img-src data:");
  window.document.querySelector<HTMLButtonElement>(".remove-attachment")!.click();await waitFor(()=>!frame.srcdoc.includes("base64,aW1hZ2U="));
 });
@@ -1081,7 +1095,7 @@ test("global audio player remains visible after switching sites", async () => {
  const first={id:"first",name:"First",about:"",created:"2026-01-01T00:00:00Z"},second={id:"second",name:"Second",about:"",created:"2026-01-01T00:00:00Z"};
  const post={id:"post",siteId:"first",title:"Song",content:"",created:"2026-01-01T00:00:00Z",modified:"2026-01-01T00:00:00Z",attachments:["sound.mp3"],audioFilename:"sound.mp3"};
  (globalThis as any).mygo={call:async(method:string,...args:string[])=>{switch(method){case "Library.Sites":return [first,second];case "Library.Subscriptions":return [];case "Library.Articles":return args[0]==="first"?[post]:[];case "Library.PreviewArticle":return "";case "Library.AudioURL":return "http://127.0.0.1:1234/token";case "Library.StopAudio":return;default:throw new Error(`Unexpected ${method}`)}}};
- await import("../src/main.ts?global-player");await waitFor(()=>!!window.document.querySelector(".article-item"));window.document.querySelector<HTMLButtonElement>(".article-item")!.click();
+ await import("../src/main.ts?global-player"); enterFirstSite(window);await waitFor(()=>!!window.document.querySelector(".article-item"));window.document.querySelector<HTMLButtonElement>(".article-item")!.click();
  window.document.querySelector<HTMLButtonElement>("#play-own-audio")!.click();await waitFor(()=>!window.document.querySelector<HTMLElement>("#audio-player")!.hidden);
  expect(window.document.querySelector<HTMLAudioElement>("#global-audio")!.src).toBe("http://127.0.0.1:1234/token");
  Array.from(window.document.querySelectorAll<HTMLButtonElement>(".site-item")).find(x=>x.textContent?.includes("Second"))!.click();await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="Second");expect(window.document.querySelector<HTMLElement>("#audio-player")!.hidden).toBe(false);
@@ -1092,7 +1106,7 @@ test("subscription audio opens in the global player", async () => {
  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});
  const feed={url:"https://example.com/feed",feed:{title:"Show",description:"",link:"",items:[{id:"1",title:"Episode",link:"",description:"",content:"",published:"",audioUrl:"https://example.com/episode.mp3"}]}};
  (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [];case "Library.Subscriptions":return [feed];case "Library.StopAudio":return;default:throw new Error(`Unexpected ${method}`)}}};
- await import("../src/main.ts?feed-audio");await waitFor(()=>!!window.document.querySelector("#subscriptions .site-item"));window.document.querySelector<HTMLButtonElement>("#subscriptions .site-item")!.click();window.document.querySelector<HTMLButtonElement>(".article-item")!.click();
+ await import("../src/main.ts?feed-audio"); enterFirstSite(window);await waitFor(()=>!!window.document.querySelector("#subscriptions .site-item"));window.document.querySelector<HTMLButtonElement>("#subscriptions .site-item")!.click();window.document.querySelector<HTMLButtonElement>(".article-item")!.click();
  const button=window.document.querySelector<HTMLButtonElement>("#play-feed-audio")!;expect(button.hidden).toBe(false);button.click();await waitFor(()=>!window.document.querySelector<HTMLElement>("#audio-player")!.hidden);
  expect(window.document.querySelector<HTMLAudioElement>("#global-audio")!.src).toBe("https://example.com/episode.mp3");
 });
@@ -1103,7 +1117,7 @@ test("subscription articles can be starred, found and shared, and Planet content
  const sub={url:"k51abcdefghijk",cid:"bafytest",pinnedCid:"",lastUpdated:new Date().toISOString(),feed:{title:"Planet",description:"",link:"",items:[post]}};let copied="";
  Object.defineProperty(window.navigator,"clipboard",{value:{writeText:async(value:string)=>{copied=value}}});
  (globalThis as any).mygo={call:async(method:string,...args:any[])=>{switch(method){case "Library.Sites":return [];case "Library.Subscriptions":return [sub];case "Library.PinSubscription":sub.pinnedCid=sub.cid;return;case "Library.StarSubscription":post.starred=args[2];return;default:throw new Error(`Unexpected ${method}`)}}};
- await import("../src/main.ts?favorites-pin");await waitFor(()=>!!window.document.querySelector("#subscriptions .site-item"));window.document.querySelector<HTMLButtonElement>("#subscriptions .site-item")!.click();
+ await import("../src/main.ts?favorites-pin"); enterFirstSite(window);await waitFor(()=>!!window.document.querySelector("#subscriptions .site-item"));window.document.querySelector<HTMLButtonElement>("#subscriptions .site-item")!.click();
  const pin=window.document.querySelector<HTMLButtonElement>("#pin-subscription")!;expect(pin.hidden).toBe(false);pin.click();await waitFor(()=>sub.pinnedCid==="bafytest");
  window.document.querySelector<HTMLButtonElement>(".article-item")!.click();window.document.querySelector<HTMLButtonElement>("#star-item")!.click();await waitFor(()=>post.starred);
  window.document.querySelector<HTMLButtonElement>("#share-item")!.click();await waitFor(()=>copied!=="");expect(copied).toBe("https://example.test/post");
@@ -1116,7 +1130,7 @@ test("pinned Planet reader loads local images and ignores a stale preview", asyn
  const two={...one,id:"two",key:"two",articleId:"two",title:"Two",content:"second"};const sub={url:"k51abcdefghijk",cid:"bafy",pinnedCid:"bafy",lastUpdated:new Date().toISOString(),feed:{title:"Planet",description:"",link:"",items:[one,two]}};
  let release:((value:string)=>void)|undefined;
  (globalThis as any).mygo={call:async(method:string,...args:string[])=>{switch(method){case "Library.Sites":return [];case "Library.Subscriptions":return [sub];case "Library.SubscriptionPreview":if(args[1]==="one")return await new Promise<string>(resolve=>{release=resolve});return "second";default:throw new Error(`Unexpected ${method}`)}}};
- await import("../src/main.ts?offline-preview");await waitFor(()=>!!window.document.querySelector("#subscriptions .site-item"));window.document.querySelector<HTMLButtonElement>("#subscriptions .site-item")!.click();
+ await import("../src/main.ts?offline-preview"); enterFirstSite(window);await waitFor(()=>!!window.document.querySelector("#subscriptions .site-item"));window.document.querySelector<HTMLButtonElement>("#subscriptions .site-item")!.click();
  const posts=window.document.querySelectorAll<HTMLButtonElement>(".article-item");posts[0]!.click();await waitFor(()=>!!release);window.document.querySelectorAll<HTMLButtonElement>(".article-item")[1]!.click();await waitFor(()=>window.document.querySelector<HTMLIFrameElement>("#reader-preview")!.srcdoc.includes("second"));release!("data:image/png;base64,STALE");await new Promise(resolve=>setTimeout(resolve,10));
  expect(window.document.querySelector<HTMLIFrameElement>("#reader-preview")!.srcdoc).not.toContain("STALE");
 });
@@ -1125,7 +1139,7 @@ test("Planet audio is opened from the local content store", async () => {
  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});
  const item={id:"post",key:"post",articleId:"post",contentCid:"bafy",audioFilename:"sound.mp3",attachments:["sound.mp3"],title:"Episode",link:"https://example.test/post",description:"",content:"text",published:""};const sub={url:"k51abcdefghijk",cid:"bafy",pinnedCid:"bafy",lastUpdated:new Date().toISOString(),feed:{title:"Planet",description:"",link:"",items:[item]}};
  (globalThis as any).mygo={call:async(method:string,...args:string[])=>{switch(method){case "Library.Sites":return [];case "Library.Subscriptions":return [sub];case "Library.SubscriptionPreview":return "text";case "Library.SubscriptionAudioURL":return "http://127.0.0.1:1234/offline";case "Library.StopAudio":return;default:throw new Error(`Unexpected ${method} ${args}`)}}};
- await import("../src/main.ts?offline-audio");await waitFor(()=>!!window.document.querySelector("#subscriptions .site-item"));window.document.querySelector<HTMLButtonElement>("#subscriptions .site-item")!.click();window.document.querySelector<HTMLButtonElement>(".article-item")!.click();
+ await import("../src/main.ts?offline-audio"); enterFirstSite(window);await waitFor(()=>!!window.document.querySelector("#subscriptions .site-item"));window.document.querySelector<HTMLButtonElement>("#subscriptions .site-item")!.click();window.document.querySelector<HTMLButtonElement>(".article-item")!.click();
  const play=window.document.querySelector<HTMLButtonElement>("#play-feed-audio")!;expect(play.hidden).toBe(false);play.click();await waitFor(()=>!window.document.querySelector<HTMLElement>("#audio-player")!.hidden);expect(window.document.querySelector<HTMLAudioElement>("#global-audio")!.src).toBe("http://127.0.0.1:1234/offline");
 });
 
@@ -1133,14 +1147,14 @@ test("feed media pin enables offline image and video playback", async () => {
  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});
  const mediaURL="https://example.test/video.mp4";const item={id:"one",key:"one",title:"Episode",link:"https://example.test/post",description:"",content:"<img src='x'>",published:"",offlineBase:"https://example.test/",videoUrl:mediaURL,offlineMedia:{[mediaURL]:{snapshot:"snapshot-1",file:"x",contentType:"video/mp4",size:5}}};const sub={url:"https://example.test/feed",offlinePinned:false,lastUpdated:new Date().toISOString(),feed:{title:"Feed",description:"",link:"",items:[item]}};
  (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [];case "Library.Subscriptions":return [sub];case "Library.PinSubscription":sub.offlinePinned=true;return;case "Library.SubscriptionPreview":return '<img src="data:image/png;base64,aW1hZ2U=">';case "Library.SubscriptionMediaURL":return "http://127.0.0.1:1234/video";default:throw new Error(`Unexpected ${method}`)}}};
- await import("../src/main.ts?feed-video-offline");await waitFor(()=>!!window.document.querySelector("#subscriptions .site-item"));window.document.querySelector<HTMLButtonElement>("#subscriptions .site-item")!.click();const pin=window.document.querySelector<HTMLButtonElement>("#pin-subscription")!;expect(pin.hidden).toBe(false);pin.click();await waitFor(()=>sub.offlinePinned);
+ await import("../src/main.ts?feed-video-offline"); enterFirstSite(window);await waitFor(()=>!!window.document.querySelector("#subscriptions .site-item"));window.document.querySelector<HTMLButtonElement>("#subscriptions .site-item")!.click();const pin=window.document.querySelector<HTMLButtonElement>("#pin-subscription")!;expect(pin.hidden).toBe(false);pin.click();await waitFor(()=>sub.offlinePinned);
  window.document.querySelector<HTMLButtonElement>(".article-item")!.click();await waitFor(()=>window.document.querySelector<HTMLIFrameElement>("#reader-preview")!.srcdoc.includes("data:image/png;base64"));window.document.querySelector<HTMLButtonElement>("#play-feed-video")!.click();await waitFor(()=>!window.document.querySelector<HTMLElement>("#audio-player")!.hidden);expect(window.document.querySelector<HTMLVideoElement>("#global-video")!.src).toBe("http://127.0.0.1:1234/video");
 });
 
 test("offline storage shows usage and refreshes after cleanup", async () => {
  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});let cleaned=false;
  (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":case "Library.Subscriptions":return [];case "Library.OfflineMediaUsage":return {totalBytes:cleaned?4:12,reclaimableBytes:cleaned?0:8,managedFiles:cleaned?1:2,reclaimableFiles:cleaned?0:1};case "Library.CleanupOfflineMedia":cleaned=true;return {reclaimedBytes:8,reclaimedFiles:1};default:throw new Error(`Unexpected ${method}`)}}};
- await import("../src/main.ts?offline-cleanup"); window.document.querySelector<HTMLButtonElement>("#offline-storage")!.click();await waitFor(()=>window.document.querySelector("#offline-storage-usage")!.textContent!.includes("8 B"));window.document.querySelector<HTMLButtonElement>("#cleanup-offline")!.click();await waitFor(()=>cleaned && window.document.querySelector("#offline-storage-result")!.textContent!.includes("8 B"));expect(window.document.querySelector("#offline-storage-usage")!.textContent).toContain("0 B");
+ await import("../src/main.ts?offline-cleanup"); enterFirstSite(window); window.document.querySelector<HTMLButtonElement>("#offline-storage")!.click();await waitFor(()=>window.document.querySelector("#offline-storage-usage")!.textContent!.includes("8 B"));window.document.querySelector<HTMLButtonElement>("#cleanup-offline")!.click();await waitFor(()=>cleaned && window.document.querySelector("#offline-storage-result")!.textContent!.includes("8 B"));expect(window.document.querySelector("#offline-storage-usage")!.textContent).toContain("0 B");
 });
 test("article tags stay local until save and trigger the normal publish", async () => {
   const window = new Window({url:"http://localhost/"}); window.document.write(await Bun.file("index.html").text()); Object.assign(globalThis,{window,document:window.document});
@@ -1153,7 +1167,7 @@ test("article tags stay local until save and trigger the normal publish", async 
     case "Library.PublishSite":publishes++;return {ipns:"k51",cid:"bafy",revision:1,pending:false};
     default:throw new Error(method);
   }}};
-  await import("../src/main.ts?edit-tags");await waitFor(()=>!!window.document.querySelector(".article-item"));window.document.querySelector<HTMLButtonElement>(".article-item")!.click();window.document.querySelector<HTMLButtonElement>("#edit-article")!.click();
+  await import("../src/main.ts?edit-tags"); enterFirstSite(window);await waitFor(()=>!!window.document.querySelector(".article-item"));window.document.querySelector<HTMLButtonElement>(".article-item")!.click();window.document.querySelector<HTMLButtonElement>("#edit-article")!.click();
   expect(window.document.querySelector("#tag-list")?.textContent).toContain("Go");
   const input=window.document.querySelector<HTMLInputElement>("#tag-input")!;input.value="New tag";window.document.querySelector<HTMLButtonElement>("#add-tag")!.click();
   expect(window.document.querySelector("#tag-list")?.textContent).toContain("New tag");expect(publishes).toBe(0);
@@ -1167,7 +1181,7 @@ test("unadded tag input blocks saving and prompts before navigation", async () =
   const site={id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z"};const post={id:"p",siteId:"s",title:"Post",content:"Body",created:site.created,modified:site.created};let saves=0, confirms=0;
   window.confirm=()=>{confirms++;return false;};
   (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [site];case "Library.Articles":return [post];case "Library.Subscriptions":return [];case "Library.PreviewArticle":return "";case "Library.SaveArticle":case "Library.SaveDraft":saves++;return {};default:throw new Error(method);}}};
-  await import("../src/main.ts?pending-tag-input");await waitFor(()=>!!window.document.querySelector(".article-item"));window.document.querySelector<HTMLButtonElement>(".article-item")!.click();window.document.querySelector<HTMLButtonElement>("#edit-article")!.click();
+  await import("../src/main.ts?pending-tag-input"); enterFirstSite(window);await waitFor(()=>!!window.document.querySelector(".article-item"));window.document.querySelector<HTMLButtonElement>(".article-item")!.click();window.document.querySelector<HTMLButtonElement>("#edit-article")!.click();
   const input=window.document.querySelector<HTMLInputElement>("#tag-input")!;input.value="Pending";input.dispatchEvent(new window.Event("input"));
   window.document.querySelector<HTMLButtonElement>("#save")!.click();window.document.querySelector<HTMLButtonElement>("#save-draft")!.click();await new Promise(resolve=>setTimeout(resolve,20));
   expect(saves).toBe(0);expect(window.document.querySelector("#error")!.textContent).toContain("请先添加标签");expect(input.value).toBe("Pending");
@@ -1183,7 +1197,7 @@ test("draft tags remain private until the draft is published", async () => {
     case "Library.PublishDraftWithTags":published=JSON.parse(args[4]!);return {id:"p",siteId:"s",title:args[2],content:args[3],tags:published,created:stored.created,modified:stored.modified};
     case "Library.PublishSite":count++;return {ipns:"k51",cid:"bafy",revision:1,pending:false};default:throw new Error(method);
   }}};
-  await import("../src/main.ts?draft-tags");await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#new-article")!.disabled);window.document.querySelector<HTMLButtonElement>("#new-article")!.click();
+  await import("../src/main.ts?draft-tags"); enterFirstSite(window);await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#new-article")!.disabled);window.document.querySelector<HTMLButtonElement>("#new-article")!.click();
   const title=window.document.querySelector<HTMLInputElement>("#title")!,input=window.document.querySelector<HTMLInputElement>("#tag-input")!;title.value="Post";title.dispatchEvent(new window.Event("input"));
   input.value="Private";window.document.querySelector<HTMLButtonElement>("#add-tag")!.click();window.document.querySelector<HTMLButtonElement>("#save-draft")!.click();await waitFor(()=>!!stored);
   expect(stored.tags).toEqual({private:"Private"});expect(count).toBe(0);

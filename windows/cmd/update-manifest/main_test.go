@@ -165,7 +165,7 @@ func TestSignRejectsBadInputsWithoutPrintingPrivateKey(t *testing.T) {
 		{"non-https", "1.2.3", "http://downloads.example.test/setup.exe", "7"},
 		{"credentials", "1.2.3", "https://user:pass@downloads.example.test/setup.exe", "7"},
 		{"not-exe", "1.2.3", "https://downloads.example.test/setup.zip", "7"},
-		{"prerelease", "1.2.3-rc.1", "https://downloads.example.test/setup.exe", "7"},
+		{"prerelease-leading-zero", "1.2.3-rc.01", "https://downloads.example.test/setup.exe", "7"},
 		{"build-metadata", "1.2.3+build", "https://downloads.example.test/setup.exe", "7"},
 		{"overflow", "4294967296.0.0", "https://downloads.example.test/setup.exe", "7"},
 		{"leading-zero", "01.2.3", "https://downloads.example.test/setup.exe", "7"},
@@ -205,5 +205,50 @@ func TestSignRejectsMinimumVersionAboveRelease(t *testing.T) {
 	}
 	if _, e := os.Stat(out); !os.IsNotExist(e) {
 		t.Fatal("invalid release wrote output")
+	}
+}
+
+func TestSignPrereleaseEnvelopeAndMinimumVersion(t *testing.T) {
+	dir := t.TempDir()
+	key := filepath.Join(dir, "key")
+	installer := filepath.Join(dir, "installer.exe")
+	var output bytes.Buffer
+	if err := run([]string{"keygen", "-out", key}, &output); err != nil {
+		t.Fatal(err)
+	}
+	public := strings.TrimSpace(output.String())
+	if err := os.WriteFile(installer, []byte("test installer"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		version, minimum string
+		allowed          bool
+	}{
+		{"0.0.1-alpha.2", "0.0.1-alpha.1", true},
+		{"0.0.1", "0.0.1-alpha.2", true},
+		{"0.0.1-alpha.2", "0.0.1", false},
+		{"0.0.1-alpha.2", "0.0.1-alpha.10", false},
+	} {
+		t.Run(tc.version+"_"+tc.minimum, func(t *testing.T) {
+			out := filepath.Join(t.TempDir(), "feed.json")
+			err := run([]string{"sign", "-private-key", key, "-installer", installer, "-url", "https://downloads.example.test/setup.exe", "-version", tc.version, "-minimum-version", tc.minimum, "-out", out}, &output)
+			if (err == nil) != tc.allowed {
+				t.Fatalf("sign: %v; allowed=%v", err, tc.allowed)
+			}
+			if !tc.allowed {
+				if _, err := os.Stat(out); !os.IsNotExist(err) {
+					t.Fatal("rejected version wrote a manifest")
+				}
+				return
+			}
+			data, err := os.ReadFile(out)
+			if err != nil {
+				t.Fatal(err)
+			}
+			r, err := updates.Verify(data, updates.Config{FeedURL: "https://downloads.example.test/feed.json", PublicKey: public}, tc.minimum, time.Now())
+			if err != nil || r.Version != tc.version {
+				t.Fatalf("client rejected publisher's prerelease: %+v, %v", r, err)
+			}
+		})
 	}
 }
