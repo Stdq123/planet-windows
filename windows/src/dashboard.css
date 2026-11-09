@@ -111,6 +111,7 @@ body:has(.shell.dashboard-mode) { overflow:hidden; }
 :is(#search-dialog,#site-dialog,#dashboard-compose-dialog) p { color:var(--pw-secondary); font:400 12px/18px var(--pw-font); }
 :is(#search-dialog,#site-dialog,#dashboard-compose-dialog) label { margin:12px 0 8px; font:500 12px/18px var(--pw-font); }
 :is(#search-dialog,#site-dialog,#dashboard-compose-dialog) :is(input:not([type="checkbox"]):not([type="radio"]),textarea,select) { padding:8px 12px; margin-top:8px; min-height:36px; border:1px solid var(--pw-control-line); font:400 13px/20px var(--pw-font); }
+:is(#search-dialog,#site-dialog,#dashboard-compose-dialog) :is(input:not([type="checkbox"]):not([type="radio"]),textarea,select)[aria-invalid="true"] { border-color:var(--pw-danger); }
 :is(#search-dialog,#site-dialog,#dashboard-compose-dialog) :is(input,textarea,select,button):focus-visible { outline:2px solid var(--pw-accent); outline-offset:2px; box-shadow:none; }
 :is(#search-dialog,#site-dialog,#dashboard-compose-dialog) .dialog-actions { gap:8px; padding:16px 24px; }
 :is(#search-dialog,#site-dialog,#dashboard-compose-dialog) button { min-height:36px; padding:7px 16px; border-radius:6px; font:500 13px/20px var(--pw-font); box-shadow:none; }

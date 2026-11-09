@@ -138,6 +138,7 @@ dialog p, dialog label span, dialog small { font-size: 12px; line-height: 1.6; c
 .dialog-body > p:first-child { margin-top: 0; }
 dialog label { font-size: 13px; line-height: 1.5; }
 dialog input, dialog textarea, dialog select { border: 1px solid var(--pw-control-line); border-radius: 8px; font-size: 14px; }
+dialog :is(input, textarea, select)[aria-invalid="true"], dialog .choice-group[aria-invalid="true"] label { border-color: var(--pw-danger); }
 dialog .dialog-actions, #ipfs-status-dialog .dialog-actions { flex: none; position: static; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin: 0; padding: 16px 24px; border-top: 1px solid var(--line); background: #f9fafc; }
 #site-dialog, #site-profile-dialog, #podcast-settings-dialog, #article-settings-dialog, #deployment-dialog, #ipfs-status-dialog, #search-dialog { width: 520px; max-height: calc(100vh - 64px); overflow: hidden; }
 #service-dialog, #pinnable-dialog { width: 600px; }
