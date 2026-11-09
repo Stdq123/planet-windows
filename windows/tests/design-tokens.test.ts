@@ -57,5 +57,9 @@ test("components read the converged scale instead of off-ladder literals", async
   expect(window.getComputedStyle(document.querySelector(".eyebrow")!).fontSize).toBe("11px");
   // Former 9px menu corner converges to the lg step.
   expect(window.getComputedStyle(document.querySelector(".workspace-menu-content")!).borderRadius).toBe("8px");
+  // Module gaps read the spacing scale; micro control gaps stay literal.
+  expect(window.getComputedStyle(document.querySelector(".dashboard-columns")!).gap).toBe("16px");
+  expect(window.getComputedStyle(document.querySelector(".view-switch")!).gap).toBe("2px");
+  expect(window.getComputedStyle(document.querySelector(".posts-header h1")!).fontWeight).toBe("600");
   await window.happyDOM.close();
 });
