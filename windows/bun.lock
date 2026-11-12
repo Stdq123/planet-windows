@@ -9,24 +9,24 @@
       },
       "devDependencies": {
         "happy-dom": "^21.0.4",
-        "mygo-cli": "^0.7.4",
+        "mygo-cli": "^0.8.3",
         "typescript": "^7",
         "vite": "^8",
       },
     },
   },
   "packages": {
-    "@egoist/mygo-cli-darwin-arm64": ["@egoist/mygo-cli-darwin-arm64@0.7.4", "", { "os": "darwin", "cpu": "arm64" }, "sha512-FZyQSzeRAlT5w8D7MfUZTmaTcJXhuT3ukztjD3Oo2Kc3Ohnqp5hVlsJr1OX5LEbOdNOfgeOIIU7ceeG/6hLcBw=="],
+    "@egoist/mygo-cli-darwin-arm64": ["@egoist/mygo-cli-darwin-arm64@0.8.3", "", { "os": "darwin", "cpu": "arm64" }, "sha512-qLkqs58idBSBONs1ce4YO5x+R67F/4HHiNMlT7fZE5QeyRHLdXnbqgVcvZ0Fwi2XSXMtXMF/AxZYtcrn5rJVrg=="],
 
-    "@egoist/mygo-cli-darwin-x64": ["@egoist/mygo-cli-darwin-x64@0.7.4", "", { "os": "darwin", "cpu": "x64" }, "sha512-ctVPT6pZX/fwEPglh96oAKP6jF8XHIdnhSj5TnEe98vPaFMBkrhasMaKF/JNQmk1QGNXuFR5KlUAJqwQ30j5Gg=="],
+    "@egoist/mygo-cli-darwin-x64": ["@egoist/mygo-cli-darwin-x64@0.8.3", "", { "os": "darwin", "cpu": "x64" }, "sha512-G4UcPrqJxeXhIe8v/nF/Nu3l7MAbq0KloB1Hy75i50Ulc6YX4yvTTVNZjYFPfatJ3uoeIfRiolQmKLwhQ5vFUQ=="],
 
-    "@egoist/mygo-cli-linux-arm64": ["@egoist/mygo-cli-linux-arm64@0.7.4", "", { "os": "linux", "cpu": "arm64" }, "sha512-bG/go4V79VycOo1j/Q0fldpcK8WUl9kWJ8ayYmTsBwEp6EheHq6duXeFIVXz/DnsR9YQI2KV5DMeJcQHVJpNtQ=="],
+    "@egoist/mygo-cli-linux-arm64": ["@egoist/mygo-cli-linux-arm64@0.8.3", "", { "os": "linux", "cpu": "arm64" }, "sha512-RcEeK3VwYbxEuuifL4N5PaUiKqTRt0NbDHt21bHBO8KMhM79xbMoK1rVBo0iinorP5lFJD2QSzn6OLwLZAR/PA=="],
 
-    "@egoist/mygo-cli-linux-x64": ["@egoist/mygo-cli-linux-x64@0.7.4", "", { "os": "linux", "cpu": "x64" }, "sha512-AKGpGbpj9IBg0j3ty9wLCX857JI/9f88dv6KQNmClW5wT6IL2HlEHkTMRnjJHNaBt6uJmjZGgcHnVtQCW+qEuQ=="],
+    "@egoist/mygo-cli-linux-x64": ["@egoist/mygo-cli-linux-x64@0.8.3", "", { "os": "linux", "cpu": "x64" }, "sha512-MHWMyaBLKLgLUugnzrS3OanZEO57w1Zf3XY2X3Gz0rMneKGAlszBgz0+I7bIY5dGZcdJXJ+2mPp9CqxJXSV2QA=="],
 
-    "@egoist/mygo-cli-win32-arm64": ["@egoist/mygo-cli-win32-arm64@0.7.4", "", { "os": "win32", "cpu": "arm64" }, "sha512-3dhN1UVKgiPG7JKD45R7AmxdwOlSr98yepj/a6Uou/PBZ9aFyrg/+xCg+Sv/G+BhKTPa170EVRgUogwd6qWsrw=="],
+    "@egoist/mygo-cli-win32-arm64": ["@egoist/mygo-cli-win32-arm64@0.8.3", "", { "os": "win32", "cpu": "arm64" }, "sha512-25crS7CLiLv7rnx2+cYFa2zdNYyMrhgjQqXT6+5nvsGg+3/n9xY3ojkYtTOCN5nEXRTxOeUNXC9AJNrQFrf3HQ=="],
 
-    "@egoist/mygo-cli-win32-x64": ["@egoist/mygo-cli-win32-x64@0.7.4", "", { "os": "win32", "cpu": "x64" }, "sha512-a0o00ibtfJypvNFc/CFxCLLhhTn6sBHlp1Hr7zmd6T7wZziEv2l4MyenoDcaAE314xPzkew5YriGA+BLnc8U4Q=="],
+    "@egoist/mygo-cli-win32-x64": ["@egoist/mygo-cli-win32-x64@0.8.3", "", { "os": "win32", "cpu": "x64" }, "sha512-OE6v5PMN+2zpwgUpQlI/lUM9oqBO65+T0n6WrtR8F5YQ5PcIjvfMvyR558shrVXmw41IiZgan7ukaQJqs+/PBQ=="],
 
     "@oxc-project/types": ["@oxc-project/types@0.156.0", "", {}, "sha512-1Duyg48TdJNdyhEB8Xn1L36bT9Pv6GUtlKjHxOys8xkaF/rQq3XJE+bAurSK/AgIz5mGFsb77cn9Pb20+WCScw=="],
 
@@ -144,7 +144,7 @@
 
     "lightningcss-win32-x64-msvc": ["lightningcss-win32-x64-msvc@1.33.0", "", { "os": "win32", "cpu": "x64" }, "sha512-OlEICDx/Xl0FqSp4bry8zFnCvGpig3Gl4gCquvYwHuqJKEC1+n9NgDniFvqHGmMv1ZkqDJrDqKKSykTDX+ehuA=="],
 
-    "mygo-cli": ["mygo-cli@0.7.4", "", { "optionalDependencies": { "@egoist/mygo-cli-darwin-arm64": "0.7.4", "@egoist/mygo-cli-darwin-x64": "0.7.4", "@egoist/mygo-cli-linux-arm64": "0.7.4", "@egoist/mygo-cli-linux-x64": "0.7.4", "@egoist/mygo-cli-win32-arm64": "0.7.4", "@egoist/mygo-cli-win32-x64": "0.7.4" }, "bin": { "mygo": "bin/mygo.js" } }, "sha512-OfX+JBxHQXTkF937vtM1uRuRPrbQ2FiuDH+ikHAYk5bMQy5TjTQymWHAI0AkEGa1l5VbUkw5Q1OJj6egkKszUA=="],
+    "mygo-cli": ["mygo-cli@0.8.3", "", { "optionalDependencies": { "@egoist/mygo-cli-darwin-arm64": "0.8.3", "@egoist/mygo-cli-darwin-x64": "0.8.3", "@egoist/mygo-cli-linux-arm64": "0.8.3", "@egoist/mygo-cli-linux-x64": "0.8.3", "@egoist/mygo-cli-win32-arm64": "0.8.3", "@egoist/mygo-cli-win32-x64": "0.8.3" }, "bin": { "mygo": "bin/mygo.js" } }, "sha512-JHJkkrekMO9rKG/5au2NoFT0POF6LO6Q9p0wYKz0b4Rv6PV4fIqKZpLCpyS6FN3kfQudFtu64T/AcZ/1SJtbVQ=="],
 
     "mygo-runtime": ["mygo-runtime@0.7.4", "", {}, "sha512-11BHbfdLp3OdVb5691zkj4xKtU6Qk9ZCVxbi2xOxPvtGTVo1xwKs1cx61Ow/p95qmJvUp8p+DjeXRnVkeSnFww=="],
 
