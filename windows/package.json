@@ -17,7 +17,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "mygo-runtime": "^0.7.4"
+    "mygo-runtime": "^0.8.3"
   },
   "devDependencies": {
     "happy-dom": "^21.0.4",
