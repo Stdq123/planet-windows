@@ -4,6 +4,8 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 ## [Unreleased]
 
+## [0.0.1-alpha.3] - 2026-11-19
+
 ### Changed
 
 - Modernized the light interface in place while keeping the graphite direction and layout: legacy blue-gray and Fluent-blue literals now read the shared semantic tokens, font sizes and radii follow unified scales with an 11px text floor, spacing rhythm and heading weights are consistent, and sidebar/overview transitions use shared duration and easing tokens. Functional colors (traffic chart, site icon tints, import warning) are unchanged.
@@ -12,6 +14,7 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 ### Fixed
 
+- Upgraded the Go toolchain requirement to `1.27.4` to address `GO-2026-6859` in `net/http`.
 - Improved the contrast of input, select, secondary-button and radio/checkbox-card boundaries on the Windows light surfaces.
 - Improved editor placeholders, selected-row details, sidebar errors, IPFS chart labels, removed-site IDs and template-library text contrast.
 - Unified error and destructive-action colors, added non-color selection indicators to navigation, article rows, the first draft and editor view controls, and aligned template selection with the graphite palette.
