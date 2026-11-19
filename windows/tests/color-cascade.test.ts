@@ -12,20 +12,20 @@ async function styledDocument() {
   return window;
 }
 
-test("legacy shell surfaces resolve to graphite roles through the full cascade", async () => {
+test("legacy shell surfaces resolve to original Mac Planet roles through the full cascade", async () => {
   const window = await styledDocument();
   const document = window.document;
   const color = (selector: string) => window.getComputedStyle(document.querySelector(selector)!).color;
   const background = (selector: string) => window.getComputedStyle(document.querySelector(selector)!).backgroundColor;
-  expect(color("#ipfs-open-site")).toBe("#5f5c58");
-  expect(color(".ipfs-stats dt")).toBe("#6d6a65");
-  expect(color(".reader h2")).toBe("#2b2b29");
-  expect(color(".site-address")).toBe("#6d6a65");
-  expect(color(".empty p")).toBe("#6d6a65");
-  expect(color(".workspace-menu-content button")).toBe("#2b2b29");
-  expect(color(".avatar-preview")).toBe("#5f5c58");
-  expect(background(".avatar-preview")).toBe("#e9e7e2");
+  expect(color("#ipfs-open-site")).toBe("#515154");
+  expect(color(".ipfs-stats dt")).toBe("#86868b");
+  expect(color(".reader h2")).toBe("#1d1d1f");
+  expect(color(".site-address")).toBe("#86868b");
+  expect(color(".empty p")).toBe("#86868b");
+  expect(color(".workspace-menu-content button")).toBe("#1d1d1f");
+  expect(color(".avatar-preview")).toBe("#515154");
+  expect(background(".avatar-preview")).toBe("#e8f2ff");
   const tagInput = document.querySelector(".tag-bar input")!;
-  expect(window.getComputedStyle(tagInput).borderTopColor).toBe("#857a6e");
+  expect(window.getComputedStyle(tagInput).borderTopColor).toBe("#c7c7cc");
   await window.happyDOM.close();
 });

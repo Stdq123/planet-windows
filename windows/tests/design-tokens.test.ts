@@ -19,15 +19,15 @@ function resolved(window: Window, property: string, token: string) {
   return window.getComputedStyle(probe).getPropertyValue(property);
 }
 
-test("legacy aliases resolve to the graphite roles through the full cascade", async () => {
+test("legacy aliases resolve to the original Mac Planet roles through the full cascade", async () => {
   const window = await styledDocument();
-  expect(resolved(window, "color", "--text-secondary")).toBe("#5f5c58");
-  expect(resolved(window, "color", "--ink")).toBe("#2b2b29");
-  expect(resolved(window, "color", "--muted")).toBe("#6d6a65");
-  expect(resolved(window, "background-color", "--selection")).toBe("#e9e7e2");
-  expect(resolved(window, "background-color", "--hover")).toBe("#eeece7");
-  expect(resolved(window, "background-color", "--brand")).toBe("#333432");
-  expect(resolved(window, "color", "--focus")).toBe("#333432");
+  expect(resolved(window, "color", "--text-secondary")).toBe("#515154");
+  expect(resolved(window, "color", "--ink")).toBe("#1d1d1f");
+  expect(resolved(window, "color", "--muted")).toBe("#86868b");
+  expect(resolved(window, "background-color", "--selection")).toBe("#e8f2ff");
+  expect(resolved(window, "background-color", "--hover")).toBe("rgba(0, 0, 0, 0.05)");
+  expect(resolved(window, "background-color", "--brand")).toBe("#007aff");
+  expect(resolved(window, "color", "--focus")).toBe("#007aff");
   await window.happyDOM.close();
 });
 

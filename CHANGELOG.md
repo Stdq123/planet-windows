@@ -7,6 +7,7 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 ### Changed
 
 - Modernized the light interface in place while keeping the graphite direction and layout: legacy blue-gray and Fluent-blue literals now read the shared semantic tokens, font sizes and radii follow unified scales with an 11px text floor, spacing rhythm and heading weights are consistent, and sidebar/overview transitions use shared duration and easing tokens. Functional colors (traffic chart, site icon tints, import warning) are unchanged.
+- Styled the Windows workspace after the original macOS Planet interface (cool neutral sidebar, circular site avatars, colour-coded Smart Feeds icons with pill unread counts, macOS blue article selection, unified 52px toolbars, system light/dark adaptation, formatted subscription dates and refined reading typography).
 
 ### Fixed
 

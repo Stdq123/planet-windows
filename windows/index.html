@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="./src/design-tokens.css" />
   <link rel="stylesheet" href="./src/navigation.css" />
   <link rel="stylesheet" href="./src/dashboard.css" />
+  <link rel="stylesheet" href="./src/mac-planet.css" />
 </head>
 <body>
   <a id="skip-to-main" class="skip-link" href="#dashboard">跳到主要内容</a>
@@ -173,17 +174,17 @@
   <dialog id="removed-sites-dialog"><h2>已移除的站点</h2><p>移除的站点可以恢复；永久删除不可撤销，已公开到 IPFS 的内容仍可能可访问。</p><div id="removed-site-list"></div><div class="dialog-actions"><button type="button" id="close-removed-sites" class="secondary">关闭</button></div></dialog>
   <dialog id="offline-storage-dialog"><h2>离线媒体空间</h2><p id="offline-storage-usage" role="status">正在计算…</p><p>清理已不再被文章或播放器使用的缓存文件，保留当前订阅内容。</p><p id="offline-storage-result" role="status"></p><div class="dialog-actions"><button type="button" id="close-offline-storage" class="secondary">关闭</button><button type="button" id="cleanup-offline" class="primary" disabled>清理可回收空间</button></div></dialog>
   <dialog id="ipfs-status-dialog" aria-labelledby="ipfs-status-heading"><div class="ipfs-dialog-heading"><div><span class="eyebrow">IPFS NETWORK</span><h2 id="ipfs-status-heading">IPFS 节点状态</h2></div><button type="button" id="toggle-ipfs" class="secondary" disabled>启动节点</button></div><p id="ipfs-status-message" role="status">正在读取…</p><dl class="ipfs-stats"><div><dt>本地网关</dt><dd><span id="ipfs-gateway">—</span> <a id="ipfs-open-site" target="_blank" rel="noopener noreferrer" hidden>打开当前站点 ↗</a></dd></div><div><dt>Kubo 版本</dt><dd id="ipfs-version">—</dd></div><div><dt>仓库大小</dt><dd id="ipfs-repo-size">—</dd></div><div><dt>已连接节点</dt><dd id="ipfs-peer-count">—</dd></div><div><dt>接收 / 发送速度</dt><dd id="ipfs-rate">—</dd></div><div><dt>累计接收 / 发送</dt><dd id="ipfs-total">—</dd></div></dl><div class="ipfs-resource"><label for="ipfs-resource">打开 IPFS 资源</label><div><input id="ipfs-resource" placeholder="ipfs://… 或 /ipns/…" autocomplete="off" /><a id="ipfs-open-resource" class="secondary" target="_blank" rel="noopener noreferrer" aria-disabled="true">打开 ↗</a></div></div><section class="ipfs-traffic" aria-label="流量历史"><div class="ipfs-traffic-heading"><strong>流量历史</strong><span><i class="traffic-in-key"></i>接收 <i class="traffic-out-key"></i>发送</span></div><svg id="ipfs-chart" viewBox="0 0 300 104" role="img" aria-label="接收与发送速度历史图" preserveAspectRatio="none"><line x1="0" y1="52" x2="300" y2="52" class="traffic-divider"/><g id="ipfs-chart-in"></g><g id="ipfs-chart-out"></g></svg><div class="ipfs-traffic-axis"><span>最多 5 分钟</span><span>现在</span></div><p id="ipfs-chart-empty">打开面板后开始采样</p></section><p class="ipfs-status-note">面板打开时每 5 秒采样。关闭节点会暂停发布、IPNS 续期和 IPFS 订阅更新；重新开启后可恢复。</p><div class="dialog-actions"><button type="button" id="ipfs-gc" class="secondary" disabled>清理未固定数据</button><button type="button" id="close-ipfs-status" class="secondary">关闭</button><button type="button" id="refresh-ipfs-status" class="secondary">刷新</button></div></dialog>
-  <script type="module" src="./src/main.ts"></script>
   <dialog id="updates-dialog" aria-labelledby="updates-heading"><form id="updates-form">
     <h2 id="updates-heading">程序更新</h2><p id="update-current"></p>
     <p>填写可信发布者提供的 HTTPS 清单地址和 Ed25519 公钥。更换地址或公钥会重置该来源的版本记录。</p>
     <label>更新清单地址<input name="feedURL" type="url" maxlength="4096" placeholder="https://updates.example/feed.json" /></label>
     <label>发布者公钥<input name="publicKey" maxlength="128" autocomplete="off" placeholder="base64 编码的 Ed25519 公钥" /></label>
-    <label><input name="autoCheck" type="checkbox" />启动时检查更新</label>
+    <label class="setting-check"><input name="autoCheck" type="checkbox" />启动时检查更新</label>
     <p id="update-result" role="status">尚未配置更新源，不会自动联网检查。</p>
     <input id="update-path" readonly hidden aria-label="已验证更新包路径" />
     <p>下载完成后关闭 Planet，再运行已验证的安装包。</p>
     <div class="dialog-actions"><button id="close-updates" type="button" class="secondary">关闭</button><button type="submit" class="secondary">保存设置</button><button id="check-updates" type="button" class="secondary" disabled>检查更新</button><button id="download-update" type="button" class="primary" disabled>下载已验证安装包</button><button id="reveal-update" type="button" class="secondary" hidden>在文件夹中显示</button></div>
   </form></dialog>
+  <script type="module" src="./src/main.ts"></script>
 </body>
 </html>
