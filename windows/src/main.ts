@@ -512,7 +512,7 @@ function updateView() {
   unfollow.hidden = !subscription; unfollow.disabled = !subscription || saving;
   refreshFeed.disabled = !!subscription && refreshingSubscriptions.has(subscription.url); refreshFeed.textContent = refreshFeed.disabled ? "正在刷新…" : "刷新订阅";
   exportSite.hidden = !!subscription; exportSite.disabled = !site || saving;
-  publishSite.hidden = !!subscription || !site; publishSite.disabled = !site || saving || !!publication?.running;
+  publishSite.hidden = !!subscription || !site || editing; publishSite.disabled = !site || saving || !!publication?.running;
   exportPlanet.hidden = !!subscription; exportPlanet.disabled = !site || saving; importPlanet.disabled = saving;
   selectTemplate.hidden = !!subscription; selectTemplate.disabled = !site || saving;
   templateSettingsButton.hidden = !!subscription; templateSettingsButton.disabled = !site || site.templateName !== "Sepia" || saving;
@@ -522,7 +522,7 @@ function updateView() {
   updateTelegramControls();
   serviceButton.hidden=!!subscription; serviceButton.disabled=!site || saving;
   xSync.update();
-  editSite.hidden = !!subscription; editSite.disabled = !site || saving;
+  editSite.hidden = !site || !!subscription; editSite.disabled = !site || saving;
   const profileButton=$<HTMLButtonElement>("#site-profile");profileButton.hidden=!!subscription;profileButton.disabled=!site || !!site.imported || saving;profileButton.title=site?.imported ? "导入站点暂不支持修改公开资料" : "";
   const podcastButton=$<HTMLButtonElement>("#podcast-settings");podcastButton.hidden=!!subscription;podcastButton.disabled=!site || !!site.imported || saving;
   const deploymentButton=$<HTMLButtonElement>("#deployment-settings");deploymentButton.hidden=!!subscription;deploymentButton.disabled=!site || !!site.imported || saving;
@@ -808,7 +808,7 @@ async function queuePublication(siteID: string, manual = false) {
     } while (state.pending);
   } finally { state.running = false; updateView(); if (isDashboard()) void dashboard.refresh(); }
 }
-$("#new-site").addEventListener("click", () => { if (canLeave()) { navigationRevision++; editingSiteID=""; form.reset(); $("#site-index-setting").hidden=true;$("#site-avatar-setting").hidden=true;$("#site-identity-settings").hidden=true;$("#site-avatar-result").textContent="";$("#site-settings-result").textContent=""; form.querySelector("h2")!.textContent="创建站点";$("#site-dialog-description").textContent="为你的新空间起个名字。"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="创建站点"; openDialog(dialog); } });
+$("#new-site").addEventListener("click", () => { if (canLeave()) { navigationRevision++; editingSiteID=""; form.reset(); $("#site-index-setting").hidden=true;$("#site-avatar-setting").hidden=true;$("#site-identity-settings").hidden=true;$("#site-more-settings").hidden=true;$("#site-avatar-result").textContent="";$("#site-settings-result").textContent=""; form.querySelector("h2")!.textContent="创建站点";$("#site-dialog-description").textContent="为你的新空间起个名字。"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="创建站点"; openDialog(dialog); } });
 function updateSiteAvatarPreview(value?:string) {
   const image=$<HTMLImageElement>("#site-avatar-preview");image.hidden=!value;$("#site-avatar-placeholder").hidden=!!value;
   if(value)image.src=`data:image/png;base64,${value}`;else image.removeAttribute("src");
@@ -824,6 +824,7 @@ editSite.addEventListener("click", () => {
   form.querySelector<HTMLInputElement>('input[name="authorName"]')!.value=site.authorName || "";
   $("#site-index-setting").hidden=!!site.imported;
   $("#site-identity-settings").hidden=!!site.imported;
+  $("#site-more-settings").hidden=false;
   $("#site-avatar-setting").hidden=!!site.imported;$("#site-avatar-result").textContent="";updateSiteAvatarPreview(site.avatarPng);
   form.querySelector("h2")!.textContent="站点设置";$("#site-dialog-description").textContent="站点信息保存后需重新发布；头像选择后会自动发布。"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="保存设置";
   openDialog(dialog);

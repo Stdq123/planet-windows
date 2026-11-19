@@ -22,7 +22,7 @@ test("legacy shell surfaces resolve to original Mac Planet roles through the ful
   expect(color(".reader h2")).toBe("#1d1d1f");
   expect(color(".site-address")).toBe("#86868b");
   expect(color(".empty p")).toBe("#86868b");
-  expect(color(".workspace-menu-content button")).toBe("#1d1d1f");
+  expect(color(".workspace-menu-content button:not(:disabled)")).toBe("#1d1d1f");
   expect(color(".avatar-preview")).toBe("#515154");
   expect(background(".avatar-preview")).toBe("#e8f2ff");
   const tagInput = document.querySelector(".tag-bar input")!;

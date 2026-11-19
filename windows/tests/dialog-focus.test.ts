@@ -193,20 +193,16 @@ test.each([
   else await import("../src/main.ts?dialog-focus-pinnable-settings");
   enterFirstSite(window);
   const $ = <T extends Element = HTMLElement>(selector: string) => window.document.querySelector<T>(selector)!;
-  const entry = $<HTMLButtonElement>(`#${entryID}`), menu = $<HTMLDetailsElement>("#workspace-menu");
+  const entry = $<HTMLButtonElement>(`#${entryID}`), siteDialog = $<HTMLDialogElement>("#site-dialog");
   const dialog = $<HTMLDialogElement>(`#${dialogID}`), close = $<HTMLButtonElement>(`#${closeID}`);
   await until(() => !entry.disabled);
-  menu.open = true; entry.focus(); entry.click();
-  // Loading disables the entry before its click bubbles; the user can still fold its menu while waiting.
-  menu.open = false;
-  expect(menu.open).toBe(false);
+  $<HTMLButtonElement>("#edit-site").click();
+  expect(siteDialog.open).toBe(true);
+  entry.focus(); entry.click();
   expect(dialog.open).toBe(false);
-  // happy-dom refuses blur() on the now-disabled entry; model focus leaving through the summary.
-  const summary = menu.querySelector<HTMLElement>("summary")!; summary.focus(); summary.blur();
-  expect(window.document.activeElement === window.document.body).toBe(true);
   await until(() => !!release); release!();
   await until(() => dialog.open && !close.disabled);
   close.focus(); close.click();
   expect(dialog.open).toBe(false);
-  expect(window.document.activeElement === menu.querySelector("summary")).toBe(true);
+  expect(window.document.activeElement === entry).toBe(true);
 });

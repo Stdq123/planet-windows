@@ -816,6 +816,43 @@ dialog .dialog-actions {
   border-top: 0.5px solid var(--mac-line);
 }
 
+/* Grouped site configuration links inside Site Settings dialog */
+.site-more-settings {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 0.5px solid var(--mac-line);
+  display: grid;
+  gap: 14px;
+}
+.site-settings-group h3 {
+  margin: 0 0 8px;
+  font: 600 11px/16px var(--mac-font);
+  color: var(--mac-muted);
+}
+.site-settings-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.site-settings-links button {
+  min-height: 28px;
+  padding: 4px 10px;
+  font: 400 12px/18px var(--mac-font);
+}
+
+/* Subtle divider before destructive items in the slim workspace menu */
+.workspace-menu-content button:disabled {
+  color: var(--mac-muted);
+}
+.workspace-menu-content #remove-site,
+.workspace-menu-content #unfollow {
+  margin-top: 4px;
+  border-top: 0.5px solid var(--mac-line);
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  padding-top: 10px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     transition-duration: 0.01ms !important;

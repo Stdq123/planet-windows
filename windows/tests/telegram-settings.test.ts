@@ -177,9 +177,9 @@ test("unreadable Telegram configuration can be cleared only after loading and co
 
 test("Telegram and X settings remain available for the same selected site", async () => {
   const ui = await setup({ handle: method => method === "Library.XSyncInfo" ? { configured: false, autoSync: false, posts: [] } : undefined });
-  const menu = ui.element("#workspace-menu");
-  expect(menu.querySelector("#telegram-settings")).not.toBeNull();
-  expect(menu.querySelector("#x-sync-settings")).not.toBeNull();
+  const siteDialog = ui.element("#site-dialog");
+  expect(siteDialog.querySelector("#telegram-settings")).not.toBeNull();
+  expect(siteDialog.querySelector("#x-sync-settings")).not.toBeNull();
   await ui.open();
   expect(ui.element<HTMLDialogElement>("#telegram-dialog").open).toBe(true);
   ui.click("#telegram-close"); ui.click("#x-sync-settings");
