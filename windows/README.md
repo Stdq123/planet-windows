@@ -282,7 +282,7 @@ X API 需要开发者应用及可用访问额度，可能产生费用，含链�
 
 ## 构建与测试
 
-开发和检查需要 Windows 64 位、Git、Go 1.27.3 或兼容工具链、Bun 和 WebView2 Runtime；打包还需要 7-Zip。Go 使用默认的 `GOTOOLCHAIN=auto` 时可以自动获取依赖所要求的工具链。
+开发和检查需要 Windows 64 位、Git、Go 1.27.4 或兼容工具链、Bun 和 WebView2 Runtime；打包还需要 7-Zip。Go 使用默认的 `GOTOOLCHAIN=auto` 时可以自动获取依赖所要求的工具链。
 
 以下命令使用 PowerShell。从仓库根目录进入 `windows/` 并安装前端依赖，后续命令均在该目录执行：
 

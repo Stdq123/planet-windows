@@ -44,7 +44,7 @@ For step-by-step instructions, see [writing](windows/README.md#写作与文章),
 
 ## Run from source
 
-The app uses Go, MyGo, WebView2 and TypeScript. On Windows x64, install Git, Bun, Go 1.27.3 (or a compatible toolchain) and WebView2 Runtime, then run in PowerShell:
+The app uses Go, MyGo, WebView2 and TypeScript. On Windows x64, install Git, Bun, Go 1.27.4 (or a compatible toolchain) and WebView2 Runtime, then run in PowerShell:
 
 ```powershell
 git clone https://github.com/Stdq123/planet-windows.git
