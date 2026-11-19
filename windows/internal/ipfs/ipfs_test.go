@@ -93,6 +93,110 @@ func TestInitEnablesIPv4AndIPv6TCPAndQUICListeners(t *testing.T) {
 	}
 }
 
+func TestApplyLowPowerDefaultsAndPreservesOverrides(t *testing.T) {
+	raw := `{
+		"AutoNAT": {},
+		"Routing": {"Type": "auto", "DelegatedRouters": ["auto"]},
+		"Swarm": {"ConnMgr": {}, "RelayClient": {"Enabled": true}},
+		"Custom": {"keep": true}
+	}`
+	var config map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(raw), &config); err != nil {
+		t.Fatal(err)
+	}
+	if err := applyLowPowerDefaults(config); err != nil {
+		t.Fatal(err)
+	}
+	merged, err := json.Marshal(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		AutoNAT struct {
+			ServiceMode string `json:"ServiceMode"`
+		} `json:"AutoNAT"`
+		Routing struct {
+			Type             string   `json:"Type"`
+			DelegatedRouters []string `json:"DelegatedRouters"`
+		} `json:"Routing"`
+		Swarm struct {
+			ConnMgr struct {
+				Type        string `json:"Type"`
+				LowWater    int    `json:"LowWater"`
+				HighWater   int    `json:"HighWater"`
+				GracePeriod string `json:"GracePeriod"`
+			} `json:"ConnMgr"`
+			RelayClient struct {
+				Enabled bool `json:"Enabled"`
+			} `json:"RelayClient"`
+			RelayService struct {
+				Enabled *bool `json:"Enabled"`
+			} `json:"RelayService"`
+		} `json:"Swarm"`
+		Custom struct {
+			Keep bool `json:"keep"`
+		} `json:"Custom"`
+	}
+	if err := json.Unmarshal(merged, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.AutoNAT.ServiceMode != "disabled" {
+		t.Fatalf("AutoNAT.ServiceMode = %q, want disabled", got.AutoNAT.ServiceMode)
+	}
+	if got.Routing.Type != "autoclient" || len(got.Routing.DelegatedRouters) != 1 || got.Routing.DelegatedRouters[0] != "auto" {
+		t.Fatalf("Routing = %+v", got.Routing)
+	}
+	if got.Swarm.ConnMgr.Type != "basic" || got.Swarm.ConnMgr.LowWater != 20 || got.Swarm.ConnMgr.HighWater != 40 || got.Swarm.ConnMgr.GracePeriod != "1m0s" {
+		t.Fatalf("Swarm.ConnMgr = %+v", got.Swarm.ConnMgr)
+	}
+	if !got.Swarm.RelayClient.Enabled || got.Swarm.RelayService.Enabled == nil || *got.Swarm.RelayService.Enabled {
+		t.Fatalf("Swarm relay = client:%v service:%v", got.Swarm.RelayClient.Enabled, got.Swarm.RelayService.Enabled)
+	}
+	if !got.Custom.Keep {
+		t.Fatal("unknown top-level config lost")
+	}
+
+	overrideRaw := `{
+		"AutoNAT": {"ServiceMode": "enabled"},
+		"Routing": {"Type": "custom"},
+		"Swarm": {"ConnMgr": {"HighWater": 120}, "RelayService": {"Enabled": true}}
+	}`
+	var override map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(overrideRaw), &override); err != nil {
+		t.Fatal(err)
+	}
+	if err := applyLowPowerDefaults(override); err != nil {
+		t.Fatal(err)
+	}
+	mergedOverride, err := json.Marshal(override)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var gotOverride struct {
+		AutoNAT struct {
+			ServiceMode string `json:"ServiceMode"`
+		} `json:"AutoNAT"`
+		Routing struct {
+			Type string `json:"Type"`
+		} `json:"Routing"`
+		Swarm struct {
+			ConnMgr struct {
+				LowWater  int `json:"LowWater"`
+				HighWater int `json:"HighWater"`
+			} `json:"ConnMgr"`
+			RelayService struct {
+				Enabled bool `json:"Enabled"`
+			} `json:"RelayService"`
+		} `json:"Swarm"`
+	}
+	if err := json.Unmarshal(mergedOverride, &gotOverride); err != nil {
+		t.Fatal(err)
+	}
+	if gotOverride.AutoNAT.ServiceMode != "enabled" || gotOverride.Routing.Type != "custom" || gotOverride.Swarm.ConnMgr.HighWater != 120 || gotOverride.Swarm.ConnMgr.LowWater != 20 || !gotOverride.Swarm.RelayService.Enabled {
+		t.Fatalf("explicit overrides were overwritten: %+v", gotOverride)
+	}
+}
+
 func TestRemoveKeyIfMatchesPreservesOtherOrUnexpectedKeys(t *testing.T) {
 	exe := os.Getenv("PLANET_TEST_KUBO")
 	if exe == "" {

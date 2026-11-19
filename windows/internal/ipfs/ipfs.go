@@ -224,6 +224,9 @@ func (c *Client) Init() error {
 	if err != nil {
 		return err
 	}
+	if err = applyLowPowerDefaults(config); err != nil {
+		return err
+	}
 	b, err = json.MarshalIndent(config, "", "  ")
 	if err != nil {
 		return err
@@ -247,6 +250,87 @@ func (c *Client) Init() error {
 		return err
 	}
 	return os.Rename(name, path)
+}
+
+// applyLowPowerDefaults applies Kubo's desktop-friendly lowpower profile
+// settings while preserving explicit user overrides and unknown fields.
+func applyLowPowerDefaults(config map[string]json.RawMessage) error {
+	unmarshalObject := func(raw json.RawMessage, label string) (map[string]json.RawMessage, error) {
+		var obj map[string]json.RawMessage
+		if len(raw) > 0 && string(bytes.TrimSpace(raw)) != "null" {
+			if json.Unmarshal(raw, &obj) != nil {
+				return nil, fmt.Errorf("Kubo %s配置无效", label)
+			}
+		}
+		if obj == nil {
+			obj = map[string]json.RawMessage{}
+		}
+		return obj, nil
+	}
+
+	autoNAT, err := unmarshalObject(config["AutoNAT"], "AutoNAT ")
+	if err != nil {
+		return err
+	}
+	if _, exists := autoNAT["ServiceMode"]; !exists {
+		autoNAT["ServiceMode"] = json.RawMessage(`"disabled"`)
+	}
+	if config["AutoNAT"], err = json.Marshal(autoNAT); err != nil {
+		return err
+	}
+
+	routing, err := unmarshalObject(config["Routing"], "Routing ")
+	if err != nil {
+		return err
+	}
+	routingType := ""
+	if raw, exists := routing["Type"]; exists {
+		_ = json.Unmarshal(raw, &routingType)
+	}
+	if routingType == "" || routingType == "auto" {
+		routing["Type"] = json.RawMessage(`"autoclient"`)
+	}
+	if config["Routing"], err = json.Marshal(routing); err != nil {
+		return err
+	}
+
+	swarm, err := unmarshalObject(config["Swarm"], "Swarm ")
+	if err != nil {
+		return err
+	}
+	connMgr, err := unmarshalObject(swarm["ConnMgr"], "Swarm.ConnMgr ")
+	if err != nil {
+		return err
+	}
+	if _, exists := connMgr["Type"]; !exists {
+		connMgr["Type"] = json.RawMessage(`"basic"`)
+	}
+	if _, exists := connMgr["LowWater"]; !exists {
+		connMgr["LowWater"] = json.RawMessage(`20`)
+	}
+	if _, exists := connMgr["HighWater"]; !exists {
+		connMgr["HighWater"] = json.RawMessage(`40`)
+	}
+	if _, exists := connMgr["GracePeriod"]; !exists {
+		connMgr["GracePeriod"] = json.RawMessage(`"1m0s"`)
+	}
+	if swarm["ConnMgr"], err = json.Marshal(connMgr); err != nil {
+		return err
+	}
+
+	relayService, err := unmarshalObject(swarm["RelayService"], "Swarm.RelayService ")
+	if err != nil {
+		return err
+	}
+	if _, exists := relayService["Enabled"]; !exists {
+		relayService["Enabled"] = json.RawMessage(`false`)
+	}
+	if swarm["RelayService"], err = json.Marshal(relayService); err != nil {
+		return err
+	}
+
+	config["Swarm"], err = json.Marshal(swarm)
+	return err
 }
 
 // Start owns the daemon process it creates. Offline mode is intended for tests.
