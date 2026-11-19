@@ -184,14 +184,14 @@ test("editor resize preserves the chosen article list while mode entry keeps it 
   $<HTMLButtonElement>("#new-article").click();expect(panel.hidden).toBe(true);
 });
 
-test("publication details opens from the workspace menu and closes that menu",async()=>{
+test("publication details opens from the toolbar and restores focus on close",async()=>{
   const {window,$}=await fixture();await until(()=>$("#site-title").textContent==="Site");
-  const menu=$<HTMLDetailsElement>("#workspace-menu"), publication=$<HTMLDialogElement>("#publication-dialog");
+  const publication=$<HTMLDialogElement>("#publication-dialog");
   const entry=$<HTMLButtonElement>("#show-publication"), close=$<HTMLButtonElement>("#close-publication");
-  menu.open=true;entry.focus();entry.click();
-  expect(menu.open).toBe(false);expect(publication.open).toBe(true);
+  entry.focus();entry.click();
+  expect(publication.open).toBe(true);
   close.focus();close.click();expect(publication.open).toBe(false);
-  expect(window.document.activeElement===menu.querySelector("summary")).toBe(true);
+  expect(window.document.activeElement===entry).toBe(true);
   const other=$<HTMLButtonElement>("#toggle-posts");other.focus();publication.showModal();publication.close();
   expect(window.document.activeElement).toBe(other);
 });

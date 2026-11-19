@@ -1,7 +1,6 @@
 package ipfs
 
 import (
-	"encoding/json"
 	"errors"
 	"time"
 )
@@ -28,14 +27,10 @@ func (c *Client) RepoSize() (int64, error) {
 	if err := c.requireOwnedDaemonLocked(); err != nil {
 		return 0, err
 	}
-	out, err := c.runTimeout(15*time.Second, "--enc=json", "repo", "stat", "--size-only")
-	if err != nil {
-		return 0, err
-	}
 	var result struct {
 		RepoSize int64 `json:"RepoSize"`
 	}
-	if err = json.Unmarshal([]byte(out), &result); err != nil {
+	if err := c.postRPC(15*time.Second, "/api/v0/repo/stat?size-only=true", 64*1024, &result); err != nil {
 		return 0, err
 	}
 	return result.RepoSize, nil

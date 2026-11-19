@@ -1,0 +1,872 @@
+/* Original macOS Planet visual language adapted for Planet Windows.
+ * Reference: D:\iip\Planet (PlanetSidebarView, ArticleListView, ArticleView). */
+
+:root {
+  --mac-sidebar: #ececec;
+  --mac-surface: #ffffff;
+  --mac-subtle: #f5f5f7;
+  --mac-hover: rgba(0, 0, 0, 0.05);
+  --mac-active: rgba(0, 0, 0, 0.09);
+  --mac-sidebar-selected: rgba(0, 0, 0, 0.085);
+  --mac-line: #e2e2e5;
+  --mac-control-line: #c7c7cc;
+  --mac-ink: #1d1d1f;
+  --mac-secondary: #515154;
+  --mac-muted: #86868b;
+  --mac-accent: #007aff;
+  --mac-accent-hover: #0066d6;
+  --mac-accent-active: #0055b3;
+  --mac-accent-ink: #ffffff;
+  --mac-list-selected: #0a66e8;
+  --mac-list-selected-ink: #ffffff;
+  --mac-list-selected-muted: rgba(255, 255, 255, 0.82);
+  --mac-selection: #e8f2ff;
+  --mac-orange: #ff9500;
+  --mac-yellow: #f5b800;
+  --mac-green: #34c759;
+  --mac-danger: #ff3b30;
+  --mac-danger-surface: #fff2f1;
+  --mac-danger-line: #ffd0cd;
+  --mac-font: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  --mac-toolbar-height: 52px;
+  --mac-shadow: 0 12px 32px rgba(0, 0, 0, 0.14), 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+  --mac-popover-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+
+  /* Map shared semantic tokens onto the original Mac Planet palette. */
+  --pw-brand: var(--mac-accent);
+  --pw-brand-hover: var(--mac-accent-hover);
+  --pw-brand-active: var(--mac-accent-active);
+  --pw-brand-ink: var(--mac-accent-ink);
+  --pw-accent: var(--mac-accent);
+  --pw-accent-ink: #0055b3;
+  --pw-selection: var(--mac-selection);
+  --pw-canvas: var(--mac-surface);
+  --pw-sidebar: var(--mac-sidebar);
+  --pw-card: var(--mac-surface);
+  --pw-raised: var(--mac-surface);
+  --pw-footer: #f7f7f9;
+  --pw-ink: var(--mac-ink);
+  --pw-secondary: var(--mac-secondary);
+  --pw-muted: var(--mac-muted);
+  --pw-line: var(--mac-line);
+  --pw-control-line: var(--mac-control-line);
+  --pw-hover: var(--mac-hover);
+  --pw-active: var(--mac-active);
+  --pw-danger: var(--mac-danger);
+  --pw-danger-surface: var(--mac-danger-surface);
+  --pw-danger-line: var(--mac-danger-line);
+  --pw-success: #248a3d;
+  --pw-warning: #b25000;
+  --pw-font: var(--mac-font);
+  --pw-popover-shadow: var(--mac-popover-shadow);
+  --pw-dialog-shadow: var(--mac-shadow);
+  --surface-main: var(--mac-surface);
+  --surface-sidebar: var(--mac-sidebar);
+  --surface-list: var(--mac-surface);
+  --line: var(--mac-line);
+  --ink: var(--mac-ink);
+  --muted: var(--mac-muted);
+  --brand: var(--mac-accent);
+  --brand-hover: var(--mac-accent-hover);
+  --brand-pressed: var(--mac-accent-active);
+  --focus: var(--mac-accent);
+  --selection: var(--mac-selection);
+  --hover: var(--mac-hover);
+  --text-secondary: var(--mac-secondary);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --mac-sidebar: #232325;
+    --mac-surface: #1c1c1e;
+    --mac-subtle: #2c2c2e;
+    --mac-hover: rgba(255, 255, 255, 0.07);
+    --mac-active: rgba(255, 255, 255, 0.12);
+    --mac-sidebar-selected: rgba(255, 255, 255, 0.13);
+    --mac-line: #343437;
+    --mac-control-line: #48484a;
+    --mac-ink: #f5f5f7;
+    --mac-secondary: #c7c7cc;
+    --mac-muted: #8e8e93;
+    --mac-accent: #0a84ff;
+    --mac-accent-hover: #3399ff;
+    --mac-accent-active: #0070e0;
+    --mac-list-selected: #0a66e8;
+    --mac-selection: rgba(10, 132, 255, 0.2);
+    --mac-danger: #ff453a;
+    --mac-danger-surface: #3a1d1c;
+    --mac-danger-line: #6b2d2a;
+    --pw-accent-ink: #64b5ff;
+    --pw-footer: #242426;
+    --pw-notice-bg: #322712;
+    --pw-notice-ink: #f5c976;
+    --pw-warning-ink: #f0b159;
+    --pw-backdrop: rgba(0, 0, 0, 0.55);
+    --mac-shadow: 0 20px 56px rgba(0, 0, 0, 0.55), 0 0 0 0.5px rgba(255, 255, 255, 0.1);
+    --mac-popover-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), 0 0 0 0.5px rgba(255, 255, 255, 0.1);
+    color-scheme: dark;
+  }
+
+  .design-icon,
+  .planet-mark,
+  .dashboard-row-icon,
+  .dashboard-row-arrow,
+  .dashboard-site-arrow,
+  .dashboard-empty-mark img,
+  .empty-orbit img {
+    filter: invert(1);
+  }
+}
+
+body {
+  font-family: var(--mac-font);
+  background: var(--mac-surface);
+  color: var(--mac-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Three-pane macOS split view geometry */
+.shell {
+  height: 100dvh;
+  min-height: 0;
+  grid-template-columns: 228px 276px minmax(0, 1fr);
+}
+.shell.posts-collapsed {
+  grid-template-columns: 228px minmax(0, 1fr);
+}
+.shell.editing-mode {
+  grid-template-columns: 228px 264px minmax(0, 1fr);
+}
+.shell.editing-mode.posts-collapsed,
+.shell.dashboard-mode {
+  grid-template-columns: 228px minmax(0, 1fr);
+}
+
+/* Unified subtle scrollbars */
+.sidebar-scroll,
+.articles,
+.dashboard,
+.dialog-body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--mac-line) transparent;
+}
+
+/* ==================== LEFT SIDEBAR ==================== */
+.shell > .sidebar {
+  padding: 10px 10px 0;
+  background: var(--mac-sidebar);
+  border-right: 1px solid var(--mac-line);
+  font: 400 13px/18px var(--mac-font);
+}
+
+.sidebar .brand {
+  min-height: 40px;
+  padding: 4px 8px 6px;
+  gap: 8px;
+  font: 600 15px/20px var(--mac-font);
+  color: var(--mac-ink);
+}
+.sidebar .planet-mark {
+  width: 22px;
+  height: 22px;
+}
+
+.sidebar .sidebar-scroll {
+  margin-top: 8px;
+  padding: 0 0 12px;
+}
+
+.sidebar .nav-section + .nav-section {
+  margin-top: 16px;
+}
+
+.sidebar .section-label {
+  min-height: 24px;
+  padding: 0 8px;
+  margin-bottom: 2px;
+  color: var(--mac-muted);
+}
+.sidebar .section-label h2 {
+  font: 600 11px/16px var(--mac-font);
+  letter-spacing: 0.01em;
+}
+.sidebar .section-label .icon-button {
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  color: var(--mac-muted);
+}
+.sidebar .section-label .icon-button:hover {
+  background: var(--mac-hover);
+  color: var(--mac-ink);
+}
+
+.sidebar .smart-action,
+.sidebar .site-item,
+.sidebar-bottom #show-ipfs-status,
+.sidebar-tools summary,
+.sidebar-tools .sidebar-action {
+  min-height: 30px;
+  padding: 5px 8px;
+  gap: 8px;
+  border-radius: 6px;
+  color: var(--mac-ink);
+  font: 400 13px/18px var(--mac-font);
+}
+
+.sidebar .smart-action:hover,
+.sidebar .site-item:hover,
+.sidebar-bottom #show-ipfs-status:hover,
+.sidebar-tools summary:hover,
+.sidebar-tools .sidebar-action:hover {
+  background: var(--mac-hover);
+}
+
+.sidebar .smart-action.active,
+.sidebar .site-item.active {
+  background: var(--mac-sidebar-selected);
+  color: var(--mac-ink);
+  font-weight: 500;
+}
+.sidebar .smart-action.active::before,
+.sidebar .site-item.active::before {
+  content: none;
+}
+
+/* Compact macOS search field in sidebar */
+.sidebar #show-search {
+  margin: 4px 0 2px;
+  min-height: 30px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.045);
+  border: 0.5px solid var(--mac-line);
+  border-radius: 6px;
+  color: var(--mac-muted);
+}
+@media (prefers-color-scheme: dark) {
+  .sidebar #show-search {
+    background: rgba(255, 255, 255, 0.06);
+  }
+}
+.sidebar #show-search:hover {
+  background: var(--mac-hover);
+  color: var(--mac-ink);
+}
+.sidebar kbd {
+  padding: 1px 5px;
+  border: 0.5px solid var(--mac-line);
+  border-radius: 4px;
+  font: 500 10px/14px var(--mac-font);
+  color: var(--mac-muted);
+}
+
+/* Iconic Smart Feed accent tinting (Today=orange, Unread=blue, Starred=yellow) */
+.sidebar #show-today .design-icon {
+  filter: brightness(0) saturate(100%) invert(58%) sepia(93%) saturate(1879%) hue-rotate(359deg) brightness(102%) contrast(105%);
+}
+.sidebar #show-unread .design-icon {
+  filter: brightness(0) saturate(100%) invert(34%) sepia(99%) saturate(2675%) hue-rotate(202deg) brightness(102%) contrast(106%);
+}
+.sidebar #show-favorites .design-icon {
+  filter: brightness(0) saturate(100%) invert(74%) sepia(83%) saturate(954%) hue-rotate(1deg) brightness(101%) contrast(98%);
+}
+
+/* Circular colorful site avatars like original Mac Planet */
+.sidebar .sites .site-item {
+  gap: 8px;
+  padding: 4px 8px;
+}
+.sidebar .sites .site-item:nth-child(n) .site-icon,
+.sidebar .sites .site-item.active .site-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font: 600 11px/1 var(--mac-font);
+  color: #ffffff;
+  background: #6b7de0;
+}
+.sidebar .sites .site-item:nth-child(6n+2) .site-icon { background: #e26d5a; }
+.sidebar .sites .site-item:nth-child(6n+3) .site-icon { background: #4da89b; }
+.sidebar .sites .site-item:nth-child(6n+4) .site-icon { background: #e09f3e; }
+.sidebar .sites .site-item:nth-child(6n+5) .site-icon { background: #9a72c8; }
+.sidebar .sites .site-item:nth-child(6n+6) .site-icon { background: #4aa3b5; }
+.sidebar .site-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+}
+
+/* Pill count badges like Mac Planet (4, 51, 74) */
+.sidebar .smart-count,
+.sidebar .subscription-count {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.065);
+  color: var(--mac-secondary);
+  text-align: center;
+  font: 500 11px/15px var(--mac-font);
+}
+@media (prefers-color-scheme: dark) {
+  .sidebar .smart-count,
+  .sidebar .subscription-count {
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
+.sidebar .smart-count:empty,
+.sidebar .subscription-count:empty {
+  display: none;
+}
+
+/* Single-row 44px macOS bottom status bar (IPFS status left, settings gear right) */
+.sidebar-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  height: 44px;
+  margin: 0 -10px;
+  padding: 0 10px;
+  border-top: 1px solid var(--mac-line);
+  background: rgba(0, 0, 0, 0.025);
+}
+@media (prefers-color-scheme: dark) {
+  .sidebar-bottom {
+    background: rgba(255, 255, 255, 0.025);
+  }
+}
+.sidebar-bottom #show-ipfs-status {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  height: 30px;
+  min-height: 30px;
+  margin: 0;
+  padding: 0 6px;
+  gap: 8px;
+  border-radius: 6px;
+  font: 400 13px/18px var(--mac-font);
+  color: var(--mac-ink);
+}
+.sidebar-bottom #show-ipfs-status::before {
+  content: "";
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--mac-green);
+}
+.sidebar-bottom #show-ipfs-status .system-icon {
+  display: none;
+}
+.sidebar-bottom .sidebar-tools {
+  flex: none;
+  margin: 0;
+  position: relative;
+}
+.sidebar-bottom .sidebar-tools > summary {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  height: 30px;
+  min-height: 30px;
+  padding: 0 8px;
+  gap: 5px;
+  border-radius: 6px;
+  color: var(--mac-secondary);
+  font: 400 12px/18px var(--mac-font);
+  white-space: nowrap;
+}
+.sidebar-bottom .sidebar-tools > summary .nav-label {
+  flex: none;
+  overflow: visible;
+}
+.sidebar-bottom .sidebar-tools > summary .nav-chevron {
+  display: none;
+}
+.sidebar-bottom .sidebar-tools[open] > summary {
+  background: var(--mac-active);
+  color: var(--mac-ink);
+}
+
+.sidebar .sidebar-tools-content {
+  left: auto;
+  right: 0;
+  bottom: calc(100% + 10px);
+  width: 208px;
+  padding: 6px;
+  border-radius: 10px;
+  border: 0.5px solid var(--mac-line);
+  background: var(--mac-surface);
+  box-shadow: var(--mac-popover-shadow);
+}
+.sidebar-tools-content .sidebar-action {
+  min-height: 30px;
+  padding: 5px 8px;
+  gap: 8px;
+  border-radius: 6px;
+  font: 400 13px/18px var(--mac-font);
+  color: var(--mac-ink);
+}
+.sidebar-tools-content .gateway-setting {
+  margin: 8px 2px 4px;
+  padding-top: 8px;
+  border-top: 0.5px solid var(--mac-line);
+}
+.sidebar-tools-content .gateway-setting legend {
+  margin-bottom: 4px;
+  padding: 0 6px;
+  font: 600 11px/16px var(--mac-font);
+  color: var(--mac-muted);
+}
+.sidebar-tools-content .gateway-setting .choice-group {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2px;
+}
+.sidebar-tools-content .gateway-setting .choice-group label {
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mac-ink);
+  font: 400 12px/16px var(--mac-font);
+}
+.sidebar-tools-content .gateway-setting .choice-group label:hover {
+  background: var(--mac-hover);
+}
+.sidebar-tools-content .gateway-setting .choice-group label:has(:checked) {
+  background: var(--mac-selection);
+  color: var(--pw-accent-ink);
+}
+.sidebar-tools-content .sidebar-footer {
+  margin: 6px 0 0;
+  padding: 8px 8px 2px;
+  gap: 6px;
+  white-space: nowrap;
+  border-top: 0.5px solid var(--mac-line);
+  font: 400 11px/16px var(--mac-font);
+  color: var(--mac-muted);
+}
+.sidebar-footer .version {
+  font-size: 11px;
+}
+
+/* ==================== MIDDLE ARTICLE LIST ==================== */
+.posts-panel {
+  background: var(--mac-surface);
+  border-right: 1px solid var(--mac-line);
+}
+
+.posts-header {
+  min-height: var(--mac-toolbar-height);
+  height: var(--mac-toolbar-height);
+  padding: 0 14px;
+  gap: 8px;
+  align-items: center;
+  border-bottom: 0;
+}
+.posts-header > div:first-child {
+  min-width: 0;
+}
+.posts-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+.posts-header h1 {
+  margin: 0;
+  font: 600 14px/18px var(--mac-font);
+  color: var(--mac-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.posts-caption {
+  min-height: 30px;
+  padding: 0 14px 6px;
+  gap: 10px;
+  border-bottom: 1px solid var(--mac-line);
+  font: 400 11px/16px var(--mac-font);
+  color: var(--mac-muted);
+}
+.posts-caption #posts-kind {
+  height: auto;
+  font: 500 11px/16px var(--mac-font);
+  color: var(--mac-secondary);
+}
+.posts-caption #posts-kind::after {
+  content: none;
+}
+.posts-caption #show-drafts {
+  min-height: 22px;
+  padding: 2px 8px;
+  border-radius: 5px;
+  background: var(--mac-subtle);
+  color: var(--mac-secondary);
+  font: 500 11px/16px var(--mac-font);
+}
+.posts-caption #show-drafts:hover:not(:disabled) {
+  background: var(--mac-hover);
+  color: var(--mac-ink);
+}
+.posts-total {
+  font-size: 11px;
+}
+
+.articles {
+  padding: 6px;
+}
+
+/* Classic macOS Planet article list rows */
+.article-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  transition: background-color 80ms ease;
+}
+.article-item + .article-item::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: 0.5px;
+  background: var(--mac-line);
+}
+.article-item.active::before,
+.article-item.active + .article-item::before,
+.article-item:hover::before,
+.article-item:hover + .article-item::before {
+  opacity: 0;
+}
+
+.article-item:hover:not(.active) {
+  background: var(--mac-hover);
+}
+
+.article-item.active {
+  background: var(--mac-list-selected);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.article-title {
+  order: 1;
+  font: 600 13px/18px var(--mac-font);
+  color: var(--mac-ink);
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.article-excerpt {
+  order: 2;
+  margin: 0;
+  font: 400 12px/17px var(--mac-font);
+  color: var(--mac-secondary);
+  -webkit-line-clamp: 2;
+}
+.article-row-heading {
+  order: 3;
+  margin: 2px 0 0;
+  gap: 6px;
+}
+.article-source-icon {
+  display: none;
+}
+.article-source,
+.article-date {
+  font: 400 11px/15px var(--mac-font);
+  color: var(--mac-muted);
+}
+
+.article-item.unread .article-title::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin: 0 6px 1px 0;
+  border-radius: 50%;
+  background: var(--mac-accent);
+}
+
+/* Iconic white-on-blue selected row state */
+.article-item.active .article-title {
+  color: var(--mac-list-selected-ink);
+  text-decoration: none;
+}
+.article-item.active .article-excerpt,
+.article-item.active .article-source,
+.article-item.active .article-date {
+  color: var(--mac-list-selected-muted);
+}
+.article-item.active.unread .article-title::before {
+  background: #ffffff;
+}
+
+/* ==================== RIGHT WORKSPACE / TOOLBAR ==================== */
+.workspace {
+  background: var(--mac-surface);
+}
+
+.workspace-header {
+  min-height: var(--mac-toolbar-height);
+  height: var(--mac-toolbar-height);
+  padding: 0 18px;
+  border-bottom: 1px solid var(--mac-line);
+  background: var(--mac-surface);
+}
+
+.workspace-title {
+  font: 500 13px/18px var(--mac-font);
+  color: var(--mac-secondary);
+}
+
+.icon-button,
+.workspace-menu summary {
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  border-radius: 6px;
+  color: var(--mac-secondary);
+}
+.icon-button:hover,
+.workspace-menu summary:hover {
+  background: var(--mac-hover);
+  color: var(--mac-ink);
+}
+
+.primary,
+.secondary {
+  min-height: 30px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font: 500 13px/18px var(--mac-font);
+}
+.primary {
+  background: var(--mac-accent);
+  border: 1px solid transparent;
+  color: var(--mac-accent-ink);
+}
+.primary:hover:not(:disabled) {
+  background: var(--mac-accent-hover);
+}
+.primary:active:not(:disabled) {
+  background: var(--mac-accent-active);
+}
+.secondary {
+  background: var(--mac-surface);
+  border: 0.5px solid var(--mac-control-line);
+  color: var(--mac-ink);
+}
+.secondary:hover:not(:disabled) {
+  background: var(--mac-hover);
+}
+.secondary.danger {
+  color: var(--mac-danger);
+  border-color: var(--mac-danger-line);
+  background: var(--mac-danger-surface);
+}
+.secondary.danger:hover:not(:disabled) {
+  background: var(--mac-danger-line);
+}
+
+/* ==================== READER & EDITOR ==================== */
+.reader .document-head {
+  width: min(100%, 780px);
+  padding: 32px 32px 0;
+}
+.reader h2 {
+  font: 700 28px/1.3 var(--mac-font);
+  letter-spacing: -0.02em;
+  color: var(--mac-ink);
+  margin: 0 0 12px;
+}
+.reader-meta {
+  margin: 0 0 14px;
+  padding: 0 0 14px;
+  border-bottom: 0.5px solid var(--mac-line);
+}
+.reader-actions button,
+.own-reader-actions button {
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  border-radius: 6px;
+}
+.reader-actions button:hover,
+.own-reader-actions button:hover {
+  background: var(--mac-hover);
+}
+#toggle-read::before { content: "\E715"; }
+#toggle-read[aria-pressed="true"]::before { content: "\E8C3"; color: var(--mac-accent); }
+#star-item::before { content: "\E734"; color: var(--mac-secondary); }
+#star-item[aria-pressed="true"]::before { content: "\E735"; color: var(--mac-yellow); }
+
+.editor-options {
+  flex: 1;
+  min-width: 0;
+}
+#toggle-metadata {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--mac-subtle);
+  border: 0.5px solid var(--mac-line);
+  color: var(--mac-secondary);
+}
+#toggle-metadata:hover {
+  background: var(--mac-hover);
+  color: var(--mac-ink);
+}
+.view-switch {
+  padding: 2px;
+  border: 0.5px solid var(--mac-line);
+  border-radius: 7px;
+  background: var(--mac-subtle);
+}
+.view-switch button {
+  border-radius: 5px;
+  padding: 4px 10px;
+  font: 500 12px/16px var(--mac-font);
+}
+.view-switch button[aria-pressed="true"] {
+  background: var(--mac-surface);
+  color: var(--mac-ink);
+  text-decoration: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* ==================== DASHBOARD (HARMONIZED MAC STYLE) ==================== */
+.dashboard {
+  background: var(--mac-surface);
+  font: 400 13px/20px var(--mac-font);
+}
+.dashboard-inner {
+  padding: 24px 32px;
+}
+.dashboard h1 {
+  font: 700 22px/28px var(--mac-font);
+  letter-spacing: -0.015em;
+}
+.dashboard .dashboard-subtitle {
+  margin-top: 4px;
+}
+.dashboard-summary {
+  border-bottom: 0.5px solid var(--mac-line);
+}
+.dashboard-row {
+  border-bottom: 0.5px solid var(--mac-line);
+}
+.dashboard-draft {
+  min-height: 58px;
+}
+.dashboard-draft:first-child {
+  background: transparent;
+  border-radius: 0;
+  border-bottom-color: var(--mac-line);
+}
+.dashboard-draft:first-child .dashboard-row-title {
+  text-decoration: none;
+  color: var(--mac-ink);
+}
+.dashboard-draft:first-child:hover {
+  background: var(--mac-hover);
+}
+.dashboard-site {
+  border-bottom: 0.5px solid var(--mac-line);
+}
+.dashboard-site-icon {
+  border-radius: 50%;
+  background: #6b7de0;
+  color: #ffffff;
+  font-weight: 600;
+}
+.dashboard-site:nth-child(6n+2) .dashboard-site-icon { background: #e26d5a; }
+.dashboard-site:nth-child(6n+3) .dashboard-site-icon { background: #4da89b; }
+.dashboard-site:nth-child(6n+4) .dashboard-site-icon { background: #e09f3e; }
+.dashboard-site:nth-child(6n+5) .dashboard-site-icon { background: #9a72c8; }
+.dashboard-site:nth-child(6n+6) .dashboard-site-icon { background: #4aa3b5; }
+.dashboard-publishing-note {
+  background: var(--mac-subtle);
+  border: 0.5px solid var(--mac-line);
+  border-radius: 10px;
+}
+.dashboard-filter[aria-pressed="true"] {
+  color: var(--mac-accent);
+  border-bottom: 2px solid var(--mac-accent);
+}
+
+/* ==================== DIALOGS (MAC SHEET FEEL) ==================== */
+dialog,
+:is(#search-dialog, #site-dialog, #dashboard-compose-dialog) {
+  background: var(--mac-surface);
+  color: var(--mac-ink);
+  border: 0.5px solid var(--mac-line);
+  border-radius: 12px;
+  box-shadow: var(--mac-shadow);
+  font-family: var(--mac-font);
+}
+.dialog-body > p:last-child {
+  margin-bottom: 0;
+}
+dialog .dialog-actions {
+  background: var(--pw-footer);
+  border-top: 0.5px solid var(--mac-line);
+}
+
+/* Grouped site configuration links inside Site Settings dialog */
+.site-more-settings {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 0.5px solid var(--mac-line);
+  display: grid;
+  gap: 14px;
+}
+.site-settings-group h3 {
+  margin: 0 0 8px;
+  font: 600 11px/16px var(--mac-font);
+  color: var(--mac-muted);
+}
+.site-settings-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.site-settings-links button {
+  min-height: 28px;
+  padding: 4px 10px;
+  font: 400 12px/18px var(--mac-font);
+}
+
+/* Subtle divider before destructive items in the slim workspace menu */
+.workspace-menu-content button:disabled {
+  color: var(--mac-muted);
+}
+.workspace-menu-content #remove-site,
+.workspace-menu-content #unfollow {
+  margin-top: 4px;
+  border-top: 0.5px solid var(--mac-line);
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  padding-top: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

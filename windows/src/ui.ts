@@ -153,11 +153,27 @@ export function syncChoices(root: ParentNode) {
 }
 
 export const readingStyles = `
+  :root{color-scheme:light dark}
+  html{scrollbar-width:thin;scrollbar-color:#d1d1d6 transparent}
   *{box-sizing:border-box}
-  body{max-width:800px;margin:0 auto;padding:8px 32px 40px;font:16px/1.85 'Segoe UI Variable','Segoe UI','Microsoft YaHei UI',sans-serif;color:#253344;overflow-wrap:anywhere}
-  p{margin:0 0 1.2em}h1,h2,h3{line-height:1.4;color:#172435}a{color:#176bc0}
-  img,video{max-width:100%;height:auto}pre{padding:16px;overflow:auto;border-radius:8px;background:#f3f5f8}
-  code{font-family:Consolas,monospace}blockquote{margin-left:0;padding-left:20px;border-left:3px solid #d7e2ee;color:#5b6b7e}
-  table{display:block;max-width:100%;overflow:auto}iframe{max-width:100%}
+  body{max-width:780px;margin:0 auto;padding:8px 32px 44px;font:16px/1.85 -apple-system,BlinkMacSystemFont,'Segoe UI Variable Text','Segoe UI','Microsoft YaHei UI',sans-serif;color:#1d1d1f;background:#ffffff;overflow-wrap:anywhere;-webkit-font-smoothing:antialiased}
+  p{margin:0 0 1.2em}h1,h2,h3{line-height:1.35;color:#1d1d1f}a{color:#007aff;text-decoration:none}a:hover{text-decoration:underline}
+  img,video{max-width:100%;height:auto;border-radius:6px}
+  pre{padding:16px;overflow:auto;border-radius:8px;background:#f5f5f7}
+  code{font-family:Consolas,monospace;padding:.12em .35em;border-radius:4px;background:#f5f5f7;font-size:.9em}
+  pre code{padding:0;border-radius:0;background:none;font-size:inherit}
+  blockquote{margin-left:0;padding-left:18px;border-left:3px solid #d1d1d6;color:#515154}
+  hr{border:0;border-top:1px solid #e2e2e5;margin:1.75em 0}
+  table{display:block;max-width:100%;overflow:auto;border-collapse:collapse}
+  th,td{padding:8px 12px;border:1px solid #e2e2e5;text-align:left}th{background:#f5f5f7;font-weight:600}
+  iframe{max-width:100%}
+  @media(prefers-color-scheme:dark){
+    html{scrollbar-color:#3a3a3c transparent}
+    body{color:#f5f5f7;background:#1c1c1e}
+    h1,h2,h3{color:#f5f5f7}a{color:#0a84ff}
+    pre,code,th{background:#2c2c2e}
+    blockquote{border-left-color:#48484a;color:#a1a1a6}
+    hr,th,td{border-color:#38383a}
+  }
   @media(max-width:520px){body{padding-inline:24px}}
 `;

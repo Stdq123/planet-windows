@@ -414,6 +414,11 @@ function renderSubscriptions() {
     button.addEventListener("click", () => selectSubscription(entry)); subscriptionsEl.append(button);
   }
 }
+function formatPublishedDate(raw: string): string {
+  if (!raw) return "";
+  const parsed = Date.parse(raw);
+  return Number.isNaN(parsed) ? raw : new Date(parsed).toLocaleDateString("zh-CN");
+}
 function renderArticles() {
   if (smartView) {
     articlesEl.replaceChildren();
@@ -422,7 +427,7 @@ function renderArticles() {
     count.textContent=String(entries.length);
     if(!entries.length) articlesEl.append(label("p",smartView==="unread" ? "没有未读文章" : "今天没有文章","list-empty"));
     for(const {source,entry} of entries) {
-      const button=articleRow(entry.title,entry.published || "",entry.description || entry.content || "",source.url===subscription?.url && (entry.key || entry.id || entry.link)===(item?.key || item?.id || item?.link),source.feed.title || source.url);
+      const button=articleRow(entry.title,formatPublishedDate(entry.published || ""),entry.description || entry.content || "",source.url===subscription?.url && (entry.key || entry.id || entry.link)===(item?.key || item?.id || item?.link),source.feed.title || source.url);
       button.classList.toggle("unread",!entry.read);
       button.addEventListener("click",()=>{subscription=source;site=null;selectFeedItem(entry);});articlesEl.append(button);
     }
@@ -432,14 +437,14 @@ function renderArticles() {
     articlesEl.replaceChildren(); const favorites = subscriptions.flatMap(source => source.feed.items.filter(entry => entry.starred).map(entry => ({source,entry})));
     count.textContent = String(favorites.length);
     if (!favorites.length) articlesEl.append(label("p", "还没有收藏的文章", "list-empty"));
-    for (const favorite of favorites) { const button=articleRow(favorite.entry.title, favorite.entry.published || "", favorite.entry.description || favorite.entry.content || "", favorite.source.url===subscription?.url && favorite.entry===item, favorite.source.feed.title || favorite.source.url); button.addEventListener("click",()=>{subscription=favorite.source; site=null; selectFeedItem(favorite.entry);}); articlesEl.append(button); }
+    for (const favorite of favorites) { const button=articleRow(favorite.entry.title, formatPublishedDate(favorite.entry.published || ""), favorite.entry.description || favorite.entry.content || "", favorite.source.url===subscription?.url && favorite.entry===item, favorite.source.feed.title || favorite.source.url); button.addEventListener("click",()=>{subscription=favorite.source; site=null; selectFeedItem(favorite.entry);}); articlesEl.append(button); }
     return;
   }
   if (subscription) {
     articlesEl.replaceChildren(); count.textContent = String(subscription.feed.items.length);
     if (!subscription.feed.items.length) articlesEl.append(label("p", "订阅暂时没有文章", "list-empty"));
     for (const entry of subscription.feed.items) {
-      const button = articleRow(entry.title, entry.published || "", entry.description || entry.content || "", entry === item, subscription.feed.title || subscription.url);
+      const button = articleRow(entry.title, formatPublishedDate(entry.published || ""), entry.description || entry.content || "", entry === item, subscription.feed.title || subscription.url);
       button.classList.toggle("unread",!entry.read);
       button.addEventListener("click", () => selectFeedItem(entry)); articlesEl.append(button);
     }
@@ -496,6 +501,7 @@ function updateView() {
   $("#unread-count").textContent=String(allItems.filter(entry=>!entry.read).length);
   $("#favorites-count").textContent=String(allItems.filter(entry=>entry.starred).length);
   workspaceMenu.hidden = !site && !subscription;
+  newArticle.hidden = !site || !!subscription;
   newArticle.disabled = !site || !!subscription || saving;
   const headerCompose=$<HTMLButtonElement>("#new-article-header"); headerCompose.hidden=!site || !!subscription || editing; headerCompose.disabled=newArticle.disabled;
   saveButton.disabled = !site || !editing || !!subscription || saving;
@@ -506,7 +512,7 @@ function updateView() {
   unfollow.hidden = !subscription; unfollow.disabled = !subscription || saving;
   refreshFeed.disabled = !!subscription && refreshingSubscriptions.has(subscription.url); refreshFeed.textContent = refreshFeed.disabled ? "正在刷新…" : "刷新订阅";
   exportSite.hidden = !!subscription; exportSite.disabled = !site || saving;
-  publishSite.hidden = !!subscription || !site; publishSite.disabled = !site || saving || !!publication?.running;
+  publishSite.hidden = !!subscription || !site || editing; publishSite.disabled = !site || saving || !!publication?.running;
   exportPlanet.hidden = !!subscription; exportPlanet.disabled = !site || saving; importPlanet.disabled = saving;
   selectTemplate.hidden = !!subscription; selectTemplate.disabled = !site || saving;
   templateSettingsButton.hidden = !!subscription; templateSettingsButton.disabled = !site || site.templateName !== "Sepia" || saving;
@@ -516,7 +522,7 @@ function updateView() {
   updateTelegramControls();
   serviceButton.hidden=!!subscription; serviceButton.disabled=!site || saving;
   xSync.update();
-  editSite.hidden = !!subscription; editSite.disabled = !site || saving;
+  editSite.hidden = !site || !!subscription; editSite.disabled = !site || saving;
   const profileButton=$<HTMLButtonElement>("#site-profile");profileButton.hidden=!!subscription;profileButton.disabled=!site || !!site.imported || saving;profileButton.title=site?.imported ? "导入站点暂不支持修改公开资料" : "";
   const podcastButton=$<HTMLButtonElement>("#podcast-settings");podcastButton.hidden=!!subscription;podcastButton.disabled=!site || !!site.imported || saving;
   const deploymentButton=$<HTMLButtonElement>("#deployment-settings");deploymentButton.hidden=!!subscription;deploymentButton.disabled=!site || !!site.imported || saving;
@@ -526,9 +532,9 @@ function updateView() {
   pinSubscription.textContent = fixed ? (subscription?.cid ? "已固定离线" : "重新固定离线") : "固定离线";
   $("#subscription-status").textContent = subscription && refreshingSubscriptions.has(subscription.url) ? "正在刷新订阅…" : subscription?.lastError ? `更新失败，正在显示已缓存内容：${subscription.lastError}` : subscription?.offlinePinned ? "已固定订阅媒体到本机" : subscription?.pinnedCid ? (subscription.pinnedCid === subscription.cid ? "已固定当前版本到本机" : "仅旧版本已固定") : "";
   const favoriteKey=subscription && item ? `${subscription.url}\u0000${item.key || item.id || item.link}` : "";
-  starItem.textContent = item?.starred ? "取消收藏" : "收藏"; starItem.title=starItem.textContent; starItem.setAttribute("aria-label",starItem.textContent); starItem.disabled = !item || !subscription || pendingStars.has(favoriteKey); shareItem.disabled = !item?.link;
+  starItem.textContent = item?.starred ? "取消收藏" : "收藏"; starItem.title=starItem.textContent; starItem.setAttribute("aria-label",starItem.textContent); starItem.setAttribute("aria-pressed", String(!!item?.starred)); starItem.disabled = !item || !subscription || pendingStars.has(favoriteKey); shareItem.disabled = !item?.link;
   const readButton=$<HTMLButtonElement>("#toggle-read"), readKey=subscription && item ? `${subscription.url}\u0000${item.key || item.id || item.link}` : "";
-  readButton.textContent=item?.read ? "标为未读" : "标为已读";readButton.title=readButton.textContent;readButton.setAttribute("aria-label",readButton.textContent);readButton.disabled=!item || !subscription || pendingRead.has(readKey) || bulkReading.has(subscription.url);
+  readButton.textContent=item?.read ? "标为未读" : "标为已读";readButton.title=readButton.textContent;readButton.setAttribute("aria-label",readButton.textContent);readButton.setAttribute("aria-pressed", String(Boolean(item && !item.read)));readButton.disabled=!item || !subscription || pendingRead.has(readKey) || bulkReading.has(subscription.url);
   const markFeed=$<HTMLButtonElement>("#mark-feed-read");markFeed.hidden=!subscription;markFeed.disabled=!subscription || bulkReading.has(subscription.url) || [...pendingRead].some(key=>key.startsWith(`${subscription!.url}\u0000`)) || !subscription.feed.items.some(entry=>!entry.read);
   deleteArticle.hidden = (!article && !draft) || !!subscription; deleteArticle.textContent=draft ? "删除草稿" : "删除文章";
   addAttachment.disabled = (!article && !draft) || !site || saving;
@@ -627,7 +633,7 @@ function readerHTML(html: string, localImages: boolean, remoteBase = "") {
 }
 function selectFeedItem(entry: Item) {
   const revision=++readerRevision, address=subscription?.url ?? "", key=entry.key || entry.id || entry.link;
-  item = entry; shareURL.hidden = true; shareStatus.textContent = ""; readerTitle.textContent = entry.title || "无标题"; readerDate.textContent = entry.published;
+  item = entry; shareURL.hidden = true; shareStatus.textContent = ""; readerTitle.textContent = entry.title || "无标题"; readerDate.textContent = formatPublishedDate(entry.published || "");
   $("#play-feed-audio").hidden = !entry.audioUrl && !(entry.audioFilename && entry.contentCid);
   $("#play-feed-video").hidden = !entry.videoUrl;
   const localPreview = !!(entry.contentCid || entry.offlineBase || subscription?.offlinePinned);
@@ -802,7 +808,7 @@ async function queuePublication(siteID: string, manual = false) {
     } while (state.pending);
   } finally { state.running = false; updateView(); if (isDashboard()) void dashboard.refresh(); }
 }
-$("#new-site").addEventListener("click", () => { if (canLeave()) { navigationRevision++; editingSiteID=""; form.reset(); $("#site-index-setting").hidden=true;$("#site-avatar-setting").hidden=true;$("#site-identity-settings").hidden=true;$("#site-avatar-result").textContent="";$("#site-settings-result").textContent=""; form.querySelector("h2")!.textContent="创建站点";$("#site-dialog-description").textContent="为你的新空间起个名字。"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="创建站点"; openDialog(dialog); } });
+$("#new-site").addEventListener("click", () => { if (canLeave()) { navigationRevision++; editingSiteID=""; form.reset(); $("#site-index-setting").hidden=true;$("#site-avatar-setting").hidden=true;$("#site-identity-settings").hidden=true;$("#site-more-settings").hidden=true;$("#site-avatar-result").textContent="";$("#site-settings-result").textContent=""; form.querySelector("h2")!.textContent="创建站点";$("#site-dialog-description").textContent="为你的新空间起个名字。"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="创建站点"; openDialog(dialog); } });
 function updateSiteAvatarPreview(value?:string) {
   const image=$<HTMLImageElement>("#site-avatar-preview");image.hidden=!value;$("#site-avatar-placeholder").hidden=!!value;
   if(value)image.src=`data:image/png;base64,${value}`;else image.removeAttribute("src");
@@ -818,6 +824,7 @@ editSite.addEventListener("click", () => {
   form.querySelector<HTMLInputElement>('input[name="authorName"]')!.value=site.authorName || "";
   $("#site-index-setting").hidden=!!site.imported;
   $("#site-identity-settings").hidden=!!site.imported;
+  $("#site-more-settings").hidden=false;
   $("#site-avatar-setting").hidden=!!site.imported;$("#site-avatar-result").textContent="";updateSiteAvatarPreview(site.avatarPng);
   form.querySelector("h2")!.textContent="站点设置";$("#site-dialog-description").textContent="站点信息保存后需重新发布；头像选择后会自动发布。"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="保存设置";
   openDialog(dialog);

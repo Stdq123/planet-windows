@@ -27,7 +27,7 @@ function markInvalid(window: Window, formSelector: string, resultSelector: strin
 
 function expectDangerBorder(window: Window, element: Element) {
   const color = window.getComputedStyle(element).borderTopColor;
-  expect(["#a13f45", "rgb(161, 63, 69)"]).toContain(color);
+  expect(["#ff3b30", "rgb(255, 59, 48)"]).toContain(color);
 }
 
 test("invalid site, article and X sync fields keep a danger boundary through the full CSS cascade", async () => {
@@ -60,6 +60,6 @@ test("clearing the error restores the normal control boundary", async () => {
   expectDangerBorder(window, field);
   errors.clear();
   const color = window.getComputedStyle(field).borderTopColor;
-  expect(["#857a6e", "rgb(133, 122, 110)"]).toContain(color);
+  expect(["#c7c7cc", "rgb(199, 199, 204)"]).toContain(color);
   await window.happyDOM.close();
 });
