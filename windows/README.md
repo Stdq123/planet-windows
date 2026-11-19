@@ -6,9 +6,11 @@
 >
 > Planet Windows 基于上述上游项目，是独立开发的 Windows 移植版本。
 
-[下载 v0.0.1-alpha.2](https://github.com/Stdq123/planet-windows/releases/tag/v0.0.1-alpha.2) · [English README](../README.md) · [贡献指南](../CONTRIBUTING.md)
+[下载 v0.0.1-alpha.4](https://github.com/Stdq123/planet-windows/releases/tag/v0.0.1-alpha.4) · [English README](../README.md) · [贡献指南](../CONTRIBUTING.md)
 
-> **当前为未签名 alpha。** 原版功能尚未全部实现；Windows 10/11 界面、输入法、恢复流程和真实 Mac 备份兼容性仍未完成验收。完整范围见[已知限制](#尚未完成与待验证)和[本次验收记录](../docs/acceptance-0.0.1-alpha.2.md)。
+[![Listed on Awesome MyGo](https://awesomemygo.dev/badge.svg)](https://awesomemygo.dev/apps/planet-windows)
+
+> **当前为未签名 alpha。** 原版功能尚未全部实现；Windows 10/11 界面、输入法、恢复流程和真实 Mac 备份兼容性仍未完成验收。完整范围见[已知限制](#尚未完成与待验证)和[本次验收记录](../docs/acceptance-0.0.1-alpha.4.md)。
 
 本文介绍日常操作，开发环境与命令见[构建与测试](#构建与测试)。
 
@@ -30,10 +32,12 @@
 ### 下载与安装
 
 1. 准备 Windows x64 和 WebView2 Runtime。
-2. [下载 Windows x64 安装包](https://github.com/Stdq123/planet-windows/releases/download/v0.0.1-alpha.2/planet-windows-safe-setup-0.0.1-alpha.2-amd64.exe)，安装到空目录后，从开始菜单打开 **Planet Windows**。[发行页面](https://github.com/Stdq123/planet-windows/releases/tag/v0.0.1-alpha.2)同时提供对应源码、SHA-256 校验文件和本次最终安装包的验收证据。
+2. [下载 Windows x64 安装包](https://github.com/Stdq123/planet-windows/releases/download/v0.0.1-alpha.4/planet-windows-safe-setup-0.0.1-alpha.4-amd64.exe)，安装到空目录后，从开始菜单打开 **Planet Windows**。[发行页面](https://github.com/Stdq123/planet-windows/releases/tag/v0.0.1-alpha.4)同时提供对应源码、SHA-256 校验文件和本次最终安装包的验收证据。
 3. 在写作台创建站点开始写作，或点击侧栏“订阅”旁的 **+** 添加订阅。
 
 ### 写作台
+
+![写作台概览，汇总站点发布状态、私密草稿和最近文章](../docs/uiux/figma-workspace-1280.png)
 
 ![写作台的空工作区，提供创建站点和导入备份的入口](../docs/screenshots/workspace-dashboard-empty.png)
 
@@ -57,6 +61,8 @@
 网页地址会尝试发现页面声明的订阅源；如果网站没有声明订阅源，请直接输入其 Feed 地址。直接输入 `.eth` 名称会使用 ENS/IPFS 订阅流程。普通网页订阅的在线文章支持显示图片及正文中的音视频；收藏或取消收藏时不会重新加载文章内容。
 
 ## 写作与文章
+
+![Markdown 编辑器与本地私密草稿列表](../docs/uiux/writing-workspace-editor.png)
 
 创建多个本地站点，创建、编辑、保存和删除 Markdown 文章，预览文章。
 
