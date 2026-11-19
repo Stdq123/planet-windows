@@ -7,21 +7,23 @@
   </picture>
 </a>
 
+[![Listed on Awesome MyGo](https://awesomemygo.dev/badge.svg)](https://awesomemygo.dev/apps/planet-windows)
+
 Write a blog, publish it to IPFS, and follow your favorite sites from a Windows desktop app.
 
 > **Upstream project: [Planetable/Planet](https://github.com/Planetable/Planet)**
 >
 > Planet Windows is an independent Windows port derived from Planet, the original macOS app.
 
-[Download](#download) · [中文使用指南](windows/README.md) · [Run from source](#run-from-source) · [Logo & branding](docs/branding/README.md) · [Contributing](CONTRIBUTING.md)
+[Download](#download) · [Screenshots](#screenshots) · [中文使用指南](windows/README.md) · [Run from source](#run-from-source) · [Logo & branding](docs/branding/README.md) · [Contributing](CONTRIBUTING.md)
 
 ## Download
 
-**[Download v0.0.1-alpha.2 for Windows x64](https://github.com/Stdq123/planet-windows/releases/download/v0.0.1-alpha.2/planet-windows-safe-setup-0.0.1-alpha.2-amd64.exe)**
+**[Download v0.0.1-alpha.4 for Windows x64](https://github.com/Stdq123/planet-windows/releases/download/v0.0.1-alpha.4/planet-windows-safe-setup-0.0.1-alpha.4-amd64.exe)**
 
-Requires Windows x64 and WebView2 Runtime. Install into an empty folder, then open **Planet Windows** from the Start menu. The [release page](https://github.com/Stdq123/planet-windows/releases/tag/v0.0.1-alpha.2) provides release notes, corresponding source, SHA-256 checksums and the final package's acceptance evidence.
+Requires Windows x64 and WebView2 Runtime. Install into an empty folder, then open **Planet Windows** from the Start menu. The [release page](https://github.com/Stdq123/planet-windows/releases/tag/v0.0.1-alpha.4) provides release notes, corresponding source, SHA-256 checksums and the final package's acceptance evidence.
 
-> **Unsigned alpha.** Features are still incomplete. Native installer acceptance is limited to seven smoke-test scenarios; use this release's attached results, not evidence from an older package. Windows 10/11 desktop, input-method and recovery testing remain incomplete. Real Mac backup compatibility is unverified. See the [known limitations](windows/README.md#尚未完成与待验证) and [acceptance scope](docs/acceptance-0.0.1-alpha.2.md).
+> **Unsigned alpha.** Features are still incomplete. Native installer acceptance is limited to seven smoke-test scenarios; use this release's attached results, not evidence from an older package. Windows 10/11 desktop, input-method and recovery testing remain incomplete. Real Mac backup compatibility is unverified. See the [known limitations](windows/README.md#尚未完成与待验证) and [acceptance scope](docs/acceptance-0.0.1-alpha.4.md).
 
 ## What you can do
 
@@ -30,9 +32,31 @@ Requires Windows x64 and WebView2 Runtime. Install into an empty folder, then op
 - **Read:** follow RSS, Atom, JSON Feed and supported IPNS / ENS sites; save favorites and pin subscriptions for offline reading.
 - **Customize:** use Plain, 8-bit, Grid, Platinum or Sepia, and import or export supported Planet backups.
 
+## Screenshots
+
+### Subscription reader
+
 ![Planet Windows showing subscriptions, an article list and a post with an illustration](docs/screenshots/subscription-reader.png)
 
 Reading a sample subscription in Planet Windows. See the [usage guide](windows/README.md) for supported formats, service integrations and their limits.
+
+### Writing dashboard
+
+![Planet Windows writing dashboard showing site status, private drafts and recent articles](docs/uiux/figma-workspace-1280.png)
+
+Overview of all sites, private drafts, recent articles and publication status.
+
+### Markdown editor & private drafts
+
+![Planet Windows Markdown editor with a site draft list and save or publish actions](docs/uiux/writing-workspace-editor.png)
+
+Focused Markdown authoring with local private drafts and explicit publish controls.
+
+### Tags & attachments
+
+![Planet Windows article metadata popover for managing tags and attachments](docs/uiux/writing-workspace-details.png)
+
+Manage article tags, attachments and editor/preview split view directly in the workspace.
 
 ## Get started
 
