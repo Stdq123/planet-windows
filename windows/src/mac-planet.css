@@ -463,8 +463,18 @@ body {
   min-height: var(--mac-toolbar-height);
   height: var(--mac-toolbar-height);
   padding: 0 14px;
+  gap: 8px;
   align-items: center;
   border-bottom: 0;
+}
+.posts-header > div:first-child {
+  min-width: 0;
+}
+.posts-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
 }
 .posts-header h1 {
   margin: 0;
