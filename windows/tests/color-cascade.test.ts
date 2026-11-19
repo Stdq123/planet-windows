@@ -17,7 +17,7 @@ test("legacy shell surfaces resolve to original Mac Planet roles through the ful
   const document = window.document;
   const color = (selector: string) => window.getComputedStyle(document.querySelector(selector)!).color;
   const background = (selector: string) => window.getComputedStyle(document.querySelector(selector)!).backgroundColor;
-  expect(color("#ipfs-open-site")).toBe("#515154");
+  expect(color("#ipfs-open-site")).toBe("#007aff");
   expect(color(".ipfs-stats dt")).toBe("#86868b");
   expect(color(".reader h2")).toBe("#1d1d1f");
   expect(color(".site-address")).toBe("#86868b");
