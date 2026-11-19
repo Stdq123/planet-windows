@@ -319,17 +319,35 @@ body {
   display: none;
 }
 
-/* Bottom status strip */
+/* Single-row 44px macOS bottom status bar (IPFS status left, settings gear right) */
 .sidebar-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  height: 44px;
   margin: 0 -10px;
-  padding: 6px 10px 8px;
+  padding: 0 10px;
   border-top: 1px solid var(--mac-line);
-  background: rgba(0, 0, 0, 0.02);
+  background: rgba(0, 0, 0, 0.025);
 }
 @media (prefers-color-scheme: dark) {
   .sidebar-bottom {
-    background: rgba(255, 255, 255, 0.02);
+    background: rgba(255, 255, 255, 0.025);
   }
+}
+.sidebar-bottom #show-ipfs-status {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  height: 30px;
+  min-height: 30px;
+  margin: 0;
+  padding: 0 6px;
+  gap: 8px;
+  border-radius: 6px;
+  font: 400 13px/18px var(--mac-font);
+  color: var(--mac-ink);
 }
 .sidebar-bottom #show-ipfs-status::before {
   content: "";
@@ -342,9 +360,84 @@ body {
 .sidebar-bottom #show-ipfs-status .system-icon {
   display: none;
 }
-.sidebar .sidebar-footer {
-  margin: 4px 0 0;
-  padding: 6px 8px 0;
+.sidebar-bottom .sidebar-tools {
+  flex: none;
+  margin: 0;
+  position: relative;
+}
+.sidebar-bottom .sidebar-tools > summary {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  gap: 0;
+  border-radius: 6px;
+  color: var(--mac-secondary);
+}
+.sidebar-bottom .sidebar-tools > summary .nav-label,
+.sidebar-bottom .sidebar-tools > summary .nav-chevron {
+  display: none;
+}
+.sidebar-bottom .sidebar-tools[open] > summary {
+  background: var(--mac-active);
+  color: var(--mac-ink);
+}
+
+.sidebar .sidebar-tools-content {
+  left: auto;
+  right: 0;
+  bottom: calc(100% + 10px);
+  width: 208px;
+  padding: 6px;
+  border-radius: 10px;
+  border: 0.5px solid var(--mac-line);
+  background: var(--mac-surface);
+  box-shadow: var(--mac-popover-shadow);
+}
+.sidebar-tools-content .sidebar-action {
+  min-height: 30px;
+  padding: 5px 8px;
+  gap: 8px;
+  border-radius: 6px;
+  font: 400 13px/18px var(--mac-font);
+  color: var(--mac-ink);
+}
+.sidebar-tools-content .gateway-setting {
+  margin: 8px 2px 4px;
+  padding-top: 8px;
+  border-top: 0.5px solid var(--mac-line);
+}
+.sidebar-tools-content .gateway-setting legend {
+  margin-bottom: 4px;
+  padding: 0 6px;
+  font: 600 11px/16px var(--mac-font);
+  color: var(--mac-muted);
+}
+.sidebar-tools-content .gateway-setting .choice-group {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2px;
+}
+.sidebar-tools-content .gateway-setting .choice-group label {
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mac-ink);
+  font: 400 12px/16px var(--mac-font);
+}
+.sidebar-tools-content .gateway-setting .choice-group label:hover {
+  background: var(--mac-hover);
+}
+.sidebar-tools-content .gateway-setting .choice-group label:has(:checked) {
+  background: var(--mac-selection);
+  color: var(--pw-accent-ink);
+}
+.sidebar-tools-content .sidebar-footer {
+  margin: 6px 0 0;
+  padding: 8px 8px 2px;
   gap: 6px;
   white-space: nowrap;
   border-top: 0.5px solid var(--mac-line);
@@ -353,13 +446,6 @@ body {
 }
 .sidebar-footer .version {
   font-size: 11px;
-}
-
-.sidebar-tools-content {
-  border-radius: 10px;
-  border: 0.5px solid var(--mac-line);
-  background: var(--mac-surface);
-  box-shadow: var(--mac-popover-shadow);
 }
 
 /* ==================== MIDDLE ARTICLE LIST ==================== */

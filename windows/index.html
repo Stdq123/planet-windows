@@ -43,16 +43,16 @@
       <div class="sidebar-bottom">
         <button id="show-ipfs-status" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE774;</span><span class="nav-label">IPFS 节点</span></button>
         <details class="sidebar-tools">
-          <summary><img class="design-icon" src="./resources/workspace/settings.svg" alt="" /><span class="nav-label">设置与工具</span><span class="nav-chevron system-icon" aria-hidden="true">&#xE70E;</span></summary>
+          <summary aria-label="设置与工具" title="设置与工具"><img class="design-icon" src="./resources/workspace/settings.svg" alt="" /><span class="nav-label">设置与工具</span><span class="nav-chevron system-icon" aria-hidden="true">&#xE70E;</span></summary>
           <div class="sidebar-tools-content">
-            <button id="import-planet" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE8B5;</span>导入 .planet 备份</button>
-            <button id="show-removed-sites" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE74D;</span>已移除的站点</button>
-            <button id="offline-storage" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE8B7;</span>离线媒体空间</button>
-            <button id="show-updates" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE895;</span>检查更新</button>
+            <button type="button" id="import-planet" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE8B5;</span>导入 .planet 备份</button>
+            <button type="button" id="show-removed-sites" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE74D;</span>已移除的站点</button>
+            <button type="button" id="offline-storage" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE8B7;</span>离线媒体空间</button>
+            <button type="button" id="show-updates" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE895;</span>检查更新</button>
             <label class="gateway-setting" for="public-gateway">公共网关<select id="public-gateway"><option value="ipfs.io">IPFS.io</option><option value="eth.sucks">eth.sucks</option><option value="dweb.link">dweb.link</option><option value="aleph">Aleph Cloud</option></select></label>
+            <div class="sidebar-footer"><span class="system-icon" aria-hidden="true">&#xE770;</span><span>本地工作区</span><span class="version"></span></div>
           </div>
         </details>
-        <div class="sidebar-footer"><span class="system-icon" aria-hidden="true">&#xE770;</span><span>本地工作区</span><span class="version"></span></div>
       </div>
     </aside>
     <main id="dashboard" class="dashboard" hidden tabindex="-1" aria-labelledby="dashboard-title">
