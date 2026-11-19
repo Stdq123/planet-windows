@@ -246,7 +246,10 @@ test("gateway selection updates and persists the published site address", async 
   await waitFor(()=>window.document.querySelector<HTMLInputElement>("#published-url")?.value!=="");
   const select=window.document.querySelector<HTMLSelectElement>("#public-gateway")!;
   expect(select).not.toBeNull();
+  expect(window.document.querySelector<HTMLInputElement>("#published-url")!.value).toBe("https://k51example.eth.sucks/");
+  select.value="ipfs.io";select.dispatchEvent(new window.Event("change"));
   expect(window.document.querySelector<HTMLInputElement>("#published-url")!.value).toBe("https://ipfs.io/ipns/k51example/");
+  expect(window.document.querySelector("#publication-status")!.textContent).toContain("限流");
   select.value="eth.sucks";select.dispatchEvent(new window.Event("change"));
   expect(window.document.querySelector<HTMLInputElement>("#published-url")!.value).toBe("https://k51example.eth.sucks/");
   window.document.querySelector<HTMLButtonElement>("#copy-published-url")!.click();
@@ -254,6 +257,36 @@ test("gateway selection updates and persists the published site address", async 
   expect(window.localStorage.getItem("planet.publicGateway")).toBe("eth.sucks");
   select.value="aleph";select.dispatchEvent(new window.Event("change"));
   expect(window.document.querySelector<HTMLInputElement>("#published-url")!.value).toBe("https://ipfs.aleph.cloud/ipns/k51example/");
+});
+
+test("IPFS status panel shows public reachability and relay state", async () => {
+  const window = new Window({url:"http://localhost/"});
+  window.document.write(await Bun.file("index.html").text());
+  Object.assign(globalThis, {window, document:window.document});
+  const states = [
+    {running:true,online:true,version:"0.38.2",peers:10,totalIn:0,totalOut:0,rateIn:0,rateOut:0,gateway:"http://127.0.0.1:1234",reachability:"local",relayPeers:0},
+    {running:true,online:true,version:"0.38.2",peers:25,totalIn:0,totalOut:0,rateIn:0,rateOut:0,gateway:"http://127.0.0.1:1234",reachability:"relay",relayPeers:2},
+    {running:true,online:true,version:"0.38.2",peers:30,totalIn:0,totalOut:0,rateIn:0,rateOut:0,gateway:"http://127.0.0.1:1234",reachability:"direct",relayPeers:0},
+  ];
+  let idx = 0;
+  (globalThis as any).mygo = {call:async(method:string)=>{
+    switch (method) {
+      case "Library.Sites": case "Library.Subscriptions": return [];
+      case "Library.IPFSStatus": return states[Math.min(idx++, states.length - 1)];
+      case "Library.IPFSRepoSize": return 1024;
+      default: throw new Error(method);
+    }
+  }};
+  await import("../src/main.ts?ipfs-reachability-ui"); enterFirstSite(window);
+  window.document.querySelector<HTMLButtonElement>("#show-ipfs-status")!.click();
+  await waitFor(()=>window.document.querySelector("#ipfs-reachability")?.textContent?.includes("仅本机可见")===true);
+  expect(window.document.querySelector("#ipfs-status-message")!.textContent).toContain("尚未获取公网中继");
+  window.document.querySelector<HTMLButtonElement>("#refresh-ipfs-status")!.click();
+  await waitFor(()=>window.document.querySelector("#ipfs-reachability")?.textContent?.includes("2 个中继")===true);
+  expect(window.document.querySelector("#ipfs-status-message")!.textContent).toBe("节点在线");
+  window.document.querySelector<HTMLButtonElement>("#refresh-ipfs-status")!.click();
+  await waitFor(()=>window.document.querySelector("#ipfs-reachability")?.textContent==="直连公网");
+  window.document.querySelector<HTMLButtonElement>("#close-ipfs-status")!.click();
 });
 
 test("saved gateway is restored when the app starts", async () => {
@@ -944,10 +977,10 @@ test("saving and deleting an article restores site actions", async () => {
   button("publish-site").click();
   expect(confirmation).toContain("photo.png");
   await waitFor(() => (window.document.querySelector<HTMLInputElement>("#published-url")?.value ?? "") !== "");
-  expect(window.document.querySelector<HTMLInputElement>("#published-url")!.value).toBe("https://ipfs.io/ipns/k51test/");
+  expect(window.document.querySelector<HTMLInputElement>("#published-url")!.value).toBe("https://k51test.eth.sucks/");
   button("copy-published-url").click();
   await waitFor(() => copied !== "");
-  expect(copied).toBe("https://ipfs.io/ipns/k51test/");
+  expect(copied).toBe("https://k51test.eth.sucks/");
   clipboardUnavailable = true;
   button("copy-published-url").click();
   await waitFor(() => window.document.querySelector("#copy-status")?.textContent === "请按 Ctrl+C 复制");
@@ -989,7 +1022,7 @@ test("restart retries saved pending publications", async () => {
   await import("../src/main.ts?restart"); enterFirstSite(window);
   await waitFor(() => calls === 1);
   expect(calls).toBe(1);
-  await waitFor(() => window.document.querySelector<HTMLInputElement>("#published-url")?.value === "https://ipfs.io/ipns/k51retry/");
+  await waitFor(() => window.document.querySelector<HTMLInputElement>("#published-url")?.value === "https://k51retry.eth.sucks/");
 });
 
 test("saving cancels an older pending site switch and still publishes", async () => {

@@ -2,7 +2,13 @@ export const gatewayKey = "planet.publicGateway";
 export type Gateway = "ipfs.io" | "eth.sucks" | "dweb.link" | "aleph";
 
 export function selectedGateway(value: string | null): Gateway {
-  return value === "eth.sucks" || value === "dweb.link" || value === "aleph" ? value : "ipfs.io";
+  return value === "ipfs.io" || value === "dweb.link" || value === "aleph" || value === "eth.sucks"
+    ? value
+    : "eth.sucks";
+}
+
+export function isRateLimitedGateway(gateway: Gateway): boolean {
+  return gateway === "ipfs.io" || gateway === "dweb.link";
 }
 
 // Paths passed here are already URL-encoded paths from a verified Planet link.

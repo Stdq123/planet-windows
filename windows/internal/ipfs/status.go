@@ -12,16 +12,18 @@ import (
 
 // KuboStatus describes only the daemon started by this application.
 type KuboStatus struct {
-	Disabled bool    `json:"disabled"`
-	Running  bool    `json:"running"`
-	Online   bool    `json:"online"`
-	Version  string  `json:"version"`
-	Peers    int     `json:"peers"`
-	TotalIn  int64   `json:"totalIn"`
-	TotalOut int64   `json:"totalOut"`
-	RateIn   float64 `json:"rateIn"`
-	RateOut  float64 `json:"rateOut"`
-	Gateway  string  `json:"gateway"`
+	Disabled     bool    `json:"disabled"`
+	Running      bool    `json:"running"`
+	Online       bool    `json:"online"`
+	Version      string  `json:"version"`
+	Peers        int     `json:"peers"`
+	TotalIn      int64   `json:"totalIn"`
+	TotalOut     int64   `json:"totalOut"`
+	RateIn       float64 `json:"rateIn"`
+	RateOut      float64 `json:"rateOut"`
+	Gateway      string  `json:"gateway"`
+	Reachability string  `json:"reachability,omitempty"`
+	RelayPeers   int     `json:"relayPeers,omitempty"`
 }
 
 // Status never starts a daemon solely for monitoring and does not block behind
@@ -60,6 +62,12 @@ func (c *Client) Status() (KuboStatus, error) {
 	}
 	status.TotalIn, status.TotalOut = bandwidth.TotalIn, bandwidth.TotalOut
 	status.RateIn, status.RateOut = bandwidth.RateIn, bandwidth.RateOut
+	var identity struct {
+		Addresses []string `json:"Addresses"`
+	}
+	if err := postRPCAPI(snap.api, 3*time.Second, "/api/v0/id", 256*1024, &identity); err == nil {
+		status.Reachability, status.RelayPeers = inspectReachability(identity.Addresses)
+	}
 	return status, nil
 }
 

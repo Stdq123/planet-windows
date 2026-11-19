@@ -5,7 +5,7 @@ import { createFormErrors } from "./form-errors";
 import { createDashboard } from "./dashboard";
 import release from "../release.json";
 import { refreshDue } from "./auto-refresh";
-import { gatewayKey, planetShareURL, selectedGateway, sitePublicURL } from "./gateway";
+import { gatewayKey, isRateLimitedGateway, planetShareURL, selectedGateway, sitePublicURL } from "./gateway";
 import { localGatewayResource } from "./local-gateway";
 import { feedArticleBase, feedReaderDocument } from "./feed-reader";
 import { hasDialogChanges, openDialog, prepareChoices, prepareDialogs, readingStyles, rememberDialog, syncChoices } from "./ui";
@@ -164,13 +164,32 @@ async function refreshIPFSStatus(includeRepo = false) {
   const revision = ++ipfsStatusRevision;
   ipfsRefresh.disabled = true; ipfsToggle.disabled = true; ipfsGC.disabled=true;
   $("#ipfs-status-message").textContent = "正在读取节点状态…";
-  for (const id of ["#ipfs-version", "#ipfs-peer-count", "#ipfs-rate", "#ipfs-total"]) $(id).textContent = "—";
+  delete $("#ipfs-status-message").dataset.state;
+  const reachabilityEl = $("#ipfs-reachability");
+  delete reachabilityEl.dataset.reachability;
+  for (const id of ["#ipfs-reachability", "#ipfs-version", "#ipfs-peer-count", "#ipfs-rate", "#ipfs-total"]) $(id).textContent = "—";
   try {
     const status = await Library.ipfsStatus();
     if (revision !== ipfsStatusRevision || !ipfsDialog.open) return;
     ipfsStatus = status;
     updateIPFSResource();
-    $("#ipfs-status-message").textContent = status.disabled ? "节点已关闭，自动发布和续期已暂停。" : !status.running ? "节点尚未启动。发布站点或读取 IPFS 内容时会启动节点。" : status.online ? "节点在线" : "节点正在离线模式运行";
+    const statusMsg = $("#ipfs-status-message");
+    if (status.disabled) {
+      statusMsg.textContent = "节点已关闭，自动发布和续期已暂停。";
+      statusMsg.dataset.state = "offline";
+    } else if (!status.running) {
+      statusMsg.textContent = "节点尚未启动。发布站点或读取 IPFS 内容时会启动节点。";
+      statusMsg.dataset.state = "offline";
+    } else if (!status.online) {
+      statusMsg.textContent = "节点正在离线模式运行";
+      statusMsg.dataset.state = "offline";
+    } else if (status.reachability === "local") {
+      statusMsg.textContent = "节点在线（尚未获取公网中继，外网网关暂时可能无法连回本机）";
+      statusMsg.dataset.state = "local";
+    } else {
+      statusMsg.textContent = "节点在线";
+      statusMsg.dataset.state = "online";
+    }
     ipfsToggle.textContent = status.disabled || !status.running ? "启动节点" : "关闭节点";
     $("#ipfs-version").textContent = status.version || "—";
     if (!status.running) $("#ipfs-repo-size").textContent="—";
@@ -181,6 +200,16 @@ async function refreshIPFSStatus(includeRepo = false) {
     if (!ipfsOpenSite.hidden && siteURL) ipfsOpenSite.href = siteURL;
     else ipfsOpenSite.removeAttribute("href");
     if (status.running && status.online) {
+      if (status.reachability === "direct") {
+        reachabilityEl.textContent = status.relayPeers ? `直连公网（含 ${status.relayPeers} 个中继）` : "直连公网";
+        reachabilityEl.dataset.reachability = "direct";
+      } else if (status.reachability === "relay") {
+        reachabilityEl.textContent = `已通过中继可达（${status.relayPeers || 1} 个中继）`;
+        reachabilityEl.dataset.reachability = "relay";
+      } else if (status.reachability === "local") {
+        reachabilityEl.textContent = "仅本机可见（正在获取公网中继…）";
+        reachabilityEl.dataset.reachability = "local";
+      }
       $("#ipfs-peer-count").textContent = String(status.peers);
       $("#ipfs-rate").textContent = `${formatIPFSBytes(status.rateIn)}/s / ${formatIPFSBytes(status.rateOut)}/s`;
       $("#ipfs-total").textContent = `${formatIPFSBytes(status.totalIn)} / ${formatIPFSBytes(status.totalOut)}`;
@@ -225,7 +254,7 @@ ipfsToggle.addEventListener("click", async () => {
 $("#close-ipfs-status").addEventListener("click", () => ipfsDialog.close());
 ipfsDialog.addEventListener("close", () => { ipfsStatusRevision++; clearTimeout(ipfsTimer); ipfsRefresh.disabled = false; ipfsStatus=null; updateIPFSResource(); ipfsOpenSite.hidden=true; ipfsOpenSite.removeAttribute("href"); });
 try { publicGateway.value = selectedGateway(window.localStorage.getItem(gatewayKey)); }
-catch { publicGateway.value = "ipfs.io"; }
+catch { publicGateway.value = "eth.sucks"; }
 syncChoices(publicGateway.parentElement!);
 const addAttachment = $<HTMLButtonElement>("#add-attachment"), attachmentList = $("#attachment-list"), attachmentHelp = $("#attachment-help");
 const tagInput=$<HTMLInputElement>("#tag-input"), addTag=$<HTMLButtonElement>("#add-tag"), tagList=$("#tag-list");
@@ -586,7 +615,12 @@ function updateView() {
   copyPublishedURL.disabled = !address;
   if (gatewayError) copyStatus.textContent = gatewayError;
   $("#show-publication").hidden = !site || !!subscription;
-  $("#publication-status").textContent = publishedAddress.hidden ? "站点尚未公开发布。发布完成后，可在这里复制访问地址。" : "站点已公开发布。网络传播可能需要时间。";
+  const activeGateway = selectedGateway(publicGateway.value);
+  $("#publication-status").textContent = publishedAddress.hidden
+    ? "站点尚未公开发布。发布完成后，可在这里复制访问地址。"
+    : isRateLimitedGateway(activeGateway)
+      ? "站点已公开发布。当前所选公共网关（ipfs.io / dweb.link）容易限流或退场，如无法打开可在左下角设置中切换为 eth.sucks 或 Aleph Cloud。"
+      : "站点已公开发布。网络传播可能需要时间，可在「IPFS 节点」查看公网可达性与中继状态。";
   emptyAction.textContent = site ? "撰写文章" : "创建站点";
   emptyAction.hidden = !!subscription || favoritesView || !!smartView;
   empty.querySelector("h2")!.textContent = smartView ? "选择一篇文章阅读" : favoritesView ? "选择一篇收藏文章" : subscription ? "选择一篇文章阅读" : site && articles.length ? "选择一篇文章" : site ? "开始记录你的故事" : "让想法有一个地方安放";

@@ -1038,6 +1038,24 @@ dialog .dialog-actions,
   background: var(--mac-green);
   flex: none;
 }
+#ipfs-status-message[data-state="local"]::before {
+  background: #e69500;
+}
+#ipfs-status-message[data-state="offline"]::before {
+  background: var(--mac-muted);
+}
+#ipfs-reachability[data-reachability="direct"] {
+  color: var(--mac-green);
+  font-weight: 500;
+}
+#ipfs-reachability[data-reachability="relay"] {
+  color: var(--mac-accent);
+  font-weight: 500;
+}
+#ipfs-reachability[data-reachability="local"] {
+  color: #b25e09;
+  font-weight: 500;
+}
 .ipfs-stats {
   border-radius: 9px;
   border: 0.5px solid var(--mac-line);

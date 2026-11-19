@@ -7,10 +7,12 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 ### Changed
 
 - Refined the macOS-style Windows UI/UX across all three panes and dialogs: continuous 52px top bar hairline across posts and workspace, left-gutter unread indicators so article titles align vertically, symmetric article selection cards, 6px overlay-style scrollbars without arrow buttons, aligned editor rail (title, metadata pill, body, footer), macOS Inset Grouped settings lists inside Site Settings with a fixed header divider, and a compact, HIG-ordered IPFS node status dialog.
+- Changed the default public IPFS gateway from `ipfs.io` (now rate-limited/sunsetting) to `eth.sucks`, labeled rate-limited gateways in Settings and the publication dialog, and surfaced public reachability and `/p2p-circuit` relay count in the IPFS node status dialog.
 
 ### Fixed
 
 - Allowed IPFS node status and repository size queries to read Kubo's concurrent loopback RPC without failing with "节点正忙，请稍后刷新" during background IPNS renewal, site publication, or subscription refresh.
+- Triggered recursive `routing/provide` announcements after site publication, startup, and IPNS renewal, automatically re-announcing published CIDs once Kubo acquires public or `/p2p-circuit` relay reachability after cold start.
 
 ## [0.0.1-alpha.4] - 2026-11-19
 

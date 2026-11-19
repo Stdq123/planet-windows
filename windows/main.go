@@ -37,28 +37,34 @@ import (
 
 // Library exposes the local authoring functions to the application window.
 type Library struct {
-	once             sync.Once
-	store            *store.Store
-	err              error
-	publicMu         sync.Mutex
-	feedMu           sync.Mutex
-	nodeMu           sync.RWMutex
-	node             *ipfs.Client
-	audioMu          sync.Mutex
-	audio            *audiostream.Server
-	audioTemp        string
-	audioSnapshot    string
-	audioFile        string
-	updateMu         sync.Mutex
-	checkedUpdate    *updates.Release
-	updateIdentity   string
-	downloadedUpdate string
-	updateGeneration uint64
-	updateCancel     context.CancelFunc
-	updateClosing    bool
-	updateWorkers    sync.WaitGroup
-	xPoster          services.XPoster
-	telegramAPI      services.TelegramAPI
+	once                sync.Once
+	store               *store.Store
+	err                 error
+	publicMu            sync.Mutex
+	feedMu              sync.Mutex
+	nodeMu              sync.RWMutex
+	node                *ipfs.Client
+	provideMu           sync.Mutex
+	provideCtx          context.Context
+	provideCancel       context.CancelFunc
+	provideWorkers      sync.WaitGroup
+	providePollInterval time.Duration
+	provideWaitLimit    time.Duration
+	audioMu             sync.Mutex
+	audio               *audiostream.Server
+	audioTemp           string
+	audioSnapshot       string
+	audioFile           string
+	updateMu            sync.Mutex
+	checkedUpdate       *updates.Release
+	updateIdentity      string
+	downloadedUpdate    string
+	updateGeneration    uint64
+	updateCancel        context.CancelFunc
+	updateClosing       bool
+	updateWorkers       sync.WaitGroup
+	xPoster             services.XPoster
+	telegramAPI         services.TelegramAPI
 }
 
 func (l *Library) open() (*store.Store, error) {
@@ -128,6 +134,7 @@ func (l *Library) SetIPFSEnabled(enabled bool) error {
 		return err
 	}
 	if !enabled {
+		l.stopProvideWorkers()
 		if l.node != nil {
 			return l.node.Close()
 		}
@@ -1293,6 +1300,7 @@ func (l *Library) PublishSite(siteID string) (publisher.Result, error) {
 	if err != nil {
 		return result, fmt.Errorf("IPNS 已发布到 %s，但保存本地状态失败：%w", result.IPNS, err)
 	}
+	l.scheduleProvide(result.CID)
 	// This integration is opt-in. IPNS publication has already succeeded, so a
 	// separate warning must not turn it into a failed publication.
 	root, e := mygo.App.Path(mygo.PathUserData)
@@ -1950,7 +1958,91 @@ func (l *Library) ExportPlanet(ctx context.Context, siteID string) (string, erro
 	return migration.New(root, exe, s, l.node).Export(siteID, paths[0])
 }
 
+func (l *Library) stopProvideWorkers() {
+	l.provideMu.Lock()
+	cancel := l.provideCancel
+	l.provideCancel = nil
+	l.provideCtx = nil
+	l.provideMu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+	l.provideWorkers.Wait()
+}
+
+// scheduleProvide pushes recursive provider records for published CIDs and,
+// when Kubo has just started behind NAT without /p2p-circuit relays yet,
+// re-announces once public or relay reachability becomes available.
+func (l *Library) scheduleProvide(cids ...string) {
+	node := l.getNode()
+	if node == nil {
+		return
+	}
+	unique := make([]string, 0, len(cids))
+	seen := make(map[string]struct{}, len(cids))
+	for _, cid := range cids {
+		cid = strings.TrimSpace(cid)
+		if cid == "" {
+			continue
+		}
+		if _, exists := seen[cid]; exists {
+			continue
+		}
+		seen[cid] = struct{}{}
+		unique = append(unique, cid)
+	}
+	if len(unique) == 0 {
+		return
+	}
+	l.provideMu.Lock()
+	if l.provideCtx == nil {
+		l.provideCtx, l.provideCancel = context.WithCancel(context.Background())
+	}
+	ctx := l.provideCtx
+	pollInterval := l.providePollInterval
+	if pollInterval <= 0 {
+		pollInterval = 5 * time.Second
+	}
+	waitLimit := l.provideWaitLimit
+	if waitLimit <= 0 {
+		waitLimit = 90 * time.Second
+	}
+	l.provideWorkers.Add(1)
+	l.provideMu.Unlock()
+
+	go func() {
+		defer l.provideWorkers.Done()
+		provideAll := func() {
+			for _, cid := range unique {
+				if ctx.Err() != nil {
+					return
+				}
+				provideCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+				err := node.ProvideContext(provideCtx, cid)
+				cancel()
+				if err != nil && ctx.Err() == nil {
+					log.Printf("routing provide %s: %v", cid, err)
+				}
+			}
+		}
+		status, err := node.Status()
+		if err == nil && status.Running && status.Online {
+			provideAll()
+			if status.Reachability == ipfs.ReachabilityDirect || status.Reachability == ipfs.ReachabilityRelay {
+				return
+			}
+		}
+		waitCtx, cancel := context.WithTimeout(ctx, waitLimit)
+		_, ready := node.WaitForPublicReachability(waitCtx, pollInterval)
+		cancel()
+		if ready && ctx.Err() == nil {
+			provideAll()
+		}
+	}()
+}
+
 func (l *Library) closeNode() {
+	l.stopProvideWorkers()
 	l.publicMu.Lock()
 	defer l.publicMu.Unlock()
 	if l.node != nil {
@@ -1992,15 +2084,20 @@ func (l *Library) maintainPublished(ctx context.Context) {
 		log.Printf("list sites: %v", err)
 		return
 	}
+	var startupCIDs []string
 	for _, site := range sites {
 		if site.LastPublishedCID != "" {
-			l.publicMu.Lock()
-			_, _, err = l.ensureNode(true)
-			l.publicMu.Unlock()
-			if err != nil {
-				log.Printf("start IPFS node: %v", err)
-			}
-			break
+			startupCIDs = append(startupCIDs, site.LastPublishedCID)
+		}
+	}
+	if len(startupCIDs) > 0 {
+		l.publicMu.Lock()
+		_, _, err = l.ensureNode(true)
+		l.publicMu.Unlock()
+		if err != nil {
+			log.Printf("start IPFS node: %v", err)
+		} else {
+			l.scheduleProvide(startupCIDs...)
 		}
 	}
 	refresh := func() {
@@ -2054,6 +2151,7 @@ func (l *Library) maintainPublished(ctx context.Context) {
 			if err = s.SetPublished(site.ID, name, site.LastPublishedCID); err != nil {
 				log.Printf("saving renewal for %s: %v", site.ID, err)
 			}
+			l.scheduleProvide(site.LastPublishedCID)
 		}
 	}
 	refresh()

@@ -23,7 +23,7 @@ flowchart LR
 2. 在 Windows 版侧栏的「公共网关」中选择 `eth.sucks`，站点的「复制地址」会生成 `https://<IPNS>.eth.sucks/`。Planet 订阅文章的复制链接也使用所选网关，保留文章路径；普通网页订阅链接保持原样。选择只保存在本机，不会更改 IPNS 发布或同步到其他设备。
 3. 在 macOS 原版 Planet 的「设置 → 通用 → IPFS Public Gateway」中选择 `eth.sucks`，再用站点或文章菜单中的 `Open in Public Gateway` 打开。[Planet 的网关说明](https://planetable.sol.build/feature-update-12/)
 
-Windows 版默认使用 `ipfs.io`，还提供 `dweb.link` 和 Aleph Cloud。`eth.sucks` 选项支持 `k51…`、`bafz…` IPNS 名称及 `.eth` ENS 名称；遇到其他格式时请选择路径式网关。网关是否可取回内容仍取决于当时的节点、网络和网关状态。
+Windows 版默认使用 `eth.sucks`，还提供 Aleph Cloud，以及可能限流或退场的 `ipfs.io` 与 `dweb.link`。`eth.sucks` 选项支持 `k51…`、`bafz…` IPNS 名称及 `.eth` ENS 名称；遇到其他格式时请选择路径式网关。网关是否可取回内容仍取决于当时的节点、网络和网关状态。
 
 ### 用固定版本或易读名称访问
 

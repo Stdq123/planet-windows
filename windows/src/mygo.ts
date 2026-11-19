@@ -133,6 +133,8 @@ export interface KuboStatus {
   rateIn: number;
   rateOut: number;
   gateway: string;
+  reachability?: string;
+  relayPeers?: number;
 }
 
 export interface OfflineAsset {
