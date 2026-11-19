@@ -4,6 +4,13 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 ## [Unreleased]
 
+## [0.0.1-alpha.4] - 2026-11-19
+
+### Changed
+
+- Upgraded the MyGo Go module, `mygo-runtime`, and `mygo-cli` together from `0.7.4` to `0.10.0`, regenerated the TypeScript bridge bindings, and re-audited the upstream NSIS template and standalone safe installer build.
+- Updated `github.com/ethereum/go-ethereum` to `1.17.10`, `go.opentelemetry.io/otel/trace` to `1.47.0`, and `vite` to `8.3.8`.
+
 ## [0.0.1-alpha.3] - 2026-11-19
 
 ### Changed
