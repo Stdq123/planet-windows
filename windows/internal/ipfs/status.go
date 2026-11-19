@@ -24,23 +24,16 @@ type KuboStatus struct {
 	Gateway  string  `json:"gateway"`
 }
 
-// Status never starts a daemon solely for monitoring.
+// Status never starts a daemon solely for monitoring and does not block behind
+// long-running publish/resolve commands because Kubo's loopback RPC is concurrent.
 func (c *Client) Status() (KuboStatus, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.process == nil {
+	snap := c.snapshot()
+	if !snap.running {
 		return KuboStatus{}, nil
 	}
-	select {
-	case <-c.exited:
-		c.process = nil
-		c.ownedAPI = ""
-		return KuboStatus{}, nil
-	default:
-	}
-	status := KuboStatus{Running: true, Online: !c.offline, Gateway: c.ownedGateway}
+	status := KuboStatus{Running: true, Online: snap.online, Gateway: snap.gateway}
 	var version struct{ Version string }
-	if err := c.postRPC(3*time.Second, "/api/v0/version", 64*1024, &version); err != nil {
+	if err := postRPCAPI(snap.api, 3*time.Second, "/api/v0/version", 64*1024, &version); err != nil {
 		return status, err
 	}
 	status.Version = version.Version
@@ -48,7 +41,7 @@ func (c *Client) Status() (KuboStatus, error) {
 		return status, nil
 	}
 	var peers struct{ Peers []struct{ Peer string } }
-	if err := c.postRPC(3*time.Second, "/api/v0/swarm/peers", 4<<20, &peers); err != nil {
+	if err := postRPCAPI(snap.api, 3*time.Second, "/api/v0/swarm/peers", 4<<20, &peers); err != nil {
 		return status, err
 	}
 	uniquePeers := make(map[string]struct{}, len(peers.Peers))
@@ -62,7 +55,7 @@ func (c *Client) Status() (KuboStatus, error) {
 		TotalIn, TotalOut int64
 		RateIn, RateOut   float64
 	}
-	if err := c.postRPC(3*time.Second, "/api/v0/stats/bw", 64*1024, &bandwidth); err != nil {
+	if err := postRPCAPI(snap.api, 3*time.Second, "/api/v0/stats/bw", 64*1024, &bandwidth); err != nil {
 		return status, err
 	}
 	status.TotalIn, status.TotalOut = bandwidth.TotalIn, bandwidth.TotalOut
@@ -73,10 +66,14 @@ func (c *Client) Status() (KuboStatus, error) {
 // postRPC queries the owned loopback RPC directly so periodic status polling
 // does not spawn repeated ipfs.exe child processes on Windows.
 func (c *Client) postRPC(timeout time.Duration, endpoint string, maxBytes int64, target any) error {
-	if !loopbackAPI.MatchString(c.ownedAPI) {
+	return postRPCAPI(c.ownedAPI, timeout, endpoint, maxBytes, target)
+}
+
+func postRPCAPI(api string, timeout time.Duration, endpoint string, maxBytes int64, target any) error {
+	if !loopbackAPI.MatchString(api) {
 		return errors.New("Kubo API 地址无效")
 	}
-	port := strings.TrimPrefix(c.ownedAPI, "/ip4/127.0.0.1/tcp/")
+	port := strings.TrimPrefix(api, "/ip4/127.0.0.1/tcp/")
 	client := http.Client{
 		Timeout:       timeout,
 		Transport:     &http.Transport{Proxy: nil},

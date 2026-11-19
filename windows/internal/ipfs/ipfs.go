@@ -28,6 +28,7 @@ var loopbackAPI = regexp.MustCompile(`^/ip4/127\.0\.0\.1/tcp/[0-9]{1,5}$`)
 
 type Client struct {
 	mu           sync.Mutex
+	stateMu      sync.Mutex
 	executable   string
 	repo         string
 	process      *exec.Cmd
@@ -37,23 +38,61 @@ type Client struct {
 	offline      bool
 }
 
-func New(executable, repo string) *Client { return &Client{executable: executable, repo: repo} }
+type daemonSnapshot struct {
+	running bool
+	online  bool
+	api     string
+	gateway string
+}
 
-func (c *Client) Alive() bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.process == nil {
-		return false
+func (c *Client) clearDaemonState() {
+	c.stateMu.Lock()
+	c.process = nil
+	c.ownedAPI = ""
+	c.ownedGateway = ""
+	c.offline = false
+	c.stateMu.Unlock()
+}
+
+func (c *Client) setDaemonState(process *exec.Cmd, exited chan error, offline bool, api, gateway string) {
+	c.stateMu.Lock()
+	c.process = process
+	c.exited = exited
+	c.offline = offline
+	c.ownedAPI = api
+	c.ownedGateway = gateway
+	c.stateMu.Unlock()
+}
+
+func (c *Client) snapshot() daemonSnapshot {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	if c.process == nil || c.ownedAPI == "" {
+		return daemonSnapshot{}
 	}
 	select {
 	case <-c.exited:
 		c.process = nil
 		c.ownedAPI = ""
 		c.ownedGateway = ""
-		return false
+		c.offline = false
+		return daemonSnapshot{}
 	default:
-		return true
+		return daemonSnapshot{
+			running: true,
+			online:  !c.offline,
+			api:     c.ownedAPI,
+			gateway: c.ownedGateway,
+		}
 	}
+}
+
+func New(executable, repo string) *Client { return &Client{executable: executable, repo: repo} }
+
+func (c *Client) Alive() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.snapshot().running
 }
 
 func (c *Client) run(args ...string) (string, error) {
@@ -356,8 +395,7 @@ func (c *Client) startLocked(offline bool) error {
 	if err := sitecleanup.CheckOfflineKuboRepo(c.repo); err != nil {
 		return err
 	}
-	c.ownedAPI = ""
-	c.ownedGateway = ""
+	c.clearDaemonState()
 	args := []string{"daemon"}
 	if offline {
 		args = append(args, "--offline")
@@ -397,20 +435,21 @@ func (c *Client) startLocked(offline bool) error {
 	go func() { exited <- cmd.Wait() }()
 	select {
 	case announced := <-ready:
-		c.process, c.exited = cmd, exited
-		c.offline = offline
+		api := ""
+		gateway := ""
 		if b, err := os.ReadFile(filepath.Join(c.repo, "api")); err == nil && len(b) <= 512 && loopbackAPI.MatchString(announced.api) && strings.TrimSpace(string(b)) == announced.api {
-			c.ownedAPI = announced.api
+			api = announced.api
 		}
 		if loopbackAPI.MatchString(announced.gateway) && !strings.HasSuffix(announced.gateway, "/tcp/0") {
-			c.ownedGateway = "http://127.0.0.1:" + strings.TrimPrefix(announced.gateway, "/ip4/127.0.0.1/tcp/")
+			gateway = "http://127.0.0.1:" + strings.TrimPrefix(announced.gateway, "/ip4/127.0.0.1/tcp/")
 		}
-		if c.ownedAPI == "" {
+		if api == "" {
 			_ = cmd.Process.Kill()
 			<-exited
-			c.process = nil
+			c.clearDaemonState()
 			return errors.New("Kubo API 地址未通过核验")
 		}
+		c.setDaemonState(cmd, exited, offline, api, gateway)
 		return nil
 	case err := <-exited:
 		return fmt.Errorf("Kubo daemon exited before startup: %v", err)
@@ -433,8 +472,7 @@ func (c *Client) closeLocked() error {
 	}
 	select {
 	case <-c.exited:
-		c.process = nil
-		c.ownedAPI = ""
+		c.clearDaemonState()
 		return nil
 	default:
 	}
@@ -445,13 +483,11 @@ func (c *Client) closeLocked() error {
 			_ = c.process.Process.Kill()
 			<-c.exited
 		}
-		c.process = nil
-		c.ownedAPI = ""
+		c.clearDaemonState()
 		return fmt.Errorf("Kubo API 无法验证，已停止本程序的 Kubo 进程：%w", err)
 	}
 	if c.process == nil {
-		c.ownedAPI = ""
-		c.offline = false
+		c.clearDaemonState()
 		return nil
 	}
 	_, err := c.runTimeout(5*time.Second, c.ownedAPIArgs("shutdown")...)
@@ -464,10 +500,7 @@ func (c *Client) closeLocked() error {
 			err = errors.New("Kubo did not shut down cleanly")
 		}
 	}
-	c.process = nil
-	c.ownedAPI = ""
-	c.ownedGateway = ""
-	c.offline = false
+	c.clearDaemonState()
 	return err
 }
 
@@ -680,8 +713,7 @@ func (c *Client) validateKeyAPI() error {
 		if c.process != nil {
 			select {
 			case <-c.exited:
-				c.process = nil
-				c.ownedAPI = ""
+				c.clearDaemonState()
 			default:
 				return errors.New("运行中的 Kubo API 地址缺失")
 			}
@@ -696,8 +728,7 @@ func (c *Client) validateKeyAPI() error {
 	}
 	select {
 	case <-c.exited:
-		c.process = nil
-		c.ownedAPI = ""
+		c.clearDaemonState()
 		return errors.New("Kubo 服务已停止，不能核对 API")
 	default:
 	}
@@ -803,7 +834,7 @@ func (c *Client) PublishOnlineContext(ctx context.Context, key, cid string) (str
 	}
 	select {
 	case <-c.exited:
-		c.process = nil
+		c.clearDaemonState()
 		return "", errors.New("Kubo daemon is not running")
 	default:
 	}

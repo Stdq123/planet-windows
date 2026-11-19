@@ -42,6 +42,7 @@ type Library struct {
 	err              error
 	publicMu         sync.Mutex
 	feedMu           sync.Mutex
+	nodeMu           sync.RWMutex
 	node             *ipfs.Client
 	audioMu          sync.Mutex
 	audio            *audiostream.Server
@@ -83,21 +84,31 @@ func (l *Library) Sites() ([]store.Site, error) {
 	return s.ListSites()
 }
 
-// IPFSStatus observes the existing daemon without waiting for an active operation.
+func (l *Library) getNode() *ipfs.Client {
+	l.nodeMu.RLock()
+	defer l.nodeMu.RUnlock()
+	return l.node
+}
+
+func (l *Library) setNode(node *ipfs.Client) {
+	l.nodeMu.Lock()
+	l.node = node
+	l.nodeMu.Unlock()
+}
+
+// IPFSStatus observes the existing daemon concurrently without blocking behind
+// active publish or subscription refresh operations.
 func (l *Library) IPFSStatus() (ipfs.KuboStatus, error) {
-	if !l.publicMu.TryLock() {
-		return ipfs.KuboStatus{}, errors.New("节点正忙，请稍后刷新")
-	}
-	defer l.publicMu.Unlock()
 	s, err := l.open()
 	if err != nil {
 		return ipfs.KuboStatus{}, err
 	}
 	disabled := s.IPFSDisabled()
-	if l.node == nil {
+	node := l.getNode()
+	if node == nil {
 		return ipfs.KuboStatus{Disabled: disabled}, nil
 	}
-	status, err := l.node.Status()
+	status, err := node.Status()
 	status.Disabled = disabled
 	return status, err
 }
@@ -134,14 +145,11 @@ func (l *Library) SetIPFSEnabled(enabled bool) error {
 }
 
 func (l *Library) IPFSRepoSize() (int64, error) {
-	if !l.publicMu.TryLock() {
-		return 0, errors.New("节点正忙，请稍后重试")
-	}
-	defer l.publicMu.Unlock()
-	if l.node == nil {
+	node := l.getNode()
+	if node == nil {
 		return 0, errors.New("IPFS 节点未运行")
 	}
-	return l.node.RepoSize()
+	return node.RepoSize()
 }
 
 func (l *Library) IPFSGarbageCollect() error {
@@ -228,7 +236,7 @@ func (l *Library) permanentlyDeleteSiteLocked(siteID string) error {
 			if _, e = os.Stat(executable); e != nil {
 				return errors.New("缺少 Kubo 程序，无法核对密钥")
 			}
-			l.node = ipfs.New(executable, filepath.Join(root, "ipfs"))
+			l.setNode(ipfs.New(executable, filepath.Join(root, "ipfs")))
 		}
 		if err = l.node.ValidateKeyAPI(); err != nil {
 			return err
@@ -1886,7 +1894,7 @@ func (l *Library) ensureNode(online bool) (string, string, error) {
 		return "", "", errors.New("缺少 Kubo 程序，请使用包含 Kubo 的安装包")
 	}
 	if l.node == nil {
-		l.node = ipfs.New(executable, filepath.Join(dataDir, "ipfs"))
+		l.setNode(ipfs.New(executable, filepath.Join(dataDir, "ipfs")))
 	}
 	if !l.node.Alive() {
 		if err = l.node.Init(); err != nil {

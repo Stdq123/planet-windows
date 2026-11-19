@@ -34,6 +34,22 @@ func TestTurningOffNodePersistsAndPreventsAutomaticRestart(t *testing.T) {
 	}
 }
 
+func TestIPFSStatusDoesNotFailBusyWhilePublicOperationRuns(t *testing.T) {
+	root := t.TempDir()
+	mygo.App.SetPath(mygo.PathUserData, root)
+	t.Cleanup(func() { mygo.App.SetPath(mygo.PathUserData, "") })
+	lib := &Library{}
+	lib.publicMu.Lock()
+	defer lib.publicMu.Unlock()
+	status, err := lib.IPFSStatus()
+	if err != nil {
+		t.Fatalf("IPFSStatus failed while publicMu held: %v", err)
+	}
+	if status.Running {
+		t.Fatalf("expected non-running status: %+v", status)
+	}
+}
+
 func TestNodeControlStartsStopsAndReopensOwnedKubo(t *testing.T) {
 	if os.Getenv("PLANET_TEST_ONLINE") != "1" {
 		t.Skip("online Kubo required")

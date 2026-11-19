@@ -8,6 +8,10 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 - Refined the macOS-style Windows UI/UX across all three panes and dialogs: continuous 52px top bar hairline across posts and workspace, left-gutter unread indicators so article titles align vertically, symmetric article selection cards, 6px overlay-style scrollbars without arrow buttons, aligned editor rail (title, metadata pill, body, footer), macOS Inset Grouped settings lists inside Site Settings with a fixed header divider, and a compact, HIG-ordered IPFS node status dialog.
 
+### Fixed
+
+- Allowed IPFS node status and repository size queries to read Kubo's concurrent loopback RPC without failing with "节点正忙，请稍后刷新" during background IPNS renewal, site publication, or subscription refresh.
+
 ## [0.0.1-alpha.4] - 2026-11-19
 
 ### Changed

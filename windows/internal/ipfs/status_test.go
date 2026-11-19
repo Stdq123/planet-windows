@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -49,6 +50,41 @@ func TestPostRPCReadsOwnedLoopbackServer(t *testing.T) {
 	c.ownedAPI = "/ip4/192.168.1.2/tcp/5001"
 	if err := c.postRPC(3*time.Second, "/api/v0/version", 64*1024, &version); err == nil {
 		t.Fatal("non-loopback API accepted")
+	}
+}
+
+func TestStatusAndRepoSizeDoNotBlockOnCommandMutex(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.RequestURI() {
+		case "/api/v0/version":
+			_, _ = io.WriteString(w, `{"Version":"0.38.2"}`)
+		case "/api/v0/swarm/peers":
+			_, _ = io.WriteString(w, `{"Peers":[{"Peer":"p1"}]}`)
+		case "/api/v0/stats/bw":
+			_, _ = io.WriteString(w, `{"TotalIn":100,"TotalOut":50,"RateIn":10,"RateOut":5}`)
+		case "/api/v0/repo/stat?size-only=true":
+			_, _ = io.WriteString(w, `{"RepoSize":8192}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	port := strings.TrimPrefix(server.URL, "http://127.0.0.1:")
+	c := &Client{}
+	c.setDaemonState(&exec.Cmd{}, make(chan error, 1), false, "/ip4/127.0.0.1/tcp/"+port, "http://127.0.0.1:8080")
+
+	// Simulate an active long-running publish/resolve holding c.mu.
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	status, err := c.Status()
+	if err != nil || !status.Running || !status.Online || status.Version != "0.38.2" || status.Peers != 1 {
+		t.Fatalf("Status blocked or failed while c.mu held: %+v %v", status, err)
+	}
+	size, err := c.RepoSize()
+	if err != nil || size != 8192 {
+		t.Fatalf("RepoSize blocked or failed while c.mu held: %d %v", size, err)
 	}
 }
 
