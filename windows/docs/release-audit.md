@@ -6,7 +6,7 @@
 
 ## 构建和静态校验
 
-当前已审查的 MyGo Go 模块及 CLI 版本为 `0.7.4`。上游 [NSIS 模板](https://github.com/egoist/mygo/blob/v0.7.4/cmd/mygo/nsis.go) 仍在 `customUnInstall` 后执行 `RMDir /r "$INSTDIR"`，现有 hook 的目录重定向保护继续适用。升级只更新精确版本检查，不移除重新审查要求；最终交付包仍由本仓库的安全安装器脚本构建。
+当前已审查的 MyGo Go 模块及 CLI 版本为 `0.10.0`。上游 [NSIS 模板](https://github.com/egoist/mygo/blob/v0.10.0/cmd/mygo/nsis.go) 仍在 `customUnInstall` 后执行 `RMDir /r "$INSTDIR"`，现有 hook 的目录重定向保护继续适用。升级只更新精确版本检查，不移除重新审查要求；最终交付包仍由本仓库的安全安装器脚本构建。
 
 2026-11-05 的升级验证包括：冻结锁文件安装、生成绑定无差异、本地安全扫描、Windows 原生构建、10 项安装内容哈希一致，以及合成安装包的正常接受/篡改拒绝测试。隔离资料库中的真实窗口通过启动、中文表单输入、本地站点创建和退出检查；测试数据未提交。检查应用互斥锁的单元测试应在测试应用退出后执行。
 
