@@ -37,7 +37,7 @@
 
 ### 写作台
 
-![写作台概览，汇总站点发布状态、私密草稿和最近文章](../docs/uiux/figma-workspace-1280.png)
+![写作台概览，汇总站点发布状态、私密草稿和最近文章](../docs/screenshots/workspace-dashboard.png)
 
 ![写作台的空工作区，提供创建站点和导入备份的入口](../docs/screenshots/workspace-dashboard-empty.png)
 
@@ -62,7 +62,7 @@
 
 ## 写作与文章
 
-![Markdown 编辑器与本地私密草稿列表](../docs/uiux/writing-workspace-editor.png)
+![Markdown 编辑器与本地私密草稿](../docs/screenshots/writing-editor.png)
 
 创建多个本地站点，创建、编辑、保存和删除 Markdown 文章，预览文章。
 

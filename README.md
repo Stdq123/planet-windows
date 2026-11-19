@@ -42,19 +42,19 @@ Reading a sample subscription in Planet Windows. See the [usage guide](windows/R
 
 ### Writing dashboard
 
-![Planet Windows writing dashboard showing site status, private drafts and recent articles](docs/uiux/figma-workspace-1280.png)
+![Planet Windows writing dashboard showing site status, private drafts and recent articles](docs/screenshots/workspace-dashboard.png)
 
 Overview of all sites, private drafts, recent articles and publication status.
 
 ### Markdown editor & private drafts
 
-![Planet Windows Markdown editor with a site draft list and save or publish actions](docs/uiux/writing-workspace-editor.png)
+![Planet Windows Markdown editor with local private drafts and save or publish actions](docs/screenshots/writing-editor.png)
 
 Focused Markdown authoring with local private drafts and explicit publish controls.
 
 ### Tags & attachments
 
-![Planet Windows article metadata popover for managing tags and attachments](docs/uiux/writing-workspace-details.png)
+![Planet Windows article metadata popover for managing tags and attachments](docs/screenshots/writing-metadata.png)
 
 Manage article tags, attachments and editor/preview split view directly in the workspace.
 
