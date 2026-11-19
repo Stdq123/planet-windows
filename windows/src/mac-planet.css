@@ -366,17 +366,22 @@ body {
   position: relative;
 }
 .sidebar-bottom .sidebar-tools > summary {
-  display: inline-grid;
-  place-items: center;
-  width: 30px;
+  display: inline-flex;
+  align-items: center;
+  width: auto;
   height: 30px;
   min-height: 30px;
-  padding: 0;
-  gap: 0;
+  padding: 0 8px;
+  gap: 5px;
   border-radius: 6px;
   color: var(--mac-secondary);
+  font: 400 12px/18px var(--mac-font);
+  white-space: nowrap;
 }
-.sidebar-bottom .sidebar-tools > summary .nav-label,
+.sidebar-bottom .sidebar-tools > summary .nav-label {
+  flex: none;
+  overflow: visible;
+}
 .sidebar-bottom .sidebar-tools > summary .nav-chevron {
   display: none;
 }
