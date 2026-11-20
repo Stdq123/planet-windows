@@ -54,6 +54,7 @@ type Site struct {
 	PrewarmNewPost             *bool              `json:"prewarmNewPost,omitempty"`
 	PublishAsIPNS              *bool              `json:"publishAsIPNS,omitempty"`
 	SaveRoundAvatar            bool               `json:"saveRoundAvatar,omitempty"`
+	Aggregation                []string           `json:"aggregation,omitempty"`
 	AvatarPNG                  string             `json:"avatarPng,omitempty"`
 	Created                    time.Time          `json:"created"`
 	IPNS                       string             `json:"ipns,omitempty"`
@@ -82,6 +83,7 @@ type Site struct {
 
 func cloneSite(site Site) Site {
 	site.PodcastCategories = append([]string(nil), site.PodcastCategories...)
+	site.Aggregation = append([]string(nil), site.Aggregation...)
 	if site.PlausibleOverride != nil {
 		copy := *site.PlausibleOverride
 		site.PlausibleOverride = &copy
@@ -183,16 +185,17 @@ type Draft struct {
 }
 
 type data struct {
-	Version        int                        `json:"version"`
-	IPFSDisabled   bool                       `json:"ipfsDisabled,omitempty"`
-	Sites          []Site                     `json:"sites"`
-	Articles       []Article                  `json:"articles"`
-	Drafts         []Draft                    `json:"drafts,omitempty"`
-	DraftCleanup   []DraftCleanup             `json:"draftCleanup,omitempty"`
-	DraftStaging   []DraftCleanup             `json:"draftStaging,omitempty"`
-	ArticleCleanup []ArticleCleanup           `json:"articleCleanup,omitempty"`
-	Subscriptions  []Subscription             `json:"subscriptions,omitempty"`
-	BackupMetadata map[string]json.RawMessage `json:"backupMetadata,omitempty"`
+	Version          int                        `json:"version"`
+	IPFSDisabled     bool                       `json:"ipfsDisabled,omitempty"`
+	Sites            []Site                     `json:"sites"`
+	Articles         []Article                  `json:"articles"`
+	Drafts           []Draft                    `json:"drafts,omitempty"`
+	DraftCleanup     []DraftCleanup             `json:"draftCleanup,omitempty"`
+	DraftStaging     []DraftCleanup             `json:"draftStaging,omitempty"`
+	ArticleCleanup   []ArticleCleanup           `json:"articleCleanup,omitempty"`
+	Subscriptions    []Subscription             `json:"subscriptions,omitempty"`
+	PublishedFolders []PublishedFolder          `json:"publishedFolders,omitempty"`
+	BackupMetadata   map[string]json.RawMessage `json:"backupMetadata,omitempty"`
 }
 
 type DraftCleanup struct {

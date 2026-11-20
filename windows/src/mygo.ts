@@ -115,6 +115,11 @@ export interface Feed {
   items: Item[];
 }
 
+export interface FolderPublishRecord {
+  cid: string;
+  publishedAt: string;
+}
+
 export interface Item {
   id: string;
   title: string;
@@ -196,6 +201,19 @@ export interface PresetAvatar {
   png: string;
 }
 
+export interface PublishedFolder {
+  id: string;
+  name: string;
+  path: string;
+  keyName: string;
+  ipns?: string;
+  lastCid?: string;
+  lastPublished?: string;
+  autoPublish?: boolean;
+  history?: FolderPublishRecord[];
+  created: string;
+}
+
 export interface RemoteMedia {
   url: string;
   type: string;
@@ -261,6 +279,7 @@ export interface Site {
   prewarmNewPost?: boolean;
   publishAsIPNS?: boolean;
   saveRoundAvatar?: boolean;
+  aggregation?: string[];
   avatarPng?: string;
   created: string;
   ipns?: string;
@@ -363,6 +382,7 @@ export const Library = {
   addAttachmentBytes: bind<[string, string, string, string], Article>("Library.AddAttachmentBytes", (siteID: string, articleID: string, name: string, dataBase64: string) => [siteID, articleID, name, dataBase64]),
   addDraftAttachment: bind<[string, string], Draft>("Library.AddDraftAttachment", (siteID: string, draftID: string) => [siteID, draftID]),
   addDraftAttachmentBytes: bind<[string, string, string, string], Draft>("Library.AddDraftAttachmentBytes", (siteID: string, draftID: string, name: string, dataBase64: string) => [siteID, draftID, name, dataBase64]),
+  addPublishedFolder: bind<[string, boolean], PublishedFolder>("Library.AddPublishedFolder", (name: string, autoPublish: boolean) => [name, autoPublish]),
   applyBuiltinTemplate: bind<[string, string], Site>("Library.ApplyBuiltinTemplate", (siteID: string, id: string) => [siteID, id]),
   applyPresetAvatar: bind<[string, string], Site>("Library.ApplyPresetAvatar", (siteID: string, key: string) => [siteID, key]),
   articles: bind<[string], Article[]>("Library.Articles", (siteID: string) => [siteID]),
@@ -445,8 +465,13 @@ export const Library = {
   probeAI: bind<[string], AIProbeResult>("Library.ProbeAI", (baseURL: string) => [baseURL]),
   publishDraft: bind<[string, string, string, string], Article>("Library.PublishDraft", (siteID: string, draftID: string, title: string, content: string) => [siteID, draftID, title, content]),
   publishDraftWithTags: bind<[string, string, string, string, string], Article>("Library.PublishDraftWithTags", (siteID: string, draftID: string, title: string, content: string, tagsJSON: string) => [siteID, draftID, title, content, tagsJSON]),
+  publishFolder: bind<[string], PublishedFolder>("Library.PublishFolder", (folderID: string) => [folderID]),
   /** PublishSite publishes the saved snapshot; Kubo is started only on request. */
   publishSite: bind<[string], Result>("Library.PublishSite", (siteID: string) => [siteID]),
+  /** Published Folders (Phase 4.1) */
+  publishedFolders: bind<[], PublishedFolder[]>("Library.PublishedFolders", () => []),
+  /** Quick Post (Phase 4.3) */
+  quickPost: bind<[string, string, string, string, string], Article>("Library.QuickPost", (siteID: string, title: string, content: string, attachmentName: string, attachmentBase64: string) => [siteID, title, content, attachmentName, attachmentBase64]),
   /**
    * RefreshSubscription only refreshes an existing subscription. A refresh
    * queued before removal must not recreate the removed subscription.
@@ -457,6 +482,7 @@ export const Library = {
   removeAttachment: bind<[string, string, string], Article>("Library.RemoveAttachment", (siteID: string, articleID: string, name: string) => [siteID, articleID, name]),
   removeDraftAttachment: bind<[string, string, string], Draft>("Library.RemoveDraftAttachment", (siteID: string, draftID: string, name: string) => [siteID, draftID, name]),
   removePodcastCover: bind<[string], Site>("Library.RemovePodcastCover", (siteID: string) => [siteID]),
+  removePublishedFolder: bind<[string], void>("Library.RemovePublishedFolder", (folderID: string) => [folderID]),
   removeSite: bind<[string], void>("Library.RemoveSite", (siteID: string) => [siteID]),
   removeSiteAvatar: bind<[string], Site>("Library.RemoveSiteAvatar", (siteID: string) => [siteID]),
   removedSites: bind<[], Site[]>("Library.RemovedSites", () => []),
@@ -496,6 +522,7 @@ export const Library = {
   /** SubscriptionPreview renders registered Planet images from the local IPFS repository. */
   subscriptionPreview: bind<[string, string], string>("Library.SubscriptionPreview", (address: string, key: string) => [address, key]),
   subscriptions: bind<[], Subscription[]>("Library.Subscriptions", () => []),
+  syncSiteAggregation: bind<[string], number>("Library.SyncSiteAggregation", (siteID: string) => [siteID]),
   syncXArticle: bind<[string, string, boolean], XSyncPostInfo>("Library.SyncXArticle", (siteID: string, articleID: string, retry: boolean) => [siteID, articleID, retry]),
   telegramInfo: bind<[string], TelegramInfo>("Library.TelegramInfo", (siteID: string) => [siteID]),
   /** TemplateSettings returns supported settings, including imported values. */
@@ -509,6 +536,8 @@ export const Library = {
   updatePodcastSettings: bind<[string, string, boolean, string], Site>("Library.UpdatePodcastSettings", (siteID: string, language: string, explicit: boolean, categoriesJSON: string) => [siteID, language, explicit, categoriesJSON]),
   updateSettings: bind<[], UpdateSettingsInfo>("Library.UpdateSettings", () => []),
   updateSite: bind<[string, string, string], Site>("Library.UpdateSite", (siteID: string, name: string, about: string) => [siteID, name, about]),
+  /** Content Aggregation (Phase 4.2) */
+  updateSiteAggregation: bind<[string, string], Site>("Library.UpdateSiteAggregation", (siteID: string, sourcesText: string) => [siteID, sourcesText]),
   updateSiteCustomCode: bind<[string, string], Site>("Library.UpdateSiteCustomCode", (siteID: string, customCodeJSON: string) => [siteID, customCodeJSON]),
   updateSiteDetails: bind<[string, string, string, boolean, string, string], Site>("Library.UpdateSiteDetails", (siteID: string, name: string, about: string, doNotIndex: boolean, slug: string, author: string) => [siteID, name, about, doNotIndex, slug, author]),
   updateSiteProfile: bind<[string, string], Site>("Library.UpdateSiteProfile", (siteID: string, profileJSON: string) => [siteID, profileJSON]),

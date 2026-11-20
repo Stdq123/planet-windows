@@ -6,6 +6,7 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 ### Added
 
+- Added Published Folders (`发布文件夹`) to publish arbitrary local directories directly to IPFS/IPNS with CID version history, per-site Content Aggregation (`跨源内容聚合`) from RSS/Atom/JSON/IPNS/ENS feeds, and a Quick Post (`快速发帖`) modal with optional image attachment upload.
 - Added the built-in local RESTful HTTP API server (`127.0.0.1`, `/v0/ping`, `/v0/planets/my`, `/v0/planets/my/:id/articles`, `/v0/planets/my/:id/publish`, `/v0/search`) with optional HTTP Basic Auth and a real-time request log console in the UI, plus the `pn` CLI tool (`windows/cmd/pn`) supporting `--source auto|api|disk` and `--json`.
 - Added BM25 + semantic vector Reciprocal Rank Fusion (`HybridSearch`) with CJK bigram tokenization, a "Related Articles" (`相关文章`) finder in the reader, a Local AI Assistant & Settings dialog (`Ollama` / `LM Studio` / OpenAI-compatible endpoints with encrypted API token storage and article/library context), an Article TTS Speech Player (`ArticleSpeechPlayer`) with pause/resume and playback speed controls, and full site/article settings editing for imported sites.
 - Added article `heroImage` derivation from Markdown and image attachments, an article list / grid view toggle, clipboard image paste and drag-and-drop image attachments with Markdown list auto-continuation in the editor, and a built-in retro/pixel Avatar Gallery (`Nostalgia`, `Monochrom`, `Pixel Planet`, `Pixel Nomad`) with the `saveRoundAvatar` circular crop option.

@@ -1104,6 +1104,205 @@ func (l *Library) ClearLocalAPILogs() {
 	l.ensureAPIServer().ClearLogs()
 }
 
+// Published Folders (Phase 4.1)
+func (l *Library) PublishedFolders() ([]store.PublishedFolder, error) {
+	s, err := l.open()
+	if err != nil {
+		return nil, err
+	}
+	return s.ListPublishedFolders()
+}
+
+func (l *Library) AddPublishedFolder(ctx context.Context, name string, autoPublish bool) (store.PublishedFolder, error) {
+	paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Parent: mygo.CallerWindow(ctx), Title: "选择要发布到 IPFS 的本地文件夹", Directory: true})
+	if err != nil || len(paths) == 0 {
+		return store.PublishedFolder{}, err
+	}
+	s, err := l.open()
+	if err != nil {
+		return store.PublishedFolder{}, err
+	}
+	return s.AddPublishedFolder(name, paths[0], autoPublish)
+}
+
+func (l *Library) PublishFolder(folderID string) (store.PublishedFolder, error) {
+	l.publicMu.Lock()
+	defer l.publicMu.Unlock()
+	s, err := l.open()
+	if err != nil {
+		return store.PublishedFolder{}, err
+	}
+	folders, err := s.ListPublishedFolders()
+	if err != nil {
+		return store.PublishedFolder{}, err
+	}
+	var target *store.PublishedFolder
+	for i := range folders {
+		if folders[i].ID == folderID {
+			target = &folders[i]
+			break
+		}
+	}
+	if target == nil {
+		return store.PublishedFolder{}, errors.New("发布文件夹不存在")
+	}
+	if info, err := os.Stat(target.Path); err != nil || !info.IsDir() {
+		return store.PublishedFolder{}, errors.New("本地文件夹已不存在或不可访问")
+	}
+	if _, _, err := l.ensureNode(true); err != nil {
+		return store.PublishedFolder{}, err
+	}
+	keyName := target.KeyName
+	if keyName == "" {
+		keyName = "folder-" + target.ID
+	}
+	ipnsKey, err := l.node.EnsureKey(keyName)
+	if err != nil {
+		return store.PublishedFolder{}, fmt.Errorf("准备文件夹 IPNS 密钥失败：%w", err)
+	}
+	cid, err := l.node.Add(target.Path)
+	if err != nil {
+		return store.PublishedFolder{}, fmt.Errorf("添加文件夹到 IPFS 失败：%w", err)
+	}
+	publishedIPNS, err := l.node.PublishOnline(keyName, cid)
+	if err != nil {
+		return store.PublishedFolder{}, fmt.Errorf("发布文件夹 IPNS 失败：%w", err)
+	}
+	if publishedIPNS == "" {
+		publishedIPNS = ipnsKey
+	}
+	l.scheduleProvide(cid)
+	return s.RecordFolderPublication(target.ID, publishedIPNS, cid)
+}
+
+func (l *Library) RemovePublishedFolder(folderID string) error {
+	s, err := l.open()
+	if err != nil {
+		return err
+	}
+	return s.RemovePublishedFolder(folderID)
+}
+
+// Content Aggregation (Phase 4.2)
+func (l *Library) UpdateSiteAggregation(siteID, sourcesText string) (store.Site, error) {
+	lines := strings.Split(sourcesText, "\n")
+	s, err := l.open()
+	if err != nil {
+		return store.Site{}, err
+	}
+	return s.UpdateSiteAggregation(siteID, lines)
+}
+
+func (l *Library) SyncSiteAggregation(siteID string) (int, error) {
+	s, err := l.open()
+	if err != nil {
+		return 0, err
+	}
+	sites, err := s.ListSites()
+	if err != nil {
+		return 0, err
+	}
+	var target *store.Site
+	for i := range sites {
+		if sites[i].ID == siteID {
+			target = &sites[i]
+			break
+		}
+	}
+	if target == nil {
+		return 0, errors.New("站点不存在")
+	}
+	if len(target.Aggregation) == 0 {
+		return 0, nil
+	}
+	existingArticles, _ := s.ListArticles(siteID)
+	seenTitles := map[string]bool{}
+	for _, a := range existingArticles {
+		seenTitles[strings.ToLower(strings.TrimSpace(a.Title))] = true
+	}
+	added := 0
+	for _, rawSource := range target.Aggregation {
+		address, err := follow.Normalize(rawSource)
+		if err != nil {
+			continue
+		}
+		var feed feeds.Feed
+		if strings.HasPrefix(strings.ToLower(address), "http://") || strings.HasPrefix(strings.ToLower(address), "https://") {
+			feed, err = feeds.Fetch(address)
+		} else {
+			l.publicMu.Lock()
+			if _, _, e := l.ensureNode(true); e == nil {
+				res, e2 := follow.Fetch(l.node, address, false)
+				feed, err = res.Feed, e2
+			} else {
+				err = e
+			}
+			l.publicMu.Unlock()
+		}
+		if err != nil {
+			continue
+		}
+		for _, item := range feed.Items {
+			title := strings.TrimSpace(item.Title)
+			if title == "" {
+				continue
+			}
+			key := strings.ToLower(title)
+			if seenTitles[key] {
+				continue
+			}
+			body := strings.TrimSpace(item.Content)
+			if body == "" {
+				body = strings.TrimSpace(item.Description)
+			}
+			if item.Link != "" {
+				body += "\n\n---\n原文链接：" + item.Link
+			}
+			if _, err := s.SaveArticle(siteID, "", title, body); err == nil {
+				seenTitles[key] = true
+				added++
+			}
+		}
+	}
+	return added, nil
+}
+
+// Quick Post (Phase 4.3)
+func (l *Library) QuickPost(siteID, title, content, attachmentName, attachmentBase64 string) (store.Article, error) {
+	s, err := l.open()
+	if err != nil {
+		return store.Article{}, err
+	}
+	title = strings.TrimSpace(title)
+	if title == "" {
+		title = "快速动态 " + time.Now().Format("2006-01-02 15:04")
+	}
+	article, err := s.SaveArticle(siteID, "", title, content)
+	if err != nil {
+		return store.Article{}, err
+	}
+	if strings.TrimSpace(attachmentBase64) != "" {
+		root, err := mygo.App.Path(mygo.PathUserData)
+		if err == nil {
+			if updated, e := attachments.AddBytes(root, s, siteID, article.ID, attachmentName, attachmentBase64); e == nil {
+				article = updated
+				if len(article.Attachments) > 0 {
+					last := article.Attachments[len(article.Attachments)-1]
+					nextContent := content
+					if nextContent != "" {
+						nextContent += "\n\n"
+					}
+					nextContent += fmt.Sprintf("![%s](%s)", last, last)
+					if saved, e2 := s.SaveArticle(siteID, article.ID, article.Title, nextContent); e2 == nil {
+						article = saved
+					}
+				}
+			}
+		}
+	}
+	return article, nil
+}
+
 // OfflineMediaUsage reports managed feed-cache usage without modifying files.
 func (l *Library) OfflineMediaUsage() (offline.Usage, error) { return l.collectOfflineMedia(false) }
 
