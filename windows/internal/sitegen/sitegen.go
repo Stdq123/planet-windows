@@ -152,6 +152,7 @@ func Render(dir string, site store.Site, articles []store.Article) error {
 		VideoFilename    string            `json:"videoFilename,omitempty"`
 		AudioDuration    *int              `json:"audioDuration,omitempty"`
 		AudioByteLength  *int64            `json:"audioByteLength,omitempty"`
+		HeroImage        string            `json:"heroImage,omitempty"`
 	}
 	seconds := func(t time.Time) float64 { return float64(t.Unix()-978307200) + float64(t.Nanosecond())/1e9 }
 	metadata := struct {
@@ -187,7 +188,11 @@ func Render(dir string, site store.Site, articles []store.Article) error {
 		if err != nil {
 			return err
 		}
-		public := publicArticle{ID: article.ID, Link: articleLink(article), Slug: article.Slug, ArticleType: article.ArticleType, ExternalLink: article.ExternalLink, Tags: article.Tags, Title: article.Title, Content: article.Content, ContentRendered: html, Created: seconds(article.Created), Modified: seconds(article.Modified), Attachments: article.Attachments, ArticleNumber: article.ArticleNumber, ArticleReference: article.ArticleReference, HasAudio: article.AudioFilename != "", HasVideo: article.VideoFilename != "", AudioFilename: article.AudioFilename, VideoFilename: article.VideoFilename, AudioDuration: article.AudioDuration, AudioByteLength: article.AudioByteLength}
+		hero := article.HeroImage
+		if hero == "" {
+			hero = store.DeriveHeroImage(article.Content, article.Attachments)
+		}
+		public := publicArticle{ID: article.ID, Link: articleLink(article), Slug: article.Slug, ArticleType: article.ArticleType, ExternalLink: article.ExternalLink, Tags: article.Tags, Title: article.Title, Content: article.Content, ContentRendered: html, Created: seconds(article.Created), Modified: seconds(article.Modified), Attachments: article.Attachments, ArticleNumber: article.ArticleNumber, ArticleReference: article.ArticleReference, HasAudio: article.AudioFilename != "", HasVideo: article.VideoFilename != "", AudioFilename: article.AudioFilename, VideoFilename: article.VideoFilename, AudioDuration: article.AudioDuration, AudioByteLength: article.AudioByteLength, HeroImage: hero}
 		if article.Pinned != nil {
 			pinned := seconds(*article.Pinned)
 			public.Pinned = &pinned

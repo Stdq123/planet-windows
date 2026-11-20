@@ -269,6 +269,20 @@ let sites: Site[] = [], articles: Article[] = [], site: Site | null = null, arti
 let sitesRevision = 0;
 const articleLoadFailures = new Set<string>();
 let drafts: Draft[] = [], draft: Draft | null = null, draftsView = false;
+let articleViewMode: "list" | "grid" = "list";
+try { if (window.localStorage.getItem("planet.articleViewMode") === "grid") articleViewMode = "grid"; } catch {}
+const toggleArticleViewBtn = $<HTMLButtonElement>("#toggle-article-view");
+function syncArticleViewMode() {
+  articlesEl.classList.toggle("grid-view", articleViewMode === "grid");
+  toggleArticleViewBtn.setAttribute("aria-pressed", String(articleViewMode === "grid"));
+  toggleArticleViewBtn.textContent = articleViewMode === "grid" ? "列表" : "网格";
+}
+syncArticleViewMode();
+toggleArticleViewBtn.addEventListener("click", () => {
+  articleViewMode = articleViewMode === "grid" ? "list" : "grid";
+  try { window.localStorage.setItem("planet.articleViewMode", articleViewMode); } catch {}
+  syncArticleViewMode();
+});
 let subscriptions: Subscription[] = [], subscription: Subscription | null = null, item: Item | null = null;
 let editingSubscriptionURL = "";
 let subscriptionsRevision = 0;
@@ -538,6 +552,11 @@ function renderArticles() {
     const prefix = `${item.pinned ? "置顶  " : ""}${item.articleType===1 ? "页面  " : ""}`;
     const button = articleRow(item.title, `${prefix}${new Date(item.modified).toLocaleDateString("zh-CN")}`, item.content, item.id === article?.id, site?.name || "我的站点");
     button.classList.toggle("is-pinned", !!item.pinned);
+    if (item.heroImage) {
+      button.dataset.heroImage = item.heroImage;
+      const badge = label("span", `封面：${item.heroImage}`, "article-hero-badge");
+      button.append(badge);
+    }
     button.addEventListener("click", () => selectArticle(item)); articlesEl.append(button);
   }
 }
@@ -978,6 +997,7 @@ editSite.addEventListener("click", () => {
   $("#site-identity-settings").hidden=!!site.imported;
   $("#site-more-settings").hidden=false;
   $("#site-avatar-setting").hidden=!!site.imported;$("#site-avatar-result").textContent="";updateSiteAvatarPreview(site.avatarPng);
+  const roundAvatarCheck=$<HTMLInputElement>("#site-round-avatar");roundAvatarCheck.checked=!!site.saveRoundAvatar;roundAvatarCheck.disabled=!!site.imported || saving;
   updateSiteNavSummary(site);
   form.querySelector("h2")!.textContent="基本资料";$("#site-dialog-description").textContent="站点信息保存后需重新发布；头像选择后会自动发布。"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="保存设置";
   siteSettingsMain.scrollTop=0;
@@ -1000,6 +1020,94 @@ async function changeSiteAvatar(remove:boolean) {
 }
 $("#choose-site-avatar").addEventListener("click",()=>void changeSiteAvatar(false));
 $("#remove-site-avatar").addEventListener("click",()=>void changeSiteAvatar(true));
+$<HTMLInputElement>("#site-round-avatar").addEventListener("change",async event=>{
+  const input=event.currentTarget as HTMLInputElement;
+  if(!editingSiteID || !site || site.id!==editingSiteID || site.imported || saving)return;
+  const siteID=editingSiteID,generation=publicationState(siteID).generation;
+  saving=true;input.disabled=true;updateView();$("#site-avatar-result").textContent="";
+  try{
+    const updated=await Library.setSaveRoundAvatar(siteID,input.checked);
+    const selected=mergeSitePublication(sites.find(entry=>entry.id===siteID),updated,generation);
+    sitesRevision++;sites=sites.map(entry=>entry.id===siteID?selected:entry);if(site?.id===siteID)site=selected;
+    updateSiteAvatarPreview(selected.avatarPng);markLocalChange(siteID);void queuePublication(siteID);
+    $("#site-avatar-result").textContent="圆形头像选项已保存。";
+  }catch(error){
+    input.checked=!!site?.saveRoundAvatar;
+    $("#site-avatar-result").textContent=`保存失败：${error instanceof Error ? error.message : String(error)}`;
+  }finally{saving=false;input.disabled=false;updateView();}
+});
+const avatarGalleryDialog=$<HTMLDialogElement>("#avatar-gallery-dialog"),avatarGalleryForm=$<HTMLFormElement>("#avatar-gallery-form"),avatarGalleryGrid=$("#avatar-gallery-grid"),avatarCategorySelect=$<HTMLSelectElement>("#avatar-category-select"),applyPresetAvatarBtn=$<HTMLButtonElement>("#apply-preset-avatar");
+let presetAvatarsCache: Array<{key:string;category:string;title:string;png:string}>=[];
+let selectedPresetKey="";
+function renderAvatarGalleryGrid(){
+  avatarGalleryGrid.replaceChildren();
+  const cat=avatarCategorySelect.value;
+  const items=presetAvatarsCache.filter(item=>cat==="all" || item.category===cat);
+  for(const item of items){
+    const btn=document.createElement("button");
+    btn.type="button";
+    btn.className="avatar-gallery-item";
+    btn.dataset.avatarKey=item.key;
+    btn.setAttribute("role","option");
+    btn.setAttribute("aria-selected",String(item.key===selectedPresetKey));
+    const img=document.createElement("img");
+    img.src=`data:image/png;base64,${item.png}`;
+    img.alt=item.title;
+    const caption=document.createElement("span");
+    caption.textContent=item.title;
+    btn.append(img,caption);
+    btn.addEventListener("click",()=>{
+      selectedPresetKey=item.key;
+      for(const el of avatarGalleryGrid.querySelectorAll<HTMLElement>(".avatar-gallery-item")){
+        el.setAttribute("aria-selected",String(el.dataset.avatarKey===selectedPresetKey));
+      }
+      applyPresetAvatarBtn.disabled=false;
+    });
+    avatarGalleryGrid.append(btn);
+  }
+  applyPresetAvatarBtn.disabled=!items.some(item=>item.key===selectedPresetKey);
+}
+$("#open-avatar-gallery").addEventListener("click",async()=>{
+  if(!editingSiteID || !site || site.id!==editingSiteID || site.imported || saving)return;
+  $("#avatar-gallery-result").textContent="";
+  selectedPresetKey="";
+  applyPresetAvatarBtn.disabled=true;
+  openDialog(avatarGalleryDialog);
+  try{
+    if(!presetAvatarsCache.length)presetAvatarsCache=await Library.presetAvatars();
+    renderAvatarGalleryGrid();
+  }catch(error){
+    $("#avatar-gallery-result").textContent=`读取内置头像失败：${error instanceof Error ? error.message : String(error)}`;
+  }
+});
+avatarCategorySelect.addEventListener("change",renderAvatarGalleryGrid);
+$("#random-avatar-pick").addEventListener("click",()=>{
+  const cat=avatarCategorySelect.value;
+  const items=presetAvatarsCache.filter(item=>cat==="all" || item.category===cat);
+  if(!items.length)return;
+  const pick=items[Math.floor(Math.random()*items.length)]!;
+  selectedPresetKey=pick.key;
+  renderAvatarGalleryGrid();
+});
+$("#close-avatar-gallery").addEventListener("click",()=>{if(!saving)avatarGalleryDialog.close();});
+avatarGalleryForm.addEventListener("submit",async event=>{
+  event.preventDefault();
+  if(!editingSiteID || !site || site.id!==editingSiteID || site.imported || !selectedPresetKey || saving)return;
+  const siteID=editingSiteID,generation=publicationState(siteID).generation;
+  saving=true;applyPresetAvatarBtn.disabled=true;updateView();$("#avatar-gallery-result").textContent="";
+  try{
+    const updated=await Library.applyPresetAvatar(siteID,selectedPresetKey);
+    const selected=mergeSitePublication(sites.find(entry=>entry.id===siteID),updated,generation);
+    sitesRevision++;sites=sites.map(entry=>entry.id===siteID?selected:entry);if(site?.id===siteID)site=selected;
+    updateSiteAvatarPreview(selected.avatarPng);markLocalChange(siteID);void queuePublication(siteID);
+    avatarGalleryDialog.close();
+    $("#site-avatar-result").textContent="已应用内置头像，正在发布站点。";
+  }catch(error){
+    $("#avatar-gallery-result").textContent=`设置失败：${error instanceof Error ? error.message : String(error)}`;
+  }finally{
+    saving=false;applyPresetAvatarBtn.disabled=!selectedPresetKey;updateView();
+  }
+});
 const siteProfileDialog=$<HTMLDialogElement>("#site-profile-dialog"),siteProfileForm=$<HTMLFormElement>("#site-profile-form");
 const profileFields=["domain","twitterUsername","githubUsername","telegramUsername","mastodonUsername","discordLink"] as const;
 $("#site-profile").addEventListener("click",()=>{
@@ -1801,6 +1909,107 @@ copyPublishedURL.addEventListener("click", async () => {
 emptyAction.addEventListener("click", () => site ? startArticle() : $("#new-site").click());
 saveButton.addEventListener("click", () => void save());
 for (const input of [title, content]) input.addEventListener("input", () => { navigationRevision++; dirty = true; updateView(); clearTimeout(previewTimer); previewTimer = setTimeout(() => void renderPreview(), 180); });
+
+// Markdown list auto-continuation on Enter (matching macOS MarkdownListAutocomplete)
+content.addEventListener("keydown", event => {
+  if (event.key !== "Enter" || event.isComposing || event.keyCode === 229 || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return;
+  const cursor = content.selectionStart;
+  if (cursor !== content.selectionEnd || cursor === null) return;
+  const text = content.value;
+  if (!text.length || (cursor >= text.length && text.endsWith("\n"))) return;
+  const lineStart = text.lastIndexOf("\n", Math.max(0, cursor - 1)) + 1;
+  const lineEndIdx = text.indexOf("\n", cursor);
+  const lineEnd = lineEndIdx === -1 ? text.length : lineEndIdx;
+  const currentLine = text.slice(lineStart, lineEnd);
+  const leadingWsMatch = /^[\t ]*/.exec(currentLine);
+  const firstVisibleOffset = leadingWsMatch ? leadingWsMatch[0].length : 0;
+  if (cursor <= lineStart + firstVisibleOffset) return;
+  const indent = leadingWsMatch ? leadingWsMatch[0] : "";
+  const trimmed = currentLine.trim();
+  const isEmptyNumbered = /^\d+\.$/.test(trimmed);
+  if (trimmed === "*" || trimmed === "+" || trimmed === "-" || trimmed === "- [ ]" || trimmed === "- [x]" || trimmed === "- [X]" || isEmptyNumbered) {
+    event.preventDefault();
+    content.value = text.slice(0, lineStart) + "\n" + text.slice(lineEnd);
+    content.selectionStart = content.selectionEnd = lineStart + 1;
+    content.dispatchEvent(new window.Event("input", { bubbles: true }));
+    return;
+  }
+  let prefix = "";
+  if (trimmed.startsWith("- [ ] ") || trimmed.startsWith("- [x] ") || trimmed.startsWith("- [X] ")) {
+    prefix = `${indent}- [ ] `;
+  } else if (trimmed.startsWith("* ")) {
+    prefix = `${indent}* `;
+  } else if (trimmed.startsWith("+ ")) {
+    prefix = `${indent}+ `;
+  } else if (trimmed.startsWith("- ")) {
+    prefix = `${indent}- `;
+  } else {
+    const numMatch = /^(\d+)\. /.exec(trimmed);
+    if (numMatch) {
+      prefix = `${indent}${Number(numMatch[1]) + 1}. `;
+    }
+  }
+  if (prefix) {
+    event.preventDefault();
+    const insertion = `\n${prefix}`;
+    content.value = text.slice(0, cursor) + insertion + text.slice(cursor);
+    content.selectionStart = content.selectionEnd = cursor + insertion.length;
+    content.dispatchEvent(new window.Event("input", { bubbles: true }));
+  }
+});
+
+async function addEditorAttachmentFile(file: File) {
+  if (!site || (!article && !draft) || saving) return;
+  const siteID = site.id, articleID = article?.id ?? "", draftID = draft?.id ?? "";
+  const previous = new Set(draft ? draft.attachments ?? [] : article?.attachments ?? []);
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
+  const b64 = window.btoa(binary);
+  const rawName = file.name || `paste-${Date.now()}.png`;
+  navigationRevision++; saving = true; busyMessage = "正在转存图片附件…"; updateView(); clearError();
+  try {
+    const updated = draftID
+      ? await Library.addDraftAttachmentBytes(siteID, draftID, rawName, b64)
+      : await Library.addAttachmentBytes(siteID, articleID, rawName, b64);
+    if (!updated.id || site?.id !== siteID || (draftID ? draft?.id !== draftID : article?.id !== articleID)) return;
+    const name = updated.attachments?.find(item => !previous.has(item)) ?? rawName;
+    if (draftID) {
+      draft = updated as Draft;
+      drafts = drafts.map(entry => entry.id === draftID ? draft! : entry);
+    } else {
+      article = updated as Article;
+      markLocalChange(siteID);
+      articles = await Library.articles(siteID);
+    }
+    const labelText = name.replace(/[\\\[\]]/g, "\\$&");
+    const url = encodeURIComponent(name).replace(/[()]/g, ch => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`);
+    const isImg = /\.(png|jpe?g|gif|webp|svg)$/i.test(name);
+    content.value += `${content.value ? "\n\n" : ""}${isImg ? "!" : ""}[${labelText}](${url})`;
+    dirty = true; navigationRevision++; void renderPreview();
+  } catch (e) {
+    showError(e);
+  } finally {
+    saving = false; busyMessage = ""; updateView();
+  }
+}
+
+content.addEventListener("paste", event => {
+  const files = Array.from(event.clipboardData?.files ?? []).filter(f => f.type.startsWith("image/"));
+  if (!files.length || !site || (!article && !draft) || saving) return;
+  event.preventDefault();
+  void addEditorAttachmentFile(files[0]!);
+});
+content.addEventListener("dragover", event => {
+  if (event.dataTransfer?.types?.includes("Files")) event.preventDefault();
+});
+content.addEventListener("drop", event => {
+  const files = Array.from(event.dataTransfer?.files ?? []);
+  if (!files.length || !site || (!article && !draft) || saving) return;
+  event.preventDefault();
+  void addEditorAttachmentFile(files[0]!);
+});
 window.addEventListener("keydown", event => {
   if (event.isComposing || !(event.ctrlKey || event.metaKey)) return;
   const key = event.key.toLowerCase();
