@@ -55,6 +55,11 @@ type Site struct {
 	PublishAsIPNS              *bool              `json:"publishAsIPNS,omitempty"`
 	SaveRoundAvatar            bool               `json:"saveRoundAvatar,omitempty"`
 	Aggregation                []string           `json:"aggregation,omitempty"`
+	AcceptsDonation            bool               `json:"acceptsDonation,omitempty"`
+	AcceptsDonationMessage     string             `json:"acceptsDonationMessage,omitempty"`
+	AcceptsDonationETHAddress  string             `json:"acceptsDonationETHAddress,omitempty"`
+	JuiceboxEnabled            bool               `json:"juiceboxEnabled,omitempty"`
+	JuiceboxProjectID          int                `json:"juiceboxProjectID,omitempty"`
 	AvatarPNG                  string             `json:"avatarPng,omitempty"`
 	Created                    time.Time          `json:"created"`
 	IPNS                       string             `json:"ipns,omitempty"`

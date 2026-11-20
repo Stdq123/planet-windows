@@ -44,10 +44,10 @@ func Normalize(address string) (string, error) {
 		return name, nil
 	}
 	normalized, err := ensip15.Shared().Normalize(name)
-	if err == nil && strings.HasSuffix(normalized, ".eth") {
+	if err == nil && (strings.HasSuffix(normalized, ".eth") || strings.HasSuffix(normalized, ".bit") || strings.HasSuffix(normalized, ".sol") || strings.HasSuffix(normalized, ".fc")) {
 		return normalized, nil
 	}
-	return "", errors.New("请输入 Planet/IPNS 名称或 ENS .eth 域名")
+	return "", errors.New("请输入 Planet/IPNS 名称或 .eth / .bit / .sol / .fc 域名")
 }
 func Fetch(node Node, address string, pin bool) (Result, error) {
 	name, err := Normalize(address)

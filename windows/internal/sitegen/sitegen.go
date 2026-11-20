@@ -210,6 +210,17 @@ func Render(dir string, site store.Site, articles []store.Article) error {
 		if err = os.WriteFile(filepath.Join(path, "article.md"), []byte(article.Title+"\n\n"+article.Content), 0600); err != nil {
 			return err
 		}
+		if !site.Imported && hero != "" && (site.AcceptsDonation || site.JuiceboxEnabled) {
+			nftMeta := map[string]any{
+				"name":         article.Title,
+				"description":  site.About,
+				"image":        hero,
+				"external_url": store.CanonicalSiteBase(site.Domain, site.IPNS) + strings.TrimPrefix(articleLink(article), "/"),
+			}
+			if nftBytes, err := json.MarshalIndent(nftMeta, "", "  "); err == nil {
+				_ = os.WriteFile(filepath.Join(path, "nft.json"), nftBytes, 0600)
+			}
+		}
 		if seconds(article.Modified) > metadata.Updated {
 			metadata.Updated = seconds(article.Modified)
 		}

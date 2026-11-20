@@ -231,3 +231,43 @@ test("local REST API console loads status, saves config, and displays request lo
   expect(savedArgs).toEqual([true,8086,true,"Planet","pass123"]);
   expect(window.document.querySelector("#local-api-logs")?.textContent).toContain("/v0/ping");
 });
+
+test("Web3 settings, i18n language switching, and standalone tool dialogs work",async()=>{
+  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});
+  const site={id:"s",name:"My Planet",about:"About",created:"2026-01-01T00:00:00Z"};
+  let web3Saved:any=null;
+  (globalThis as any).mygo={call:async(method:string,...args:any[])=>{switch(method){
+    case "Library.Sites":return [site];
+    case "Library.Subscriptions":case "Library.Articles":return [];
+    case "Library.UpdateSiteWeb3":web3Saved=JSON.parse(args[1]);return {...site,...web3Saved};
+    case "Library.PublishSite":return {cid:"test",ipns:"test"};
+    case "Library.AppLogs":return [{time:"01:18:00",category:"IPFS",message:"daemon ready"}];
+    case "Library.ListDownloads":return [{name:"song.mp3",sourceName:"Pod",url:"https://example.test/song.mp3",size:1024,status:"已下载离线"}];
+    default:throw new Error(method);
+  }}};
+  await import("../src/main.ts?web3-i18n-tools"); enterFirstSite(window);await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="My Planet");
+  const langSelect=window.document.querySelector<HTMLSelectElement>("#ui-language")!;
+  langSelect.value="en";langSelect.dispatchEvent(new window.Event("change",{bubbles:true}));
+  expect(window.document.documentElement.lang).toBe("en");
+  expect(window.document.querySelector("#sites-heading")?.textContent).toBe("My Planets");
+
+  window.document.querySelector<HTMLButtonElement>("#show-app-logs")!.click();
+  await waitFor(()=>window.document.querySelector("#app-logs-viewer")?.textContent?.includes("daemon ready")===true);
+  window.document.querySelector<HTMLButtonElement>("#close-app-logs")!.click();
+
+  window.document.querySelector<HTMLButtonElement>("#show-downloads")!.click();
+  await waitFor(()=>window.document.querySelector("#downloads-list")?.textContent?.includes("song.mp3")===true);
+  window.document.querySelector<HTMLButtonElement>("#close-downloads")!.click();
+
+  window.document.querySelector<HTMLButtonElement>("#edit-site")!.click();
+  window.document.querySelector<HTMLButtonElement>("#web3-settings")!.click();
+  const web3Form=window.document.querySelector<HTMLFormElement>("#web3-form")!;
+  web3Form.querySelector<HTMLInputElement>('[name="acceptsDonation"]')!.checked=true;
+  web3Form.querySelector<HTMLInputElement>('[name="acceptsDonationETHAddress"]')!.value="vitalik.eth";
+  web3Form.querySelector<HTMLInputElement>('[name="juiceboxEnabled"]')!.checked=true;
+  web3Form.querySelector<HTMLInputElement>('[name="juiceboxProjectID"]')!.value="7";
+  web3Form.dispatchEvent(new window.Event("submit",{cancelable:true}));
+  await waitFor(()=>web3Saved!==null);
+  expect(web3Saved.acceptsDonationETHAddress).toBe("vitalik.eth");
+  expect(web3Saved.juiceboxProjectID).toBe(7);
+});

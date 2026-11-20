@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo"
+	"windows/internal/applog"
 	"windows/internal/attachments"
 	"windows/internal/audiostream"
 	"windows/internal/backup"
@@ -1301,6 +1302,151 @@ func (l *Library) QuickPost(siteID, title, content, attachmentName, attachmentBa
 		}
 	}
 	return article, nil
+}
+
+// Phase 5: Key Manager, Categorized Live Log Viewer, Downloads Manager, Template Live Reload
+func (l *Library) ListIPNSKeys() ([]ipfs.KeyInfo, error) {
+	l.publicMu.Lock()
+	defer l.publicMu.Unlock()
+	if _, _, err := l.ensureNode(false); err != nil {
+		return nil, err
+	}
+	return l.node.ListKeys()
+}
+
+func (l *Library) ExportIPNSKey(ctx context.Context, name string) (string, error) {
+	dir, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Parent: mygo.CallerWindow(ctx), Title: "选择导出 .key 的目录", Directory: true})
+	if err != nil || len(dir) == 0 {
+		return "", err
+	}
+	target := filepath.Join(dir[0], name+".key")
+	l.publicMu.Lock()
+	defer l.publicMu.Unlock()
+	if _, _, err := l.ensureNode(false); err != nil {
+		return "", err
+	}
+	if err := l.node.ExportKey(name, target); err != nil {
+		return "", err
+	}
+	applog.Global.Append("IPFS", "已导出 IPNS 密钥："+name)
+	return target, nil
+}
+
+func (l *Library) ImportIPNSKey(ctx context.Context, name string) (string, error) {
+	paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Parent: mygo.CallerWindow(ctx), Title: "选择要导入的 .key 文件"})
+	if err != nil || len(paths) == 0 {
+		return "", err
+	}
+	l.publicMu.Lock()
+	defer l.publicMu.Unlock()
+	if _, _, err := l.ensureNode(false); err != nil {
+		return "", err
+	}
+	id, err := l.node.ImportKey(name, paths[0])
+	if err != nil {
+		return "", err
+	}
+	applog.Global.Append("IPFS", fmt.Sprintf("已导入 IPNS 密钥：%s (%s)", name, id))
+	return id, nil
+}
+
+func (l *Library) AppLogs(category string) []applog.Entry {
+	return applog.Global.List(category)
+}
+
+func (l *Library) ClearAppLogs(category string) {
+	applog.Global.Clear(category)
+}
+
+type DownloadItem struct {
+	Name       string `json:"name"`
+	SourceName string `json:"sourceName"`
+	URL        string `json:"url"`
+	Size       int64  `json:"size"`
+	Status     string `json:"status"`
+}
+
+func (l *Library) ListDownloads() ([]DownloadItem, error) {
+	s, err := l.open()
+	if err != nil {
+		return nil, err
+	}
+	subs, err := s.ListSubscriptions()
+	if err != nil {
+		return nil, err
+	}
+	var out []DownloadItem
+	for _, sub := range subs {
+		source := sub.CustomTitle
+		if source == "" {
+			source = sub.Feed.Title
+		}
+		for _, item := range sub.Feed.Items {
+			for mediaURL, asset := range item.OfflineMedia {
+				out = append(out, DownloadItem{
+					Name:       asset.File,
+					SourceName: source,
+					URL:        mediaURL,
+					Size:       asset.Size,
+					Status:     "已下载离线",
+				})
+			}
+			for _, att := range item.Attachments {
+				out = append(out, DownloadItem{
+					Name:       att,
+					SourceName: source,
+					URL:        item.Link,
+					Status:     "IPFS 附件",
+				})
+			}
+		}
+	}
+	if out == nil {
+		out = []DownloadItem{}
+	}
+	return out, nil
+}
+
+func (l *Library) CheckTemplateModified(siteID string) (int64, error) {
+	s, err := l.open()
+	if err != nil {
+		return 0, err
+	}
+	site, _, _, err := s.PublicationSnapshot(siteID)
+	if err != nil {
+		return 0, err
+	}
+	dir, err := l.templatePath(site)
+	if err != nil || dir == "" {
+		return 0, err
+	}
+	var latest int64
+	_ = filepath.Walk(dir, func(_ string, info os.FileInfo, err error) error {
+		if err == nil && !info.IsDir() {
+			if mt := info.ModTime().UnixNano(); mt > latest {
+				latest = mt
+			}
+		}
+		return nil
+	})
+	return latest, nil
+}
+
+// Phase 6: Web3 Donation / Juicebox Settings
+func (l *Library) UpdateSiteWeb3(siteID, web3JSON string) (store.Site, error) {
+	var cfg store.SiteWeb3Settings
+	if len(web3JSON) > 16<<10 || json.Unmarshal([]byte(web3JSON), &cfg) != nil {
+		return store.Site{}, errors.New("Web3 捐赠配置无效")
+	}
+	s, err := l.open()
+	if err != nil {
+		return store.Site{}, err
+	}
+	updated, err := s.UpdateSiteWeb3(siteID, cfg)
+	if err == nil {
+		applog.Global.Append("Planet", "已更新站点 Web3 捐赠设置："+updated.Name)
+	}
+	return updated, err
 }
 
 // OfflineMediaUsage reports managed feed-cache usage without modifying files.

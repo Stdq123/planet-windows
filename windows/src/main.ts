@@ -8,6 +8,7 @@ import { refreshDue } from "./auto-refresh";
 import { gatewayKey, isRateLimitedGateway, planetShareURL, selectedGateway, sitePublicURL } from "./gateway";
 import { localGatewayResource } from "./local-gateway";
 import { feedArticleBase, feedReaderDocument } from "./feed-reader";
+import { applyLocale, normalizeLocale } from "./i18n";
 import { hasDialogChanges, mayDismiss, openDialog, prepareChoices, prepareDialogs, readingStyles, rememberDialog, syncChoices } from "./ui";
 
 prepareChoices(document);
@@ -625,6 +626,7 @@ function updateView() {
   const podcastButton=$<HTMLButtonElement>("#podcast-settings");podcastButton.hidden=!!subscription;podcastButton.disabled=!site || saving;
   const customCodeButton=$<HTMLButtonElement>("#custom-code-settings");customCodeButton.hidden=!!subscription;customCodeButton.disabled=!site || saving;
   const aggregationButton=$<HTMLButtonElement>("#aggregation-settings");aggregationButton.hidden=!!subscription;aggregationButton.disabled=!site || saving;
+  const web3Button=$<HTMLButtonElement>("#web3-settings");web3Button.hidden=!!subscription;web3Button.disabled=!site || saving;
   const deploymentButton=$<HTMLButtonElement>("#deployment-settings");deploymentButton.hidden=!!subscription;deploymentButton.disabled=!site || saving;
   removeSite.hidden = !!subscription; removeSite.disabled = !site || saving || !!publication?.running;
   const fixed = !!subscription && (subscription.cid ? subscription.pinnedCid === subscription.cid : !!subscription.offlinePinned);
@@ -1829,6 +1831,116 @@ quickPostForm.addEventListener("submit",async event=>{
   }catch(error){
     quickPostStatus.textContent=`发布失败：${error instanceof Error ? error.message : String(error)}`;
   }finally{submitBtn.disabled=false;}
+});
+
+// Phase 5: Key Manager, App Logs, Downloads Manager
+const keyManagerDialog=$<HTMLDialogElement>("#key-manager-dialog"),keyManagerList=$("#key-manager-list"),keyManagerStatus=$("#key-manager-status");
+async function refreshIPNSKeys(){
+  keyManagerList.replaceChildren();
+  keyManagerStatus.textContent="正在读取本机 IPNS 密钥…";
+  try{
+    const keys=await Library.listIPNSKeys();
+    keyManagerStatus.textContent=`共 ${keys.length} 个本地密钥。`;
+    for(const k of keys){
+      const row=document.createElement("div");row.className="removed-site-item";
+      const info=document.createElement("div");info.append(label("strong",k.name,""),label("small",k.id,""));
+      const exportBtn=document.createElement("button");exportBtn.type="button";exportBtn.className="secondary";exportBtn.textContent="导出 .key";
+      exportBtn.disabled=k.name==="self";
+      exportBtn.addEventListener("click",async()=>{
+        try{const outPath=await Library.exportIPNSKey(k.name);if(outPath)keyManagerStatus.textContent=`已导出至：${outPath}`;}
+        catch(error){keyManagerStatus.textContent=`导出失败：${error instanceof Error ? error.message : String(error)}`;}
+      });
+      row.append(info,exportBtn);
+      keyManagerList.append(row);
+    }
+  }catch(error){keyManagerStatus.textContent=`读取失败：${error instanceof Error ? error.message : String(error)}`;}
+}
+$("#show-key-manager").addEventListener("click",()=>{openDialog(keyManagerDialog);void refreshIPNSKeys();});
+$("#refresh-ipns-keys").addEventListener("click",()=>void refreshIPNSKeys());
+$("#import-ipns-key").addEventListener("click",async()=>{
+  const keyName=$<HTMLInputElement>("#import-key-name").value.trim();
+  if(!keyName){keyManagerStatus.textContent="请先输入导入后的密钥名称。";return;}
+  try{
+    const id=await Library.importIPNSKey(keyName);
+    if(id){$<HTMLInputElement>("#import-key-name").value="";keyManagerStatus.textContent=`已导入密钥 ${keyName}：${id}`;await refreshIPNSKeys();}
+  }catch(error){keyManagerStatus.textContent=`导入失败：${error instanceof Error ? error.message : String(error)}`;}
+});
+$("#close-key-manager").addEventListener("click",()=>keyManagerDialog.close());
+
+const appLogsDialog=$<HTMLDialogElement>("#app-logs-dialog"),appLogsCategory=$<HTMLSelectElement>("#app-logs-category"),appLogsViewer=$("#app-logs-viewer");
+async function refreshAppLogs(){
+  try{
+    const list=await Library.appLogs(appLogsCategory.value);
+    appLogsViewer.textContent=list.length ? list.map(e=>`[${e.time}] [${e.category}] ${e.message}`).join("\n") : "暂无日志记录。";
+  }catch(error){appLogsViewer.textContent=`读取失败：${error instanceof Error ? error.message : String(error)}`;}
+}
+$("#show-app-logs").addEventListener("click",()=>{openDialog(appLogsDialog);void refreshAppLogs();});
+appLogsCategory.addEventListener("change",()=>void refreshAppLogs());
+$("#refresh-app-logs").addEventListener("click",()=>void refreshAppLogs());
+$("#clear-app-logs").addEventListener("click",async()=>{await Library.clearAppLogs(appLogsCategory.value);await refreshAppLogs();});
+$("#close-app-logs").addEventListener("click",()=>appLogsDialog.close());
+
+const downloadsDialog=$<HTMLDialogElement>("#downloads-dialog"),downloadsList=$("#downloads-list");
+async function refreshDownloads(){
+  downloadsList.replaceChildren();
+  try{
+    const items=await Library.listDownloads();
+    if(!items.length){downloadsList.append(label("p","暂无下载记录。","list-empty"));return;}
+    for(const it of items){
+      const row=document.createElement("div");row.className="removed-site-item";
+      row.append(label("strong",it.name,""),label("small",`${it.sourceName} · ${it.status}${it.size ? ` · ${formatBytes(it.size)}` : ""}`,""));
+      downloadsList.append(row);
+    }
+  }catch(error){downloadsList.append(label("p",`读取失败：${error instanceof Error ? error.message : String(error)}`,"list-empty"));}
+}
+$("#show-downloads").addEventListener("click",()=>{openDialog(downloadsDialog);void refreshDownloads();});
+$("#refresh-downloads").addEventListener("click",()=>void refreshDownloads());
+$("#close-downloads").addEventListener("click",()=>downloadsDialog.close());
+
+// Phase 6: Web3 Donation / Juicebox & UI i18n
+const web3Dialog=$<HTMLDialogElement>("#web3-dialog"),web3Form=$<HTMLFormElement>("#web3-form"),web3Result=$("#web3-result");
+$("#web3-settings").addEventListener("click",()=>{
+  if(!site || saving)return;
+  web3Form.querySelector<HTMLInputElement>('[name="acceptsDonation"]')!.checked=!!site.acceptsDonation;
+  web3Form.querySelector<HTMLInputElement>('[name="acceptsDonationMessage"]')!.value=site.acceptsDonationMessage || "";
+  web3Form.querySelector<HTMLInputElement>('[name="acceptsDonationETHAddress"]')!.value=site.acceptsDonationETHAddress || "";
+  web3Form.querySelector<HTMLInputElement>('[name="juiceboxEnabled"]')!.checked=!!site.juiceboxEnabled;
+  web3Form.querySelector<HTMLInputElement>('[name="juiceboxProjectID"]')!.value=String(site.juiceboxProjectID ?? 0);
+  web3Result.textContent="";
+  openDialog(web3Dialog);
+});
+$("#close-web3").addEventListener("click",()=>{if(!saving)web3Dialog.close();});
+web3Form.addEventListener("submit",async event=>{
+  event.preventDefault();if(!site || saving)return;
+  const siteID=site.id,generation=publicationState(siteID).generation;
+  const payload={
+    acceptsDonation:web3Form.querySelector<HTMLInputElement>('[name="acceptsDonation"]')!.checked,
+    acceptsDonationMessage:web3Form.querySelector<HTMLInputElement>('[name="acceptsDonationMessage"]')!.value.trim(),
+    acceptsDonationETHAddress:web3Form.querySelector<HTMLInputElement>('[name="acceptsDonationETHAddress"]')!.value.trim(),
+    juiceboxEnabled:web3Form.querySelector<HTMLInputElement>('[name="juiceboxEnabled"]')!.checked,
+    juiceboxProjectID:Number(web3Form.querySelector<HTMLInputElement>('[name="juiceboxProjectID"]')!.value) || 0,
+  };
+  saving=true;updateView();
+  try{
+    const updated=await Library.updateSiteWeb3(siteID,JSON.stringify(payload));
+    const selected=mergeSitePublication(sites.find(entry=>entry.id===siteID),updated,generation);
+    sitesRevision++;sites=sites.map(entry=>entry.id===siteID?selected:entry);if(site?.id===siteID)site=selected;
+    if(dialog.open){rememberDialog(web3Dialog);web3Result.textContent="已保存 Web3 设置，正在重新发布站点。";}else web3Dialog.close();
+    markLocalChange(siteID);void queuePublication(siteID);
+  }catch(error){web3Result.textContent=`保存失败：${error instanceof Error ? error.message : String(error)}`;}
+  finally{saving=false;updateView();}
+});
+
+const uiLanguageSelect=$<HTMLSelectElement>("#ui-language");
+try{
+  const savedLocale=normalizeLocale(window.localStorage.getItem("planet.locale"));
+  uiLanguageSelect.value=savedLocale;
+  applyLocale(document,savedLocale);
+}catch{}
+uiLanguageSelect.addEventListener("change",()=>{
+  const nextLocale=normalizeLocale(uiLanguageSelect.value);
+  try{window.localStorage.setItem("planet.locale",nextLocale);}catch{}
+  applyLocale(document,nextLocale);
 });
 starItem.addEventListener("click",async()=>{
   if(!subscription || !item) return; const address=subscription.url, key=item.key || item.id || item.link; if(!key) { showError("文章缺少可用标识"); return; } const starred=!item.starred;
