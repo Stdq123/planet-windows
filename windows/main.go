@@ -1396,6 +1396,8 @@ func (l *Library) PublishSite(siteID string) (publisher.Result, error) {
 		} else if endpoint != "" {
 			if e = pinnable.NewClient().PinForSite(endpoint, result.IPNS, true); e != nil {
 				result.PinnableWarning = "站点已发布，但 Pinnable 固定请求未完成：" + e.Error() + "。请在固定服务中检查。"
+			} else {
+				l.pushPinnableRecord(endpoint, result.IPNS)
 			}
 		}
 		if e = services.PinPublished(root, siteID, result.CID, services.NewClient()); e != nil {
@@ -1787,7 +1789,27 @@ func (l *Library) RequestPinnablePin(siteID string) error {
 	if endpoint == "" {
 		return errors.New("请先配置 Pinnable 地址")
 	}
-	return pinnable.NewClient().PinForSite(endpoint, site.IPNS, false)
+	if err := pinnable.NewClient().PinForSite(endpoint, site.IPNS, false); err != nil {
+		return err
+	}
+	l.pushPinnableRecord(endpoint, site.IPNS)
+	return nil
+}
+
+// pushPinnableRecord best-effort posts the locally signed IPNS record for ipns
+// to POST <endpoint>/record after the pin request has verified the endpoint.
+func (l *Library) pushPinnableRecord(endpoint, ipns string) {
+	node := l.getNode()
+	if node == nil || ipns == "" {
+		return
+	}
+	record, err := node.LocalIPNSRecord(ipns)
+	if err != nil || len(record) == 0 {
+		return
+	}
+	if err := pinnable.NewClient().PushRecord(endpoint, record); err != nil {
+		log.Printf("push IPNS record to Pinnable: %v", err)
+	}
 }
 
 func (l *Library) PinnableStatus(siteID string) (pinnable.Status, error) {
