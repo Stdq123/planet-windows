@@ -1,12 +1,17 @@
 package ipfs
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -465,6 +470,126 @@ func TestPublishRejectsExitedDaemon(t *testing.T) {
 	client := &Client{process: &exec.Cmd{}, exited: exited}
 	if _, err := client.PublishOnline("site", "bafy123"); err == nil || err.Error() != "Kubo daemon is not running" {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestPublishOnlineContextUsesLoopbackHTTPRPC(t *testing.T) {
+	var mu sync.Mutex
+	var method, path, gotArg, gotKey, gotLifetime string
+	mode := "ok"
+	setMode := func(next string) {
+		mu.Lock()
+		mode = next
+		mu.Unlock()
+	}
+	started := make(chan struct{}, 1)
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		method = r.Method
+		path = r.URL.Path
+		gotArg = r.URL.Query().Get("arg")
+		gotKey = r.URL.Query().Get("key")
+		gotLifetime = r.URL.Query().Get("lifetime")
+		current := mode
+		mu.Unlock()
+		switch current {
+		case "ok":
+			_, _ = io.WriteString(w, `{"Name":"k51qzi5uqu5testkey","Value":"/ipfs/QmTestCid123"}`)
+		case "wrong-value":
+			_, _ = io.WriteString(w, `{"Name":"k51qzi5uqu5testkey","Value":"/ipfs/QmDifferent"}`)
+		case "unsafe-name":
+			_, _ = io.WriteString(w, `{"Name":"../evil","Value":"/ipfs/QmTestCid123"}`)
+		case "rpc-error":
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = io.WriteString(w, `{"Message":"no key by the given name was found","Code":0,"Type":"error"}`)
+		case "redirect":
+			http.Redirect(w, r, "http://127.0.0.1:9999/other", http.StatusFound)
+		case "block":
+			select {
+			case started <- struct{}{}:
+			default:
+			}
+			select {
+			case <-r.Context().Done():
+			case <-release:
+			}
+		}
+	}))
+	defer func() {
+		close(release)
+		server.Close()
+	}()
+
+	port := strings.TrimPrefix(server.URL, "http://127.0.0.1:")
+	client := &Client{}
+	client.setDaemonState(&exec.Cmd{}, make(chan error, 1), false, "/ip4/127.0.0.1/tcp/"+port, "http://127.0.0.1:8080")
+
+	// Must not block behind c.mu while another command is active.
+	client.mu.Lock()
+	defer client.mu.Unlock()
+
+	name, err := client.PublishOnlineContext(context.Background(), "site-one", "QmTestCid123")
+	if err != nil {
+		t.Fatalf("PublishOnlineContext failed: %v", err)
+	}
+	if name != "k51qzi5uqu5testkey" {
+		t.Fatalf("name = %q, want k51qzi5uqu5testkey", name)
+	}
+	mu.Lock()
+	if method != http.MethodPost || path != "/api/v0/name/publish" {
+		mu.Unlock()
+		t.Fatalf("unexpected request: %s %s", method, path)
+	}
+	if gotArg != "/ipfs/QmTestCid123" || gotKey != "site-one" || gotLifetime != "7200h" {
+		mu.Unlock()
+		t.Fatalf("unexpected query: arg=%q key=%q lifetime=%q", gotArg, gotKey, gotLifetime)
+	}
+	mu.Unlock()
+
+	setMode("wrong-value")
+	if _, err := client.PublishOnlineContext(context.Background(), "site-one", "QmTestCid123"); err == nil {
+		t.Fatal("mismatched published value was accepted")
+	}
+
+	setMode("unsafe-name")
+	if _, err := client.PublishOnlineContext(context.Background(), "site-one", "QmTestCid123"); err == nil {
+		t.Fatal("unsafe published name was accepted")
+	}
+
+	setMode("rpc-error")
+	if _, err := client.PublishOnlineContext(context.Background(), "site-one", "QmTestCid123"); err == nil || !strings.Contains(err.Error(), "no key by the given name was found") || strings.Contains(err.Error(), "site-one") {
+		t.Fatalf("unexpected RPC error: %v", err)
+	}
+
+	setMode("redirect")
+	if _, err := client.PublishOnlineContext(context.Background(), "site-one", "QmTestCid123"); err == nil {
+		t.Fatal("redirect response was accepted")
+	}
+
+	setMode("block")
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := client.PublishOnlineContext(ctx, "site-one", "QmTestCid123")
+		errCh <- err
+	}()
+	<-started
+	cancel()
+	if err := <-errCh; !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+
+	offline := &Client{}
+	offline.setDaemonState(&exec.Cmd{}, make(chan error, 1), true, "/ip4/127.0.0.1/tcp/"+port, "http://127.0.0.1:8080")
+	if _, err := offline.PublishOnlineContext(context.Background(), "site-one", "QmTestCid123"); err == nil {
+		t.Fatal("offline daemon accepted PublishOnlineContext")
+	}
+
+	nonLoopback := &Client{}
+	nonLoopback.setDaemonState(&exec.Cmd{}, make(chan error, 1), false, "/ip4/192.168.1.2/tcp/5001", "http://127.0.0.1:8080")
+	if _, err := nonLoopback.PublishOnlineContext(context.Background(), "site-one", "QmTestCid123"); err == nil {
+		t.Fatal("non-loopback API accepted PublishOnlineContext")
 	}
 }
 
