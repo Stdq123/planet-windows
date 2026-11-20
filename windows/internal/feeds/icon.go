@@ -26,7 +26,7 @@ import (
 const (
 	maxIconFetchBytes = 2 << 20
 	maxPageFetchBytes = 1 << 20
-	maxIconAttempts   = 6
+	maxIconAttempts   = 8
 	maxIconCandidates = 6
 	iconFetchTimeout  = 6 * time.Second
 	iconHostDNSBudget = 3 * time.Second
@@ -268,26 +268,68 @@ func fetchSiteIcon(sourceURL, feedURL *url.URL, siteLink string, feedIcons, page
 		}
 	} else {
 		homepage = resolveSiteHomepage(feedURL, siteLink)
-		if homepage != nil && !sameRequestURL(homepage, feedURL) {
-			if err := allowedIconURL(ctx, allowedHosts, homepage); err == nil {
-				if doc, err := fetchHTMLPage(ctx, client, homepage); err == nil && doc.isHTML {
+		var pageCandidates []*url.URL
+		for _, candidate := range []*url.URL{homepage, resolveDirURL(feedURL)} {
+			if candidate == nil || sameRequestURL(candidate, feedURL) {
+				continue
+			}
+			duplicate := false
+			for _, existing := range pageCandidates {
+				if sameRequestURL(candidate, existing) {
+					duplicate = true
+					break
+				}
+			}
+			if !duplicate {
+				pageCandidates = append(pageCandidates, candidate)
+			}
+		}
+		htmlMatched := false
+		for _, candidate := range pageCandidates {
+			if err := allowedIconURL(ctx, allowedHosts, candidate); err != nil {
+				continue
+			}
+			if doc, err := fetchHTMLPage(ctx, client, candidate); err == nil && doc.isHTML {
+				if !htmlMatched {
 					homepage = doc.url
-					if encoded := tryList(discoverIcons(doc.body, doc.url)); encoded != "" {
-						return encoded
-					}
+					htmlMatched = true
+				}
+				if encoded := tryList(discoverIcons(doc.body, doc.url)); encoded != "" {
+					return encoded
 				}
 			}
 		}
 	}
 
 	var fallbacks []*url.URL
+	for _, base := range []*url.URL{homepage, sourceURL, feedURL} {
+		if dir := resolveDirURL(base); dir != nil {
+			fallbacks = append(fallbacks,
+				dir.ResolveReference(&url.URL{Path: "avatar.png"}),
+				dir.ResolveReference(&url.URL{Path: "favicon.ico"}),
+			)
+		}
+	}
 	for _, origin := range []*url.URL{homepage, sourceURL, feedURL} {
 		if origin == nil || (origin.Scheme != "http" && origin.Scheme != "https") || origin.Host == "" {
 			continue
 		}
-		fallbacks = append(fallbacks, &url.URL{Scheme: origin.Scheme, Host: origin.Host, Path: "/favicon.ico"})
+		fallbacks = append(fallbacks,
+			&url.URL{Scheme: origin.Scheme, Host: origin.Host, Path: "/avatar.png"},
+			&url.URL{Scheme: origin.Scheme, Host: origin.Host, Path: "/favicon.ico"},
+		)
 	}
 	return tryList(fallbacks)
+}
+
+func resolveDirURL(u *url.URL) *url.URL {
+	if u == nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return nil
+	}
+	dir := u.ResolveReference(&url.URL{Path: "./"})
+	dir.RawQuery = ""
+	dir.Fragment = ""
+	return dir
 }
 
 func resolveSiteHomepage(feedURL *url.URL, siteLink string) *url.URL {
@@ -296,10 +338,7 @@ func resolveSiteHomepage(feedURL *url.URL, siteLink string) *url.URL {
 			return resolved
 		}
 	}
-	if feedURL != nil && (feedURL.Scheme == "http" || feedURL.Scheme == "https") && feedURL.Host != "" {
-		return &url.URL{Scheme: feedURL.Scheme, Host: feedURL.Host, Path: "/"}
-	}
-	return nil
+	return resolveDirURL(feedURL)
 }
 
 func sameRequestURL(a, b *url.URL) bool {

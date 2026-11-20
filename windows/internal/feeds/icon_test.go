@@ -190,3 +190,119 @@ func TestFetchRejectsUnsafeCrossHostPrivateIconURLs(t *testing.T) {
 		t.Fatalf("cross-host localhost icon should be blocked: requested=%v iconLen=%d", privateRequested, len(feed.IconPNG))
 	}
 }
+
+func TestFetchFallsBackToAvatarPNGWhenNoIconDeclared(t *testing.T) {
+	avatar := testPNG(t, 32, color.NRGBA{R: 30, G: 160, B: 210, A: 255})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/":
+			w.Header().Set("Content-Type", "text/html")
+			fmt.Fprint(w, `<!doctype html><html><head><link rel="alternate" type="application/rss+xml" href="/rss.xml"></head><body>Home</body></html>`)
+		case "/rss.xml":
+			fmt.Fprint(w, `<rss version="2.0"><channel><title>Site</title><item><guid>1</guid><title>Post</title></item></channel></rss>`)
+		case "/avatar.png":
+			w.Header().Set("Content-Type", "image/png")
+			_, _ = w.Write(avatar)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	feed, err := Fetch(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	img, _, err := siteimage.DecodePNG(feed.IconPNG)
+	if err != nil || img.Bounds().Dx() != 32 || img.Bounds().Dy() != 32 {
+		t.Fatalf("expected 32x32 avatar.png fallback, got err=%v", err)
+	}
+}
+
+func TestFetchDirectFeedFallsBackToAvatarPNGOverFavicon(t *testing.T) {
+	avatar := testPNG(t, 48, color.NRGBA{R: 220, G: 80, B: 40, A: 255})
+	ico := testICO(testPNG(t, 16, color.NRGBA{R: 10, G: 20, B: 30, A: 255}), 16)
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/rss.xml":
+			fmt.Fprintf(w, `<rss version="2.0"><channel><title>Blog</title><link>%s/</link><item><guid>1</guid><title>Post</title></item></channel></rss>`, server.URL)
+		case "/":
+			w.Header().Set("Content-Type", "text/html")
+			fmt.Fprint(w, `<!doctype html><html><head><title>Blog</title></head><body>Hi</body></html>`)
+		case "/avatar.png":
+			w.Header().Set("Content-Type", "image/png")
+			_, _ = w.Write(avatar)
+		case "/favicon.ico":
+			w.Header().Set("Content-Type", "image/x-icon")
+			_, _ = w.Write(ico)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	feed, err := Fetch(server.URL + "/rss.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	img, _, err := siteimage.DecodePNG(feed.IconPNG)
+	if err != nil || img.Bounds().Dx() != 48 || img.Bounds().Dy() != 48 {
+		t.Fatalf("expected 48x48 avatar.png over favicon.ico, got err=%v", err)
+	}
+}
+
+func TestFetchResolvesSubpathAvatarPNGForGatewayFeed(t *testing.T) {
+	avatar := testPNG(t, 40, color.NRGBA{R: 70, G: 190, B: 110, A: 255})
+	ico := testICO(testPNG(t, 16, color.NRGBA{R: 10, G: 20, B: 30, A: 255}), 16)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/ipns/k51test/rss.xml":
+			fmt.Fprint(w, `<rss version="2.0"><channel><title>Gateway Site</title><item><guid>1</guid><title>Post</title></item></channel></rss>`)
+		case "/ipns/k51test/avatar.png":
+			w.Header().Set("Content-Type", "image/png")
+			_, _ = w.Write(avatar)
+		case "/favicon.ico":
+			w.Header().Set("Content-Type", "image/x-icon")
+			_, _ = w.Write(ico)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	feed, err := Fetch(server.URL + "/ipns/k51test/rss.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	img, _, err := siteimage.DecodePNG(feed.IconPNG)
+	if err != nil || img.Bounds().Dx() != 40 || img.Bounds().Dy() != 40 {
+		t.Fatalf("expected 40x40 subpath avatar.png, got err=%v", err)
+	}
+}
+
+func TestFetchFallsBackToFeedDirectoryWhenSiteLinkFails(t *testing.T) {
+	avatar := testPNG(t, 36, color.NRGBA{R: 140, G: 90, B: 230, A: 255})
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/blog/rss.xml":
+			fmt.Fprintf(w, `<rss version="2.0"><channel><title>Blog</title><link>%s/missing/</link><item><guid>1</guid><title>Post</title></item></channel></rss>`, server.URL)
+		case "/blog/avatar.png":
+			w.Header().Set("Content-Type", "image/png")
+			_, _ = w.Write(avatar)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	feed, err := Fetch(server.URL + "/blog/rss.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	img, _, err := siteimage.DecodePNG(feed.IconPNG)
+	if err != nil || img.Bounds().Dx() != 36 || img.Bounds().Dy() != 36 {
+		t.Fatalf("expected 36x36 /blog/avatar.png, got err=%v", err)
+	}
+}
