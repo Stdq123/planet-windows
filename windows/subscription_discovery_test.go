@@ -128,3 +128,74 @@ func TestFollowHomepageFetchesAndPersistsSiteIcon(t *testing.T) {
 		t.Fatalf("saved subscription icon mismatch: %v", err)
 	}
 }
+
+func TestUpdateSubscriptionEditsTitleAndReplacesAddress(t *testing.T) {
+	mygo.App.SetPath(mygo.PathUserData, t.TempDir())
+	t.Cleanup(func() { mygo.App.SetPath(mygo.PathUserData, "") })
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/old.xml":
+			fmt.Fprint(w, `<rss version="2.0"><channel><title>Old Feed</title><item><guid>shared</guid><title>Shared Post</title></item></channel></rss>`)
+		case "/new.xml":
+			fmt.Fprint(w, `<rss version="2.0"><channel><title>New Feed</title><item><guid>shared</guid><title>Shared Post Updated</title></item><item><guid>second</guid><title>Second</title></item></channel></rss>`)
+		case "/other.xml":
+			fmt.Fprint(w, `<rss version="2.0"><channel><title>Other</title><item><guid>o1</guid><title>Other Post</title></item></channel></rss>`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	lib := &Library{}
+	sub, err := lib.Follow(server.URL + "/old.xml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := lib.Follow(server.URL + "/other.xml"); err != nil {
+		t.Fatal(err)
+	}
+	if err := lib.StarSubscription(sub.URL, "shared", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := lib.SetSubscriptionRead(sub.URL, "shared", true); err != nil {
+		t.Fatal(err)
+	}
+
+	// Rename only (same URL) persists and survives refresh.
+	renamed, err := lib.UpdateSubscription(sub.URL, sub.URL, "我的自定义名称")
+	if err != nil || renamed.CustomTitle != "我的自定义名称" {
+		t.Fatalf("rename failed: sub=%+v err=%v", renamed, err)
+	}
+	refreshed, err := lib.RefreshSubscription(sub.URL)
+	if err != nil || refreshed.CustomTitle != "我的自定义名称" {
+		t.Fatalf("custom title lost on refresh: sub=%+v err=%v", refreshed, err)
+	}
+
+	// Colliding target URL is rejected without altering existing subscriptions.
+	if _, err := lib.UpdateSubscription(sub.URL, server.URL+"/other.xml", "冲突"); err == nil {
+		t.Fatal("expected duplicate subscription URL to be rejected")
+	}
+
+	// Failed fetch keeps the original subscription untouched.
+	if _, err := lib.UpdateSubscription(sub.URL, server.URL+"/missing.xml", "失败"); err == nil {
+		t.Fatal("expected unreachable new URL to fail")
+	}
+
+	// Replace URL preserves position, custom title, and matching item star/read state.
+	replaced, err := lib.UpdateSubscription(sub.URL, server.URL+"/new.xml", "新名称")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replaced.URL != server.URL+"/new.xml" || replaced.CustomTitle != "新名称" || len(replaced.Feed.Items) != 2 {
+		t.Fatalf("unexpected replaced subscription: %+v", replaced)
+	}
+	if !replaced.Feed.Items[0].Starred || !replaced.Feed.Items[0].Read {
+		t.Fatalf("star/read state lost after URL replacement: %+v", replaced.Feed.Items[0])
+	}
+
+	reopened, err := (&Library{}).Subscriptions()
+	if err != nil || len(reopened) != 2 || reopened[0].URL != server.URL+"/new.xml" || reopened[0].CustomTitle != "新名称" {
+		t.Fatalf("reopened subscriptions mismatch: %+v err=%v", reopened, err)
+	}
+}

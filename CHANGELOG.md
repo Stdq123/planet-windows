@@ -4,6 +4,10 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 ## [Unreleased]
 
+### Added
+
+- Added subscription settings (edit display name, change feed/Planet URL, and delete subscription directly from the subscription header or dialog) alongside the existing workspace menu actions.
+
 ### Changed
 
 - Displayed each subscribed site's own icon or website favicon (from Planet `avatar.png` / `favicon.ico`, feed icons, HTML icon links, or `avatar.png` / `favicon.ico` fallbacks) in the sidebar and reading views, using a neutral website icon fallback instead of first-letter initials when no site icon is available.
