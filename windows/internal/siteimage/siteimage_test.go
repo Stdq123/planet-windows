@@ -47,3 +47,26 @@ func TestJPEGConversionAndGeneratedICO(t *testing.T) {
 		t.Fatalf("invalid icon: %v", err)
 	}
 }
+
+func TestPresetAvatarsAndCircleCropPNG(t *testing.T) {
+	presets := PresetAvatars()
+	if len(presets) < 12 {
+		t.Fatalf("expected at least 12 preset avatars, got %d", len(presets))
+	}
+	pngData, err := PresetAvatarPNG(presets[0].Key)
+	if err != nil || pngData == "" {
+		t.Fatalf("PresetAvatarPNG failed: %v", err)
+	}
+	cropped, err := CircleCropPNG(pngData)
+	if err != nil || cropped == "" {
+		t.Fatalf("CircleCropPNG failed: %v", err)
+	}
+	img, _, err := DecodePNG(cropped)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, _, a := img.At(0, 0).RGBA()
+	if a != 0 {
+		t.Fatalf("expected transparent top-left corner after circle crop, got alpha %d", a)
+	}
+}

@@ -24,6 +24,7 @@ export interface Article {
   videoFilename?: string;
   audioDuration?: number;
   audioByteLength?: number;
+  heroImage?: string;
   pinned?: string;
 }
 
@@ -162,6 +163,13 @@ export interface PlausibleTracking {
   server?: string;
 }
 
+export interface PresetAvatar {
+  key: string;
+  category: string;
+  title: string;
+  png: string;
+}
+
 export interface RemoteMedia {
   url: string;
   type: string;
@@ -223,6 +231,7 @@ export interface Site {
   customCodeBodyEnd?: string;
   prewarmNewPost?: boolean;
   publishAsIPNS?: boolean;
+  saveRoundAvatar?: boolean;
   avatarPng?: string;
   created: string;
   ipns?: string;
@@ -317,8 +326,11 @@ export interface XSyncPostInfo {
 export const Library = {
   /** AddAttachment copies a selected local file into a saved Windows article. */
   addAttachment: bind<[string, string], Article>("Library.AddAttachment", (siteID: string, articleID: string) => [siteID, articleID]),
+  addAttachmentBytes: bind<[string, string, string, string], Article>("Library.AddAttachmentBytes", (siteID: string, articleID: string, name: string, dataBase64: string) => [siteID, articleID, name, dataBase64]),
   addDraftAttachment: bind<[string, string], Draft>("Library.AddDraftAttachment", (siteID: string, draftID: string) => [siteID, draftID]),
+  addDraftAttachmentBytes: bind<[string, string, string, string], Draft>("Library.AddDraftAttachmentBytes", (siteID: string, draftID: string, name: string, dataBase64: string) => [siteID, draftID, name, dataBase64]),
   applyBuiltinTemplate: bind<[string, string], Site>("Library.ApplyBuiltinTemplate", (siteID: string, id: string) => [siteID, id]),
+  applyPresetAvatar: bind<[string, string], Site>("Library.ApplyPresetAvatar", (siteID: string, key: string) => [siteID, key]),
   articles: bind<[string], Article[]>("Library.Articles", (siteID: string) => [siteID]),
   /** AudioURL provides a revocable loopback stream for the selected article audio. */
   audioURL: bind<[string, string], string>("Library.AudioURL", (siteID: string, articleID: string) => [siteID, articleID]),
@@ -385,6 +397,7 @@ export const Library = {
   pinnableStatus: bind<[string], Status>("Library.PinnableStatus", (siteID: string) => [siteID]),
   plausibleStats: bind<[string], Stats>("Library.PlausibleStats", (siteID: string) => [siteID]),
   plausibleStatsRange: bind<[string, string], Stats>("Library.PlausibleStatsRange", (siteID: string, period: string) => [siteID, period]),
+  presetAvatars: bind<[], PresetAvatar[]>("Library.PresetAvatars", () => []),
   preview: bind<[string], string>("Library.Preview", (content: string) => [content]),
   /** PreviewArticle renders the draft with images registered to its saved article. */
   previewArticle: bind<[string, string, string], string>("Library.PreviewArticle", (siteID: string, articleID: string, content: string) => [siteID, articleID, content]),
@@ -429,6 +442,7 @@ export const Library = {
   setDraftExistingAttachmentRemoved: bind<[string, string, string, boolean], Draft>("Library.SetDraftExistingAttachmentRemoved", (siteID: string, draftID: string, name: string, removed: boolean) => [siteID, draftID, name, removed]),
   /** SetIPFSEnabled persists the user's node preference and controls the owned daemon. */
   setIPFSEnabled: bind<[boolean], void>("Library.SetIPFSEnabled", (enabled: boolean) => [enabled]),
+  setSaveRoundAvatar: bind<[string, boolean], Site>("Library.SetSaveRoundAvatar", (siteID: string, round: boolean) => [siteID, round]),
   setSubscriptionRead: bind<[string, string, boolean], void>("Library.SetSubscriptionRead", (address: string, key: string, read: boolean) => [address, key, read]),
   sites: bind<[], Site[]>("Library.Sites", () => []),
   starSubscription: bind<[string, string, boolean], void>("Library.StarSubscription", (address: string, key: string, starred: boolean) => [address, key, starred]),

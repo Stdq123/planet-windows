@@ -134,3 +134,36 @@ test("custom code and publication flags save from the dedicated site settings pa
   expect(savedPayload.publishAsIPNS).toBe(false);
   expect(savedPayload.prewarmNewPost).toBe(false);
 });
+
+test("avatar gallery applies preset avatar and toggles saveRoundAvatar, and article list toggles grid view",async()=>{
+  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});
+  let site:any={id:"s",name:"My Planet",about:"About",created:"2026-01-01T00:00:00Z"};
+  const article={id:"a1",siteId:"s",title:"First Post",content:"![cover](hero.png)",created:"2026-01-01T00:00:00Z",modified:"2026-01-01T00:00:00Z",heroImage:"hero.png"};
+  let appliedKey="";let roundValue:boolean|null=null;
+  (globalThis as any).mygo={call:async(method:string,...args:any[])=>{switch(method){
+    case "Library.Sites":return [site];
+    case "Library.Subscriptions":return [];
+    case "Library.Articles":return [article];
+    case "Library.PresetAvatars":return [{key:"NSTG-0001",category:"Nostalgia",title:"Maglev Pram",png:"aGVsbG8="}];
+    case "Library.ApplyPresetAvatar":appliedKey=args[1];site={...site,avatarPng:"aGVsbG8="};return site;
+    case "Library.SetSaveRoundAvatar":roundValue=args[1];site={...site,saveRoundAvatar:args[1]};return site;
+    case "Library.PublishSite":return {cid:"test",ipns:"test"};
+    default:throw new Error(method);
+  }}};
+  await import("../src/main.ts?avatar-gallery-and-grid"); enterFirstSite(window);await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="My Planet");
+  const toggleBtn=window.document.querySelector<HTMLButtonElement>("#toggle-article-view")!;
+  toggleBtn.click();
+  expect(window.document.querySelector("#articles")!.classList.contains("grid-view")).toBe(true);
+  expect(window.document.querySelector(".article-hero-badge")?.textContent).toContain("hero.png");
+
+  window.document.querySelector<HTMLButtonElement>("#edit-site")!.click();
+  const roundCheck=window.document.querySelector<HTMLInputElement>("#site-round-avatar")!;
+  roundCheck.checked=true;roundCheck.dispatchEvent(new window.Event("change",{bubbles:true}));
+  await waitFor(()=>roundValue===true);
+
+  window.document.querySelector<HTMLButtonElement>("#open-avatar-gallery")!.click();
+  await waitFor(()=>window.document.querySelectorAll(".avatar-gallery-item").length===1);
+  window.document.querySelector<HTMLButtonElement>(".avatar-gallery-item")!.click();
+  window.document.querySelector<HTMLFormElement>("#avatar-gallery-form")!.dispatchEvent(new window.Event("submit",{cancelable:true}));
+  await waitFor(()=>appliedKey==="NSTG-0001");
+});

@@ -99,3 +99,56 @@ func TestSubscriptionIconPersistsAndSurvivesEmptyRefresh(t *testing.T) {
 		t.Fatalf("icon not persisted across reopen: %+v %v", subs, err)
 	}
 }
+
+func TestSaveRoundAvatarAndHeroImageDerivation(t *testing.T) {
+	root := t.TempDir()
+	s, err := Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	site, err := s.CreateSite("Site", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	img := image.NewRGBA(image.Rect(0, 0, 16, 16))
+	for y := 0; y < 16; y++ {
+		for x := 0; x < 16; x++ {
+			img.Set(x, y, color.RGBA{R: 255, G: 0, B: 0, A: 255})
+		}
+	}
+	var encoded bytes.Buffer
+	if err = png.Encode(&encoded, img); err != nil {
+		t.Fatal(err)
+	}
+	avatar := base64.StdEncoding.EncodeToString(encoded.Bytes())
+	if _, err = s.SetSiteAvatar(site.ID, avatar); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := s.SetSaveRoundAvatar(site.ID, true)
+	if err != nil || !updated.SaveRoundAvatar || updated.AvatarPNG == avatar {
+		t.Fatalf("round avatar not applied: %+v %v", updated, err)
+	}
+
+	article, err := s.SaveArticle(site.ID, "", "Hello", "Text with ![cover](cover.png) inside")
+	if err != nil {
+		t.Fatal(err)
+	}
+	article, err = s.AddAttachment(site.ID, article.ID, "other.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if article.HeroImage != "other.png" {
+		t.Fatalf("expected fallback hero image other.png, got %q", article.HeroImage)
+	}
+	article, err = s.AddAttachment(site.ID, article.ID, "cover.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	article, err = s.SaveArticle(site.ID, article.ID, "Hello", "Text with ![cover](cover.png) inside")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if article.HeroImage != "cover.png" {
+		t.Fatalf("expected markdown hero image cover.png, got %q", article.HeroImage)
+	}
+}

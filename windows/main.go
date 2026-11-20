@@ -431,6 +431,30 @@ func (l *Library) RemoveSiteAvatar(siteID string) (store.Site, error) {
 	}
 	return s.SetSiteAvatar(siteID, "")
 }
+
+func (l *Library) PresetAvatars() []siteimage.PresetAvatar {
+	return siteimage.PresetAvatars()
+}
+
+func (l *Library) ApplyPresetAvatar(siteID, key string) (store.Site, error) {
+	avatar, err := siteimage.PresetAvatarPNG(key)
+	if err != nil {
+		return store.Site{}, err
+	}
+	s, err := l.open()
+	if err != nil {
+		return store.Site{}, err
+	}
+	return s.SetSiteAvatar(siteID, avatar)
+}
+
+func (l *Library) SetSaveRoundAvatar(siteID string, round bool) (store.Site, error) {
+	s, err := l.open()
+	if err != nil {
+		return store.Site{}, err
+	}
+	return s.SetSaveRoundAvatar(siteID, round)
+}
 func (l *Library) Articles(siteID string) ([]store.Article, error) {
 	s, err := l.open()
 	if err != nil {
@@ -523,6 +547,20 @@ func (l *Library) AddDraftAttachment(ctx context.Context, siteID, draftID string
 		return store.Draft{}, err
 	}
 	return attachments.AddDraft(root, s, siteID, draftID, paths[0])
+}
+
+func (l *Library) AddDraftAttachmentBytes(siteID, draftID, name, dataBase64 string) (store.Draft, error) {
+	l.publicMu.Lock()
+	defer l.publicMu.Unlock()
+	s, err := l.open()
+	if err != nil {
+		return store.Draft{}, err
+	}
+	root, err := mygo.App.Path(mygo.PathUserData)
+	if err != nil {
+		return store.Draft{}, err
+	}
+	return attachments.AddDraftBytes(root, s, siteID, draftID, name, dataBase64)
 }
 
 func (l *Library) RemoveDraftAttachment(siteID, draftID, name string) (store.Draft, error) {
@@ -646,6 +684,20 @@ func (l *Library) AddAttachment(ctx context.Context, siteID, articleID string) (
 		return store.Article{}, err
 	}
 	return attachments.Add(root, s, siteID, articleID, paths[0])
+}
+
+func (l *Library) AddAttachmentBytes(siteID, articleID, name, dataBase64 string) (store.Article, error) {
+	l.publicMu.Lock()
+	defer l.publicMu.Unlock()
+	s, err := l.open()
+	if err != nil {
+		return store.Article{}, err
+	}
+	root, err := mygo.App.Path(mygo.PathUserData)
+	if err != nil {
+		return store.Article{}, err
+	}
+	return attachments.AddBytes(root, s, siteID, articleID, name, dataBase64)
 }
 
 // RemoveAttachment removes a file previously added to a Windows article.

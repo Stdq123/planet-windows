@@ -3,6 +3,7 @@ package attachments
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"windows/internal/backup"
 	"windows/internal/mediainfo"
@@ -861,4 +863,105 @@ func GenerateVideoThumbnail(root string, site store.Site, article store.Article,
 		return nil
 	}
 	return os.WriteFile(target, data, 0600)
+}
+
+func stageAttachmentBytes(name, dataBase64 string, existing []string) (string, string, func(), error) {
+	const maxPasteBytes = 32 << 20
+	if len(dataBase64) == 0 || len(dataBase64) > base64.StdEncoding.EncodedLen(maxPasteBytes) {
+		return "", "", nil, errors.New("附件数据为空或超过 32 MiB 上限")
+	}
+	raw, err := base64.StdEncoding.DecodeString(dataBase64)
+	if err != nil || len(raw) == 0 || len(raw) > maxPasteBytes {
+		return "", "", nil, errors.New("附件编码无效")
+	}
+	name = strings.TrimSpace(filepath.Base(name))
+	if name == "" || name == "." || name == "/" || name == `\` {
+		name = fmt.Sprintf("paste-%d.png", time.Now().UTC().UnixNano())
+	}
+	if filepath.Ext(name) == "" {
+		switch http.DetectContentType(raw) {
+		case "image/png":
+			name += ".png"
+		case "image/jpeg":
+			name += ".jpg"
+		case "image/gif":
+			name += ".gif"
+		case "image/webp":
+			name += ".webp"
+		default:
+			return "", "", nil, errors.New("附件缺少文件扩展名")
+		}
+	}
+	ext := filepath.Ext(name)
+	stem := strings.TrimSuffix(name, ext)
+	candidate := name
+	for n := 2; n < 1000; n++ {
+		conflict := false
+		for _, old := range existing {
+			if strings.EqualFold(old, candidate) {
+				conflict = true
+				break
+			}
+		}
+		if !conflict {
+			break
+		}
+		candidate = fmt.Sprintf("%s-%d%s", stem, n, ext)
+	}
+	if !validName(candidate) {
+		return "", "", nil, errors.New("附件文件名无效或与生成文件冲突")
+	}
+	dir, err := os.MkdirTemp("", "planet-paste-*")
+	if err != nil {
+		return "", "", nil, err
+	}
+	cleanup := func() { _ = os.RemoveAll(dir) }
+	target := filepath.Join(dir, candidate)
+	if err := os.WriteFile(target, raw, 0600); err != nil {
+		cleanup()
+		return "", "", nil, err
+	}
+	return target, candidate, cleanup, nil
+}
+
+// AddBytes stages in-memory attachment bytes (such as a pasted or dropped image) into a saved article.
+func AddBytes(root string, library *store.Store, siteID, articleID, name, dataBase64 string) (store.Article, error) {
+	posts, err := library.ListArticles(siteID)
+	if err != nil {
+		return store.Article{}, err
+	}
+	var existing []string
+	for _, post := range posts {
+		if post.ID == articleID {
+			existing = post.Attachments
+			break
+		}
+	}
+	stagedPath, _, cleanup, err := stageAttachmentBytes(name, dataBase64, existing)
+	if err != nil {
+		return store.Article{}, err
+	}
+	defer cleanup()
+	return Add(root, library, siteID, articleID, stagedPath)
+}
+
+// AddDraftBytes stages in-memory attachment bytes (such as a pasted or dropped image) into a draft.
+func AddDraftBytes(root string, library *store.Store, siteID, draftID, name, dataBase64 string) (store.Draft, error) {
+	drafts, err := library.ListDrafts(siteID)
+	if err != nil {
+		return store.Draft{}, err
+	}
+	var existing []string
+	for _, draft := range drafts {
+		if draft.ID == draftID {
+			existing = draft.Attachments
+			break
+		}
+	}
+	stagedPath, _, cleanup, err := stageAttachmentBytes(name, dataBase64, existing)
+	if err != nil {
+		return store.Draft{}, err
+	}
+	defer cleanup()
+	return AddDraft(root, library, siteID, draftID, stagedPath)
 }

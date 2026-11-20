@@ -286,6 +286,11 @@ func Merge(original json.RawMessage, site store.Site, articles []store.Article) 
 		if site.PublishAsIPNS != nil {
 			put(root, "publishAsIPNS", *site.PublishAsIPNS)
 		}
+		if site.SaveRoundAvatar {
+			put(root, "saveRoundAvatar", true)
+		} else if len(original) == 0 {
+			delete(root, "saveRoundAvatar")
+		}
 	}
 	tagSource := original
 	if len(tagSource) == 0 {
@@ -420,8 +425,17 @@ func Merge(original json.RawMessage, site store.Site, articles []store.Article) 
 			}
 			if article.Pinned != nil {
 				put(item, "pinned", appleDate(*article.Pinned))
-			} else {
+			} else if len(original) == 0 {
 				delete(item, "pinned")
+			}
+			hero := article.HeroImage
+			if hero == "" {
+				hero = store.DeriveHeroImage(article.Content, article.Attachments)
+			}
+			if hero != "" {
+				put(item, "heroImage", hero)
+			} else if len(original) == 0 {
+				delete(item, "heroImage")
 			}
 		}
 		var oldContent string

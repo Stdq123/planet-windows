@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -52,6 +53,7 @@ type Site struct {
 	CustomCodeBodyEnd          string             `json:"customCodeBodyEnd,omitempty"`
 	PrewarmNewPost             *bool              `json:"prewarmNewPost,omitempty"`
 	PublishAsIPNS              *bool              `json:"publishAsIPNS,omitempty"`
+	SaveRoundAvatar            bool               `json:"saveRoundAvatar,omitempty"`
 	AvatarPNG                  string             `json:"avatarPng,omitempty"`
 	Created                    time.Time          `json:"created"`
 	IPNS                       string             `json:"ipns,omitempty"`
@@ -161,6 +163,7 @@ type Article struct {
 	VideoFilename          string            `json:"videoFilename,omitempty"`
 	AudioDuration          *int              `json:"audioDuration,omitempty"`
 	AudioByteLength        *int64            `json:"audioByteLength,omitempty"`
+	HeroImage              string            `json:"heroImage,omitempty"`
 	Pinned                 *time.Time        `json:"pinned,omitempty"`
 }
 
@@ -1675,9 +1678,41 @@ func mediaType(name string) string {
 		return "audio"
 	case ".mp4", ".mov", ".m4v", ".webm", ".avi", ".mpeg", ".mpg":
 		return "video"
+	case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg":
+		return "image"
 	default:
 		return ""
 	}
+}
+
+var markdownImagePattern = regexp.MustCompile(`!\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)`)
+
+// DeriveHeroImage selects the first Markdown image attachment or the first image attachment.
+func DeriveHeroImage(content string, attachments []string) string {
+	if len(attachments) == 0 {
+		return ""
+	}
+	for _, match := range markdownImagePattern.FindAllStringSubmatch(content, -1) {
+		if len(match) < 2 {
+			continue
+		}
+		rawTarget := strings.TrimPrefix(strings.Trim(match[1], "<>"), "./")
+		decoded, err := url.PathUnescape(rawTarget)
+		if err != nil {
+			decoded = rawTarget
+		}
+		for _, att := range attachments {
+			if mediaType(att) == "image" && (strings.EqualFold(att, decoded) || strings.EqualFold(att, rawTarget)) {
+				return att
+			}
+		}
+	}
+	for _, att := range attachments {
+		if mediaType(att) == "image" {
+			return att
+		}
+	}
+	return ""
 }
 
 func (s *Store) AddAttachmentWithMetadata(siteID, articleID, name string, duration *int, size *int64) (Article, error) {
@@ -1718,6 +1753,10 @@ func (s *Store) AddAttachmentWithMetadata(siteID, articleID, name string, durati
 			article.AudioFilename, article.AudioDuration, article.AudioByteLength = name, duration, size
 		case "video":
 			article.VideoFilename = name
+		case "image":
+			if article.HeroImage == "" {
+				article.HeroImage = DeriveHeroImage(article.Content, article.Attachments)
+			}
 		}
 		article.Modified = time.Now().UTC()
 		next.Articles[i] = article
@@ -1778,6 +1817,9 @@ func (s *Store) RemoveAttachment(siteID, articleID, name string) (Article, error
 					article.VideoFilename = item
 				}
 			}
+		}
+		if article.HeroImage == name {
+			article.HeroImage = DeriveHeroImage(article.Content, remaining)
 		}
 		article.Modified = time.Now().UTC()
 		next.Articles[i] = article
@@ -1875,6 +1917,7 @@ func (s *Store) saveArticleLocked(siteID, articleID, title, content, draftID str
 				if err != nil {
 					return Article{}, err
 				}
+				article.HeroImage = DeriveHeroImage(article.Content, article.Attachments)
 				next.Articles[i] = article
 				markContentChange(&next, siteID, true)
 				if err := s.write(next); err != nil {
@@ -1948,6 +1991,7 @@ func (s *Store) saveArticleLocked(siteID, articleID, title, content, draftID str
 	if err != nil {
 		return Article{}, err
 	}
+	article.HeroImage = DeriveHeroImage(article.Content, article.Attachments)
 	next.Articles = append(next.Articles, article)
 	markContentChange(&next, siteID, true)
 	for i := range next.Sites {
