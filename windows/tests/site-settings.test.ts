@@ -70,7 +70,7 @@ test("site setting errors associate native and known server failures without los
   expect(slug.hasAttribute("aria-invalid")).toBe(false);expect(slug.getAttribute("aria-describedby")).toBe("site-slug-hint");expect(result.textContent).toBe("");
 });
 
-test("site settings uses wide two-column navigation in edit mode and compact layout in create mode",async()=>{
+test("site settings uses wide two-column multi-page navigation in edit mode and compact layout in create mode",async()=>{
   const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});
   let confirmCalls=0;window.confirm=()=>{confirmCalls++;return false;};
   const site={id:"s",name:"My Planet",about:"About",created:"2026-01-01T00:00:00Z"};
@@ -80,12 +80,25 @@ test("site settings uses wide two-column navigation in edit mode and compact lay
   const nav=window.document.querySelector<HTMLElement>("#site-settings-nav")!;
   window.document.querySelector<HTMLButtonElement>("#edit-site")!.click();
   expect(dialog.dataset.mode).toBe("edit");
+  expect(dialog.dataset.page).toBe("general");
   expect(nav.hidden).toBe(false);
   expect(window.document.querySelector("#site-nav-name")?.textContent).toBe("My Planet");
-  const publishNav=window.document.querySelector<HTMLButtonElement>('.site-nav-item[data-target="site-section-publish"]')!;
-  publishNav.click();
-  expect(publishNav.classList.contains("is-active")).toBe(true);
-  expect(publishNav.getAttribute("aria-current")).toBe("true");
+  const profileNav=window.document.querySelector<HTMLButtonElement>("#site-profile")!;
+  const podcastNav=window.document.querySelector<HTMLButtonElement>("#podcast-settings")!;
+  const generalNav=window.document.querySelector<HTMLButtonElement>("#site-general-nav")!;
+  profileNav.click();
+  expect(dialog.dataset.page).toBe("site-profile-dialog");
+  expect(profileNav.classList.contains("is-active")).toBe(true);
+  expect(profileNav.getAttribute("aria-current")).toBe("true");
+  expect(window.document.querySelector<HTMLDialogElement>("#site-profile-dialog")!.open).toBe(true);
+  podcastNav.click();
+  expect(dialog.dataset.page).toBe("podcast-settings-dialog");
+  expect(window.document.querySelector<HTMLDialogElement>("#site-profile-dialog")!.open).toBe(false);
+  expect(window.document.querySelector<HTMLDialogElement>("#podcast-settings-dialog")!.open).toBe(true);
+  generalNav.click();
+  expect(dialog.dataset.page).toBe("general");
+  expect(window.document.querySelector<HTMLDialogElement>("#podcast-settings-dialog")!.open).toBe(false);
+  expect(generalNav.classList.contains("is-active")).toBe(true);
   const nameInput=window.document.querySelector<HTMLInputElement>('#site-form input[name="name"]')!;
   nameInput.value="Edited Name";
   window.document.querySelector<HTMLButtonElement>("#close-site-x")!.click();

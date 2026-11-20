@@ -8,7 +8,7 @@ import { refreshDue } from "./auto-refresh";
 import { gatewayKey, isRateLimitedGateway, planetShareURL, selectedGateway, sitePublicURL } from "./gateway";
 import { localGatewayResource } from "./local-gateway";
 import { feedArticleBase, feedReaderDocument } from "./feed-reader";
-import { hasDialogChanges, openDialog, prepareChoices, prepareDialogs, readingStyles, rememberDialog, syncChoices } from "./ui";
+import { hasDialogChanges, mayDismiss, openDialog, prepareChoices, prepareDialogs, readingStyles, rememberDialog, syncChoices } from "./ui";
 
 prepareChoices(document);
 prepareDialogs(document);
@@ -886,13 +886,17 @@ async function queuePublication(siteID: string, manual = false) {
 const siteSettingsNav = $<HTMLElement>("#site-settings-nav");
 const siteSettingsMain = $<HTMLElement>("#site-settings-main");
 const siteNavItems = Array.from(siteSettingsNav.querySelectorAll<HTMLButtonElement>(".site-nav-item"));
-function setActiveSiteNav(targetId: string) {
+function setActiveSiteNav(pageId: string) {
+  dialog.dataset.page = pageId;
   for (const item of siteNavItems) {
-    const active = item.dataset.target === targetId;
+    const active = item.dataset.page === pageId;
     item.classList.toggle("is-active", active);
     if (active) item.setAttribute("aria-current", "true");
     else item.removeAttribute("aria-current");
   }
+}
+function closeInlineSettingsPages() {
+  for (const sub of dialog.querySelectorAll<HTMLDialogElement>("dialog.site-settings-page[open]")) sub.close();
 }
 function updateSiteNavSummary(currentSite: Site | null) {
   $("#site-nav-name").textContent = currentSite?.name || "";
@@ -911,31 +915,37 @@ function updateSiteNavSummary(currentSite: Site | null) {
     navAvatar.append(icon);
   }
 }
-for (const item of siteNavItems) {
-  item.addEventListener("click", () => {
-    const targetId = item.dataset.target;
-    if (!targetId) return;
-    setActiveSiteNav(targetId);
-    const section = document.getElementById(targetId);
-    if (section && typeof section.scrollIntoView === "function") {
-      section.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  });
-}
-siteSettingsMain.addEventListener("scroll", () => {
-  if (dialog.dataset.mode !== "edit") return;
-  const top = siteSettingsMain.scrollTop + 48;
-  let activeId = siteNavItems[0]?.dataset.target ?? "site-section-general";
-  for (const item of siteNavItems) {
-    const targetId = item.dataset.target;
-    if (!targetId) continue;
-    const section = document.getElementById(targetId);
-    if (section && section.offsetTop - siteSettingsMain.offsetTop <= top) activeId = targetId;
+siteSettingsNav.addEventListener("click", event => {
+  const button = (event.target as Element).closest<HTMLButtonElement>(".site-nav-item");
+  if (!button || button.disabled) return;
+  const targetPage = button.dataset.page;
+  if (!targetPage) return;
+  const activePage = dialog.querySelector<HTMLDialogElement>("dialog.site-settings-page[open]");
+  if (activePage && activePage.id === targetPage) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return;
   }
-  setActiveSiteNav(activeId);
+  if (activePage && !mayDismiss(activePage)) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return;
+  }
+}, true);
+$("#site-general-nav").addEventListener("click", () => {
+  closeInlineSettingsPages();
+  setActiveSiteNav("general");
 });
-$("#close-site-x").addEventListener("click", () => { $("#cancel-site").click(); });
-$("#new-site").addEventListener("click", () => { if (canLeave()) { navigationRevision++; editingSiteID=""; dialog.dataset.mode="create"; siteSettingsNav.hidden=true; form.reset(); $("#site-index-setting").hidden=true;$("#site-avatar-setting").hidden=true;$("#site-identity-settings").hidden=true;$("#site-more-settings").hidden=true;$("#site-avatar-result").textContent="";$("#site-settings-result").textContent=""; form.querySelector("h2")!.textContent="创建站点";$("#site-dialog-description").textContent="为你的新空间起个名字。"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="创建站点"; siteSettingsMain.scrollTop=0; openDialog(dialog); } });
+$("#close-site-x").addEventListener("click", () => {
+  if (saving) return;
+  const activePage = dialog.querySelector<HTMLDialogElement>("dialog.site-settings-page[open]");
+  if (activePage) {
+    if (!mayDismiss(activePage)) return;
+    activePage.close();
+  }
+  $("#cancel-site").click();
+});
+$("#new-site").addEventListener("click", () => { if (canLeave()) { navigationRevision++; editingSiteID=""; closeInlineSettingsPages(); dialog.dataset.mode="create"; setActiveSiteNav("general"); siteSettingsNav.hidden=true; form.reset(); $("#site-index-setting").hidden=true;$("#site-avatar-setting").hidden=true;$("#site-identity-settings").hidden=true;$("#site-more-settings").hidden=true;$("#site-avatar-result").textContent="";$("#site-settings-result").textContent=""; form.querySelector("h2")!.textContent="创建站点";$("#site-dialog-description").textContent="为你的新空间起个名字。"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="创建站点"; siteSettingsMain.scrollTop=0; openDialog(dialog); } });
 function updateSiteAvatarPreview(value?:string) {
   const image=$<HTMLImageElement>("#site-avatar-preview");image.hidden=!value;$("#site-avatar-placeholder").hidden=!!value;
   if(value)image.src=`data:image/png;base64,${value}`;else image.removeAttribute("src");
@@ -944,7 +954,7 @@ function updateSiteAvatarPreview(value?:string) {
 }
 editSite.addEventListener("click", () => {
   if (!site || saving) return;
-  editingSiteID=site.id; dialog.dataset.mode="edit"; siteSettingsNav.hidden=false; form.reset();$("#site-settings-result").textContent="";
+  editingSiteID=site.id; closeInlineSettingsPages(); dialog.dataset.mode="edit"; setActiveSiteNav("general"); siteSettingsNav.hidden=false; form.reset();$("#site-settings-result").textContent="";
   form.querySelector<HTMLInputElement>('input[name="name"]')!.value=site.name;
   form.querySelector<HTMLTextAreaElement>('textarea[name="about"]')!.value=site.about;
   form.querySelector<HTMLInputElement>('input[name="doNotIndex"]')!.checked=!!site.doNotIndex;
@@ -955,8 +965,7 @@ editSite.addEventListener("click", () => {
   $("#site-more-settings").hidden=false;
   $("#site-avatar-setting").hidden=!!site.imported;$("#site-avatar-result").textContent="";updateSiteAvatarPreview(site.avatarPng);
   updateSiteNavSummary(site);
-  setActiveSiteNav("site-section-general");
-  form.querySelector("h2")!.textContent="站点设置";$("#site-dialog-description").textContent="站点信息保存后需重新发布；头像选择后会自动发布。"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="保存设置";
+  form.querySelector("h2")!.textContent="基本资料";$("#site-dialog-description").textContent="站点信息保存后需重新发布；头像选择后会自动发布。"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="保存设置";
   siteSettingsMain.scrollTop=0;
   openDialog(dialog);
 });
@@ -990,7 +999,7 @@ siteProfileForm.addEventListener("submit",async event=>{
   event.preventDefault();if(!site || site.imported || saving)return;
   const siteID=site.id,generation=publicationState(siteID).generation,profile=Object.fromEntries(profileFields.map(name=>[name,siteProfileForm.querySelector<HTMLInputElement>(`[name="${name}"]`)!.value.trim()]));
   const controls=Array.from(siteProfileForm.querySelectorAll<HTMLInputElement|HTMLButtonElement>("input,button"));controls.forEach(control=>control.disabled=true);saving=true;updateView();
-  try {const updated=await Library.updateSiteProfile(siteID,JSON.stringify(profile));const selected=mergeSitePublication(sites.find(entry=>entry.id===siteID),updated,generation);sitesRevision++;sites=sites.map(entry=>entry.id===siteID?selected:entry);if(site?.id===siteID)site=selected;siteProfileDialog.close();markLocalChange(siteID);void queuePublication(siteID);}
+  try {const updated=await Library.updateSiteProfile(siteID,JSON.stringify(profile));const selected=mergeSitePublication(sites.find(entry=>entry.id===siteID),updated,generation);sitesRevision++;sites=sites.map(entry=>entry.id===siteID?selected:entry);if(site?.id===siteID)site=selected;if(dialog.open){rememberDialog(siteProfileDialog);$("#site-profile-result").textContent="已保存，正在重新发布站点。";}else siteProfileDialog.close();markLocalChange(siteID);void queuePublication(siteID);}
   catch(error){$("#site-profile-result").textContent=`保存失败：${error instanceof Error ? error.message : String(error)}`;}
   finally{controls.forEach(control=>control.disabled=false);saving=false;updateView();}
 });
@@ -1004,7 +1013,7 @@ podcastForm.addEventListener("submit",async event=>{
   event.preventDefault();if(!site || site.imported || saving)return;const siteID=site.id,generation=publicationState(siteID).generation;
   const language=podcastForm.querySelector<HTMLInputElement>('[name="language"]')!.value.trim(),explicit=podcastForm.querySelector<HTMLInputElement>('[name="explicit"]')!.checked,categories=Array.from(podcastForm.querySelectorAll<HTMLInputElement>('[name="category"]:checked')).map(input=>input.value);
   const controls=Array.from(podcastForm.querySelectorAll<HTMLInputElement|HTMLButtonElement>("input,button"));controls.forEach(control=>control.disabled=true);saving=true;updateView();
-  try{const updated=await Library.updatePodcastSettings(siteID,language,explicit,JSON.stringify(categories));const selected=mergeSitePublication(sites.find(entry=>entry.id===siteID),updated,generation);sitesRevision++;sites=sites.map(entry=>entry.id===siteID?selected:entry);if(site?.id===siteID)site=selected;podcastDialog.close();markLocalChange(siteID);void queuePublication(siteID);}
+  try{const updated=await Library.updatePodcastSettings(siteID,language,explicit,JSON.stringify(categories));const selected=mergeSitePublication(sites.find(entry=>entry.id===siteID),updated,generation);sitesRevision++;sites=sites.map(entry=>entry.id===siteID?selected:entry);if(site?.id===siteID)site=selected;if(dialog.open){rememberDialog(podcastDialog);$("#podcast-settings-result").textContent="已保存，正在重新发布站点。";}else podcastDialog.close();markLocalChange(siteID);void queuePublication(siteID);}
   catch(error){$("#podcast-settings-result").textContent=`保存失败：${error instanceof Error ? error.message : String(error)}`;}
   finally{controls.forEach(control=>control.disabled=false);saving=false;updateView();}
 });
@@ -1117,7 +1126,7 @@ $("#close-removed-sites").addEventListener("click",()=>{if(!saving)removedSitesD
 removedSitesDialog.addEventListener("cancel",event=>{if(saving)event.preventDefault();});
 $("#cancel-site").addEventListener("click", () => { if (!saving) dialog.close(); });
 dialog.addEventListener("cancel", event => { if (saving) event.preventDefault(); });
-dialog.addEventListener("close", () => { navigationRevision++; });
+dialog.addEventListener("close", () => { closeInlineSettingsPages(); setActiveSiteNav("general"); navigationRevision++; });
 form.addEventListener("submit", async (event) => {
   event.preventDefault(); if (saving) return;
   $("#site-settings-result").textContent="";if(!siteFormErrors.validate())return;
