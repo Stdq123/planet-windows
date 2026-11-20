@@ -29,13 +29,55 @@ func articleLink(article store.Article) string {
 	return "/" + article.ID + "/"
 }
 
-const header = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{.Title}}</title>{{if .Site.AvatarPNG}}<link rel="icon" href="{{.IconPrefix}}favicon.ico">{{end}}{{if .Site.PlausibleEnabled}}{{if .Site.PlausibleScriptID}}<script async src="https://{{.Site.PlausibleAPIServer}}/js/{{.Site.PlausibleScriptID}}.js"></script><script>window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};plausible.init()</script>{{else}}<script defer data-domain="{{.Site.PlausibleDomain}}" src="https://{{.Site.PlausibleAPIServer}}/js/plausible.local.js"></script>{{end}}{{end}}<style>body{max-width:740px;margin:70px auto;padding:0 24px;font:17px/1.8 system-ui,sans-serif;color:#262b32}h1,h2{line-height:1.25}a{color:#52649c}article{margin:48px 0}footer{margin-top:80px;color:#888;font-size:13px}pre{overflow:auto;background:#f5f5f5;padding:16px}img{max-width:100%}</style></head><body>`
-const footer = `<footer>Published with Planet</footer></body></html>`
+func customCodeHead(site store.Site) template.HTML {
+	if !site.Imported && site.CustomCodeHeadEnabled && site.CustomCodeHead != "" {
+		return template.HTML(site.CustomCodeHead)
+	}
+	return ""
+}
 
-var indexTemplate = template.Must(template.New("index").Funcs(template.FuncMap{"articleHref": relativeArticleLink}).Parse(header + `<header>{{if .Site.AvatarPNG}}<img src="avatar.png" alt="" width="96" height="96" style="object-fit:cover;border-radius:50%">{{end}}<h1>{{.Site.Name}}</h1><p>{{.Site.About}}</p><nav>{{range .Navigation}}<a href="{{.Href}}">{{.Title}}</a> {{end}}{{if .Site.Tags}}<a href="tags.html">标签</a>{{end}} {{if .HasPodcast}}<a href="podcast.xml">播客</a>{{end}} {{range .Social}}<a href="{{.Href}}" rel="noopener noreferrer">{{.Title}}</a> {{end}}</nav></header><main>{{range .Articles}}<article><h2><a href="{{articleHref .}}">{{.Title}}</a></h2><time>{{.Created.Format "2006-01-02"}}</time></article>{{end}}</main>` + footer))
-var postTemplate = template.Must(template.New("post").Parse(header + `{{if .Article.ExternalLink}}<script>if(!/Planet\/\S*/.test(navigator.userAgent)){window.location.href={{.Article.ExternalLink}};}</script>{{end}}<header><a href="../">{{.Site.Name}}</a><nav>{{range .Navigation}}<a href="{{.Href}}">{{.Title}}</a> {{end}}</nav></header><article><h1>{{.Article.Title}}</h1><time>{{.Article.Created.Format "2006-01-02"}}</time>{{if .Article.AudioFilename}}<audio controls preload="metadata" src="{{.Article.AudioFilename}}"></audio>{{end}}{{if .Article.VideoFilename}}<video controls preload="metadata" src="{{.Article.VideoFilename}}"></video>{{end}}<div>{{.HTML}}</div>{{if .Article.Tags}}<p>标签：{{range $key,$label := .Article.Tags}} <a href="../{{$key}}.html">{{$label}}</a>{{end}}</p>{{end}}</article>` + footer))
-var tagIndexTemplate = template.Must(template.New("tag-index").Parse(header + `<header><a href="./">{{.Site.Name}}</a></header><main><h1>标签</h1>{{range $key,$label:=.Site.Tags}}<p><a href="{{$key}}.html">{{$label}}</a></p>{{end}}</main>` + footer))
-var tagPageTemplate = template.Must(template.New("tag-page").Funcs(template.FuncMap{"articleHref": relativeArticleLink}).Parse(header + `<header><a href="./">{{.Site.Name}}</a> · <a href="tags.html">标签</a></header><main><h1>{{.Label}}</h1>{{range .Articles}}<article><h2><a href="{{articleHref .}}">{{.Title}}</a></h2><time>{{.Created.Format "2006-01-02"}}</time></article>{{end}}</main>` + footer))
+func customCodeBodyStart(site store.Site) template.HTML {
+	if !site.Imported && site.CustomCodeBodyStartEnabled && site.CustomCodeBodyStart != "" {
+		return template.HTML(site.CustomCodeBodyStart)
+	}
+	return ""
+}
+
+func customCodeBodyEnd(site store.Site) template.HTML {
+	if !site.Imported && site.CustomCodeBodyEndEnabled && site.CustomCodeBodyEnd != "" {
+		return template.HTML(site.CustomCodeBodyEnd)
+	}
+	return ""
+}
+
+func sortSiteArticles(items []store.Article) {
+	sort.SliceStable(items, func(i, j int) bool {
+		iPinned := items[i].Pinned != nil
+		jPinned := items[j].Pinned != nil
+		if iPinned != jPinned {
+			return iPinned
+		}
+		if iPinned && jPinned && !items[i].Pinned.Equal(*items[j].Pinned) {
+			return items[i].Pinned.After(*items[j].Pinned)
+		}
+		return items[i].Created.After(items[j].Created)
+	})
+}
+
+var baseTemplateFuncs = template.FuncMap{
+	"articleHref":     relativeArticleLink,
+	"customHead":      customCodeHead,
+	"customBodyStart": customCodeBodyStart,
+	"customBodyEnd":   customCodeBodyEnd,
+}
+
+const header = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{.Title}}</title>{{if .Site.AvatarPNG}}<link rel="icon" href="{{.IconPrefix}}favicon.ico">{{end}}{{if .Site.PlausibleEnabled}}{{if .Site.PlausibleScriptID}}<script async src="https://{{.Site.PlausibleAPIServer}}/js/{{.Site.PlausibleScriptID}}.js"></script><script>window.plausible=window.plausible||function(){(plausible.q=plausible.q||[]).push(arguments)},plausible.init=plausible.init||function(i){plausible.o=i||{}};plausible.init()</script>{{else}}<script defer data-domain="{{.Site.PlausibleDomain}}" src="https://{{.Site.PlausibleAPIServer}}/js/plausible.local.js"></script>{{end}}{{end}}<style>body{max-width:740px;margin:70px auto;padding:0 24px;font:17px/1.8 system-ui,sans-serif;color:#262b32}h1,h2{line-height:1.25}a{color:#52649c}article{margin:48px 0}footer{margin-top:80px;color:#888;font-size:13px}pre{overflow:auto;background:#f5f5f5;padding:16px}img{max-width:100%}</style>{{customHead .Site}}</head><body>{{customBodyStart .Site}}`
+const footer = `<footer>Published with Planet</footer>{{customBodyEnd .Site}}</body></html>`
+
+var indexTemplate = template.Must(template.New("index").Funcs(baseTemplateFuncs).Parse(header + `<header>{{if .Site.AvatarPNG}}<img src="avatar.png" alt="" width="96" height="96" style="object-fit:cover;border-radius:50%">{{end}}<h1>{{.Site.Name}}</h1><p>{{.Site.About}}</p><nav>{{range .Navigation}}<a href="{{.Href}}">{{.Title}}</a> {{end}}{{if .Site.Tags}}<a href="tags.html">标签</a>{{end}} {{if .HasPodcast}}<a href="podcast.xml">播客</a>{{end}} {{range .Social}}<a href="{{.Href}}" rel="noopener noreferrer">{{.Title}}</a> {{end}}</nav></header><main>{{range .Articles}}<article><h2><a href="{{articleHref .}}">{{.Title}}</a></h2><time>{{.Created.Format "2006-01-02"}}</time></article>{{end}}</main>` + footer))
+var postTemplate = template.Must(template.New("post").Funcs(baseTemplateFuncs).Parse(header + `{{if .Article.ExternalLink}}<script>if(!/Planet\/\S*/.test(navigator.userAgent)){window.location.href={{.Article.ExternalLink}};}</script>{{end}}<header><a href="../">{{.Site.Name}}</a><nav>{{range .Navigation}}<a href="{{.Href}}">{{.Title}}</a> {{end}}</nav></header><article><h1>{{.Article.Title}}</h1><time>{{.Article.Created.Format "2006-01-02"}}</time>{{if .Article.AudioFilename}}<audio controls preload="metadata" src="{{.Article.AudioFilename}}"></audio>{{end}}{{if .Article.VideoFilename}}<video controls preload="metadata" src="{{.Article.VideoFilename}}"></video>{{end}}<div>{{.HTML}}</div>{{if .Article.Tags}}<p>标签：{{range $key,$label := .Article.Tags}} <a href="../{{$key}}.html">{{$label}}</a>{{end}}</p>{{end}}</article>` + footer))
+var tagIndexTemplate = template.Must(template.New("tag-index").Funcs(baseTemplateFuncs).Parse(header + `<header><a href="./">{{.Site.Name}}</a></header><main><h1>标签</h1>{{range $key,$label:=.Site.Tags}}<p><a href="{{$key}}.html">{{$label}}</a></p>{{end}}</main>` + footer))
+var tagPageTemplate = template.Must(template.New("tag-page").Funcs(baseTemplateFuncs).Parse(header + `<header><a href="./">{{.Site.Name}}</a> · <a href="tags.html">标签</a></header><main><h1>{{.Label}}</h1>{{range .Articles}}<article><h2><a href="{{articleHref .}}">{{.Title}}</a></h2><time>{{.Created.Format "2006-01-02"}}</time></article>{{end}}</main>` + footer))
 
 func Render(dir string, site store.Site, articles []store.Article) error {
 	if !site.Imported {
@@ -87,7 +129,7 @@ func Render(dir string, site store.Site, articles []store.Article) error {
 		return err
 	}
 	items := append([]store.Article{}, articles...)
-	sort.Slice(items, func(i, j int) bool { return items[i].Created.After(items[j].Created) })
+	sortSiteArticles(items)
 	type publicArticle struct {
 		ID               string            `json:"id"`
 		Link             string            `json:"link"`
@@ -100,6 +142,7 @@ func Render(dir string, site store.Site, articles []store.Article) error {
 		ContentRendered  string            `json:"contentRendered"`
 		Created          float64           `json:"created"`
 		Modified         float64           `json:"modified"`
+		Pinned           *float64          `json:"pinned,omitempty"`
 		Attachments      []string          `json:"attachments,omitempty"`
 		ArticleNumber    *int              `json:"articleNumber,omitempty"`
 		ArticleReference string            `json:"articleReference,omitempty"`
@@ -145,6 +188,10 @@ func Render(dir string, site store.Site, articles []store.Article) error {
 			return err
 		}
 		public := publicArticle{ID: article.ID, Link: articleLink(article), Slug: article.Slug, ArticleType: article.ArticleType, ExternalLink: article.ExternalLink, Tags: article.Tags, Title: article.Title, Content: article.Content, ContentRendered: html, Created: seconds(article.Created), Modified: seconds(article.Modified), Attachments: article.Attachments, ArticleNumber: article.ArticleNumber, ArticleReference: article.ArticleReference, HasAudio: article.AudioFilename != "", HasVideo: article.VideoFilename != "", AudioFilename: article.AudioFilename, VideoFilename: article.VideoFilename, AudioDuration: article.AudioDuration, AudioByteLength: article.AudioByteLength}
+		if article.Pinned != nil {
+			pinned := seconds(*article.Pinned)
+			public.Pinned = &pinned
+		}
 		if article.ArticleType != 1 {
 			metadata.Articles = append(metadata.Articles, public)
 		}

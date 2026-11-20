@@ -24,6 +24,7 @@ export interface Article {
   videoFilename?: string;
   audioDuration?: number;
   audioByteLength?: number;
+  pinned?: string;
 }
 
 export interface Builtin {
@@ -214,6 +215,14 @@ export interface Site {
   podcastCategories?: string[];
   podcastCoverPng?: string;
   doNotIndex?: boolean;
+  customCodeHeadEnabled?: boolean;
+  customCodeHead?: string;
+  customCodeBodyStartEnabled?: boolean;
+  customCodeBodyStart?: string;
+  customCodeBodyEndEnabled?: boolean;
+  customCodeBodyEnd?: string;
+  prewarmNewPost?: boolean;
+  publishAsIPNS?: boolean;
   avatarPng?: string;
   created: string;
   ipns?: string;
@@ -416,6 +425,7 @@ export const Library = {
   selectSiteAvatar: bind<[string], Site>("Library.SelectSiteAvatar", (siteID: string) => [siteID]),
   selectTemplate: bind<[string], Site>("Library.SelectTemplate", (siteID: string) => [siteID]),
   serviceInfo: bind<[string, string], ServiceInfo>("Library.ServiceInfo", (siteID: string, kind: string) => [siteID, kind]),
+  setArticlePinned: bind<[string, string, boolean], Article>("Library.SetArticlePinned", (siteID: string, articleID: string, pinned: boolean) => [siteID, articleID, pinned]),
   setDraftExistingAttachmentRemoved: bind<[string, string, string, boolean], Draft>("Library.SetDraftExistingAttachmentRemoved", (siteID: string, draftID: string, name: string, removed: boolean) => [siteID, draftID, name, removed]),
   /** SetIPFSEnabled persists the user's node preference and controls the owned daemon. */
   setIPFSEnabled: bind<[boolean], void>("Library.SetIPFSEnabled", (enabled: boolean) => [enabled]),
@@ -444,6 +454,7 @@ export const Library = {
   updatePodcastSettings: bind<[string, string, boolean, string], Site>("Library.UpdatePodcastSettings", (siteID: string, language: string, explicit: boolean, categoriesJSON: string) => [siteID, language, explicit, categoriesJSON]),
   updateSettings: bind<[], UpdateSettingsInfo>("Library.UpdateSettings", () => []),
   updateSite: bind<[string, string, string], Site>("Library.UpdateSite", (siteID: string, name: string, about: string) => [siteID, name, about]),
+  updateSiteCustomCode: bind<[string, string], Site>("Library.UpdateSiteCustomCode", (siteID: string, customCodeJSON: string) => [siteID, customCodeJSON]),
   updateSiteDetails: bind<[string, string, string, boolean, string, string], Site>("Library.UpdateSiteDetails", (siteID: string, name: string, about: string, doNotIndex: boolean, slug: string, author: string) => [siteID, name, about, doNotIndex, slug, author]),
   updateSiteProfile: bind<[string, string], Site>("Library.UpdateSiteProfile", (siteID: string, profileJSON: string) => [siteID, profileJSON]),
   updateSiteSettings: bind<[string, string, string, boolean], Site>("Library.UpdateSiteSettings", (siteID: string, name: string, about: string, doNotIndex: boolean) => [siteID, name, about, doNotIndex]),

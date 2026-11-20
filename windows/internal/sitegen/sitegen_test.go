@@ -544,6 +544,48 @@ func TestMediaFieldsReachPublicMetadataAndBasicPage(t *testing.T) {
 	}
 }
 
+func TestRenderOrdersPinnedArticlesFirstAndInjectsCustomCode(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Now().UTC()
+	pinnedAt := now.Add(time.Minute)
+	site := store.Site{
+		ID:                         "site",
+		Name:                       "Site",
+		Created:                    now,
+		CustomCodeHeadEnabled:      true,
+		CustomCodeHead:             `<meta name="planet-custom-head" content="ok">`,
+		CustomCodeBodyStartEnabled: true,
+		CustomCodeBodyStart:        `<div id="planet-custom-start">Top</div>`,
+		CustomCodeBodyEndEnabled:   true,
+		CustomCodeBodyEnd:          `<div id="planet-custom-end">Bottom</div>`,
+	}
+	olderPinned := store.Article{ID: "older-pinned", SiteID: site.ID, Title: "Older Pinned", Content: "Body 1", Created: now.Add(-2 * time.Hour), Modified: now, Pinned: &pinnedAt}
+	newerUnpinned := store.Article{ID: "newer-unpinned", SiteID: site.ID, Title: "Newer Unpinned", Content: "Body 2", Created: now.Add(-1 * time.Hour), Modified: now}
+	if err := Render(dir, site, []store.Article{newerUnpinned, olderPinned}); err != nil {
+		t.Fatal(err)
+	}
+	index, err := os.ReadFile(filepath.Join(dir, "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	htmlStr := string(index)
+	for _, snippet := range []string{`planet-custom-head`, `planet-custom-start`, `planet-custom-end`} {
+		if !strings.Contains(htmlStr, snippet) {
+			t.Fatalf("missing custom code %s in %s", snippet, htmlStr)
+		}
+	}
+	if strings.Index(htmlStr, "Older Pinned") > strings.Index(htmlStr, "Newer Unpinned") {
+		t.Fatalf("pinned article did not render before newer unpinned article: %s", htmlStr)
+	}
+	metaBytes, err := os.ReadFile(filepath.Join(dir, "older-pinned", "article.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(metaBytes), `"pinned":`) {
+		t.Fatalf("expected pinned timestamp in article.json: %s", metaBytes)
+	}
+}
+
 func TestVerifiedTemplatesRenderAudioAndVideo(t *testing.T) {
 	root := os.Getenv("PLANET_TEST_TEMPLATES_DIR")
 	if root == "" {

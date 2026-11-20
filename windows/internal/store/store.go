@@ -28,39 +28,47 @@ type PlausibleTracking struct {
 	Server   string `json:"server,omitempty"`
 }
 type Site struct {
-	ID                string             `json:"id"`
-	Name              string             `json:"name"`
-	About             string             `json:"about"`
-	Slug              string             `json:"slug,omitempty"`
-	AuthorName        string             `json:"authorName,omitempty"`
-	Domain            string             `json:"domain,omitempty"`
-	TwitterUsername   string             `json:"twitterUsername,omitempty"`
-	GithubUsername    string             `json:"githubUsername,omitempty"`
-	TelegramUsername  string             `json:"telegramUsername,omitempty"`
-	MastodonUsername  string             `json:"mastodonUsername,omitempty"`
-	DiscordLink       string             `json:"discordLink,omitempty"`
-	PodcastLanguage   string             `json:"podcastLanguage,omitempty"`
-	PodcastExplicit   bool               `json:"podcastExplicit,omitempty"`
-	PodcastCategories []string           `json:"podcastCategories,omitempty"`
-	PodcastCoverPNG   string             `json:"podcastCoverPng,omitempty"`
-	DoNotIndex        bool               `json:"doNotIndex,omitempty"`
-	AvatarPNG         string             `json:"avatarPng,omitempty"`
-	Created           time.Time          `json:"created"`
-	IPNS              string             `json:"ipns,omitempty"`
-	LastPublishedCID  string             `json:"lastPublishedCID,omitempty"`
-	LastPublished     *time.Time         `json:"lastPublished,omitempty"`
-	TemplateID        string             `json:"templateId,omitempty"`
-	TemplateName      string             `json:"templateName,omitempty"`
-	TemplateSettings  map[string]string  `json:"templateSettings,omitempty"`
-	NextArticleNumber int                `json:"nextArticleNumber,omitempty"`
-	Imported          bool               `json:"imported,omitempty"`
-	TagsUnsupported   bool               `json:"tagsUnsupported,omitempty"`
-	Removed           bool               `json:"removed,omitempty"`
-	DeletionPending   bool               `json:"deletionPending,omitempty"`
-	ContentRevision   uint64             `json:"contentRevision,omitempty"`
-	PublishedRevision uint64             `json:"publishedRevision,omitempty"`
-	PublishPending    bool               `json:"publishPending,omitempty"`
-	PlausibleOverride *PlausibleTracking `json:"plausibleOverride,omitempty"`
+	ID                         string             `json:"id"`
+	Name                       string             `json:"name"`
+	About                      string             `json:"about"`
+	Slug                       string             `json:"slug,omitempty"`
+	AuthorName                 string             `json:"authorName,omitempty"`
+	Domain                     string             `json:"domain,omitempty"`
+	TwitterUsername            string             `json:"twitterUsername,omitempty"`
+	GithubUsername             string             `json:"githubUsername,omitempty"`
+	TelegramUsername           string             `json:"telegramUsername,omitempty"`
+	MastodonUsername           string             `json:"mastodonUsername,omitempty"`
+	DiscordLink                string             `json:"discordLink,omitempty"`
+	PodcastLanguage            string             `json:"podcastLanguage,omitempty"`
+	PodcastExplicit            bool               `json:"podcastExplicit,omitempty"`
+	PodcastCategories          []string           `json:"podcastCategories,omitempty"`
+	PodcastCoverPNG            string             `json:"podcastCoverPng,omitempty"`
+	DoNotIndex                 bool               `json:"doNotIndex,omitempty"`
+	CustomCodeHeadEnabled      bool               `json:"customCodeHeadEnabled,omitempty"`
+	CustomCodeHead             string             `json:"customCodeHead,omitempty"`
+	CustomCodeBodyStartEnabled bool               `json:"customCodeBodyStartEnabled,omitempty"`
+	CustomCodeBodyStart        string             `json:"customCodeBodyStart,omitempty"`
+	CustomCodeBodyEndEnabled   bool               `json:"customCodeBodyEndEnabled,omitempty"`
+	CustomCodeBodyEnd          string             `json:"customCodeBodyEnd,omitempty"`
+	PrewarmNewPost             *bool              `json:"prewarmNewPost,omitempty"`
+	PublishAsIPNS              *bool              `json:"publishAsIPNS,omitempty"`
+	AvatarPNG                  string             `json:"avatarPng,omitempty"`
+	Created                    time.Time          `json:"created"`
+	IPNS                       string             `json:"ipns,omitempty"`
+	LastPublishedCID           string             `json:"lastPublishedCID,omitempty"`
+	LastPublished              *time.Time         `json:"lastPublished,omitempty"`
+	TemplateID                 string             `json:"templateId,omitempty"`
+	TemplateName               string             `json:"templateName,omitempty"`
+	TemplateSettings           map[string]string  `json:"templateSettings,omitempty"`
+	NextArticleNumber          int                `json:"nextArticleNumber,omitempty"`
+	Imported                   bool               `json:"imported,omitempty"`
+	TagsUnsupported            bool               `json:"tagsUnsupported,omitempty"`
+	Removed                    bool               `json:"removed,omitempty"`
+	DeletionPending            bool               `json:"deletionPending,omitempty"`
+	ContentRevision            uint64             `json:"contentRevision,omitempty"`
+	PublishedRevision          uint64             `json:"publishedRevision,omitempty"`
+	PublishPending             bool               `json:"publishPending,omitempty"`
+	PlausibleOverride          *PlausibleTracking `json:"plausibleOverride,omitempty"`
 	// Public analytics values are derived from verified original metadata at
 	// render time; the private API key is never stored in this structure.
 	PlausibleEnabled   bool              `json:"-"`
@@ -83,7 +91,23 @@ func cloneSite(site Site) Site {
 		}
 		site.TemplateSettings = cloned
 	}
+	if site.PrewarmNewPost != nil {
+		v := *site.PrewarmNewPost
+		site.PrewarmNewPost = &v
+	}
+	if site.PublishAsIPNS != nil {
+		v := *site.PublishAsIPNS
+		site.PublishAsIPNS = &v
+	}
 	return site
+}
+
+func (s Site) ShouldPublishIPNS() bool {
+	return s.PublishAsIPNS == nil || *s.PublishAsIPNS
+}
+
+func (s Site) ShouldPrewarmNewPost() bool {
+	return s.PrewarmNewPost == nil || *s.PrewarmNewPost
 }
 
 var plausibleDomainPattern = regexp.MustCompile(`(?i)^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$`)
@@ -137,6 +161,7 @@ type Article struct {
 	VideoFilename          string            `json:"videoFilename,omitempty"`
 	AudioDuration          *int              `json:"audioDuration,omitempty"`
 	AudioByteLength        *int64            `json:"audioByteLength,omitempty"`
+	Pinned                 *time.Time        `json:"pinned,omitempty"`
 }
 
 // Draft is private local work and is never included in publication snapshots.
@@ -855,6 +880,10 @@ func cloneArticle(article Article) Article {
 		article.Tags = copyTags(article.Tags)
 	}
 	article.Attachments = append([]string(nil), article.Attachments...)
+	if article.Pinned != nil {
+		pinned := *article.Pinned
+		article.Pinned = &pinned
+	}
 	return article
 }
 
@@ -1612,10 +1641,25 @@ func (s *Store) ListArticles(siteID string) ([]Article, error) {
 		return nil, errors.New("站点不存在")
 	}
 	articles := []Article{}
+	hasPinned := false
 	for _, a := range s.data.Articles {
 		if a.SiteID == siteID {
+			if a.Pinned != nil {
+				hasPinned = true
+			}
 			articles = append(articles, cloneArticle(a))
 		}
+	}
+	if hasPinned {
+		sort.SliceStable(articles, func(i, j int) bool {
+			if (articles[i].Pinned != nil) != (articles[j].Pinned != nil) {
+				return articles[i].Pinned != nil
+			}
+			if articles[i].Pinned != nil && articles[j].Pinned != nil && !articles[i].Pinned.Equal(*articles[j].Pinned) {
+				return articles[i].Pinned.After(*articles[j].Pinned)
+			}
+			return false
+		})
 	}
 	return articles, nil
 }
