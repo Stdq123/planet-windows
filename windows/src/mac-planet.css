@@ -998,7 +998,10 @@ dialog .dialog-actions,
   border-top: 0.5px solid var(--mac-line);
 }
 
-/* Wide two-column Preferences layout for Site Settings dialog */
+/* Wide two-column multi-page Preferences layout for Site Settings dialog */
+#site-dialog {
+  position: fixed;
+}
 .site-dialog-heading {
   display: flex;
   align-items: center;
@@ -1006,7 +1009,11 @@ dialog .dialog-actions,
   gap: 12px;
   width: 100%;
 }
-#site-dialog .dialog-close-x {
+#site-dialog > .dialog-close-x {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  z-index: 5;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1021,47 +1028,48 @@ dialog .dialog-actions,
   font: 400 18px/1 var(--mac-font);
   cursor: pointer;
 }
-#site-dialog .dialog-close-x:hover:not(:disabled) {
+#site-dialog > .dialog-close-x:hover:not(:disabled) {
   background: var(--mac-hover);
   color: var(--mac-ink);
 }
 #site-dialog[data-mode="create"] {
   width: min(460px, calc(100vw - 48px));
 }
+#site-dialog[data-mode="create"] > dialog.site-settings-page {
+  display: none;
+}
 #site-dialog[data-mode="edit"] {
-  width: min(840px, calc(100vw - 48px));
+  width: min(860px, calc(100vw - 48px));
   height: min(640px, calc(100vh - 48px));
   max-height: calc(100vh - 48px);
   border-radius: 14px;
 }
-#site-dialog[data-mode="edit"][open] > #site-form.dialog-layout {
+#site-dialog[data-mode="edit"][open] {
   display: grid;
-  grid-template-columns: 196px minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  height: 100%;
-  max-height: 100%;
-  min-height: 0;
-}
-#site-dialog[data-mode="edit"] .dialog-body {
-  display: contents;
-  padding: 0;
+  grid-template-columns: 200px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
 }
 #site-dialog .site-settings-nav[hidden] {
   display: none;
 }
-#site-dialog[data-mode="edit"] .site-settings-nav {
+#site-dialog[data-mode="edit"] > .site-settings-nav {
   grid-column: 1;
-  grid-row: 1 / -1;
+  grid-row: 1;
   display: flex;
   flex-direction: column;
+  gap: 14px;
   padding: 18px 10px 14px;
   background: var(--mac-sidebar);
   border-right: 0.5px solid var(--mac-line);
   overflow-y: auto;
   min-height: 0;
 }
+.site-nav-group {
+  display: flex;
+  flex-direction: column;
+}
 .site-nav-label {
-  padding: 0 10px 8px;
+  padding: 0 10px 6px;
   font: 600 11px/16px var(--mac-font);
   color: var(--mac-muted);
 }
@@ -1092,6 +1100,11 @@ dialog .dialog-actions,
   background: var(--mac-active);
   font-weight: 500;
   color: var(--mac-ink);
+}
+#site-dialog .site-nav-item:disabled {
+  color: var(--mac-muted);
+  opacity: 0.5;
+  cursor: default;
 }
 .site-nav-footer {
   margin-top: auto;
@@ -1135,30 +1148,84 @@ dialog .dialog-actions,
   font: 400 11px/15px var(--mac-font);
   color: var(--mac-muted);
 }
-#site-dialog[data-mode="edit"] .dialog-header {
+#site-dialog[data-mode="edit"] > #site-form.dialog-layout {
   grid-column: 2;
   grid-row: 1;
-  padding: 20px 28px 10px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+}
+#site-dialog[data-mode="edit"]:not([data-page="general"]) > #site-form.dialog-layout {
+  display: none;
+}
+#site-dialog > dialog.site-settings-page:not([open]) {
+  display: none;
+}
+#site-dialog > dialog.site-settings-page[open] {
+  grid-column: 2;
+  grid-row: 1;
+  position: static;
+  inset: auto;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  color: var(--mac-ink);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+#site-dialog > dialog.site-settings-page[open] > .dialog-layout {
+  flex: 1;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+#site-dialog[data-mode="edit"] > #site-form > .dialog-header,
+#site-dialog > dialog.site-settings-page .dialog-header {
+  padding: 20px 56px 10px 28px;
   border-bottom: 0;
 }
-#site-dialog[data-mode="edit"] .dialog-header h2 {
+#site-dialog[data-mode="edit"] > #site-form > .dialog-header h2,
+#site-dialog > dialog.site-settings-page .dialog-header h2 {
   font: 600 18px/24px var(--mac-font);
   letter-spacing: -0.015em;
 }
-#site-dialog[data-mode="edit"] .site-settings-main {
-  grid-column: 2;
-  grid-row: 2;
+#site-dialog[data-mode="edit"] > #site-form > .dialog-body,
+#site-dialog > dialog.site-settings-page .dialog-body {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  min-height: 0;
-  padding: 0 28px 28px;
+  padding: 0 28px 24px;
+}
+#site-dialog[data-mode="edit"] > #site-form > .dialog-actions,
+#site-dialog > dialog.site-settings-page .dialog-actions {
+  flex: none;
+  padding: 12px 28px;
+}
+#site-dialog > #template-gallery.site-settings-page .template-gallery-body {
+  height: min(370px, 46vh);
+  min-height: 180px;
 }
 #site-dialog[data-mode="edit"] #site-dialog-description {
   margin: 0 0 18px;
   font: 400 13px/19px var(--mac-font);
   color: var(--mac-muted);
 }
-#site-dialog[data-mode="edit"] .site-avatar-setting {
+#site-dialog[data-mode="edit"] .site-avatar-setting,
+#site-dialog > dialog.site-settings-page .site-avatar-setting {
   margin: 0 0 18px;
   padding: 14px 16px;
   border: 0.5px solid var(--mac-line);
@@ -1196,99 +1263,32 @@ dialog .dialog-actions,
 #site-dialog[data-mode="edit"] #site-index-setting[hidden] {
   display: none;
 }
-.site-settings-section,
-.site-settings-group {
-  scroll-margin-top: 12px;
-}
-.site-more-settings {
-  margin-top: 24px;
-  padding-top: 22px;
-  border-top: 0.5px solid var(--mac-line);
-  display: grid;
-  gap: 24px;
-}
-.site-settings-group-head {
-  margin: 0 0 10px;
-}
-.site-settings-group-head h3 {
-  margin: 0;
-  padding: 0;
-  font: 600 14px/20px var(--mac-font);
-  color: var(--mac-ink);
-}
-.site-settings-group-head p {
-  margin: 2px 0 0;
-  font: 400 12px/18px var(--mac-font);
-  color: var(--mac-muted);
-}
-.site-settings-links {
-  display: flex;
-  flex-direction: column;
-  border: 0.5px solid var(--mac-line);
-  border-radius: 10px;
-  background: var(--mac-surface);
-  overflow: hidden;
-}
-.site-settings-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 16px;
-}
-.site-settings-row + .site-settings-row {
-  border-top: 0.5px solid var(--mac-line);
-}
-.site-settings-row-copy {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.site-settings-row-copy strong {
-  font: 500 13px/18px var(--mac-font);
-  color: var(--mac-ink);
-}
-.site-settings-row-copy span {
-  font: 400 12px/17px var(--mac-font);
-  color: var(--mac-muted);
-}
-#site-dialog .site-settings-row button {
-  flex: none;
-  min-height: 30px;
-  padding: 5px 12px;
-  border-radius: 7px;
-  font: 500 12px/18px var(--mac-font);
-  white-space: nowrap;
-}
-#site-dialog[data-mode="edit"] .dialog-actions {
-  grid-column: 2;
-  grid-row: 3;
-  padding: 12px 28px;
+#site-dialog .site-more-settings {
+  display: none;
 }
 @media (max-width: 720px) {
   #site-dialog[data-mode="edit"] {
     width: calc(100vw - 24px);
     height: calc(100vh - 24px);
   }
-  #site-dialog[data-mode="edit"][open] > #site-form.dialog-layout {
+  #site-dialog[data-mode="edit"][open] {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr);
   }
-  #site-dialog[data-mode="edit"] .dialog-header {
+  #site-dialog[data-mode="edit"] > .site-settings-nav {
     grid-column: 1;
     grid-row: 1;
-    padding: 16px 18px 8px;
-  }
-  #site-dialog[data-mode="edit"] .site-settings-nav {
-    grid-column: 1;
-    grid-row: 2;
     flex-direction: row;
     align-items: center;
-    padding: 8px 18px;
+    gap: 6px;
+    padding: 10px 52px 10px 16px;
     border-right: 0;
     border-bottom: 0.5px solid var(--mac-line);
     overflow-x: auto;
+  }
+  .site-nav-group {
+    flex-direction: row;
+    align-items: center;
   }
   .site-nav-label,
   .site-nav-footer {
@@ -1302,17 +1302,24 @@ dialog .dialog-actions,
     width: auto;
     white-space: nowrap;
   }
-  #site-dialog[data-mode="edit"] .site-settings-main {
+  #site-dialog[data-mode="edit"] > #site-form.dialog-layout,
+  #site-dialog > dialog.site-settings-page[open] {
     grid-column: 1;
-    grid-row: 3;
-    padding: 14px 18px 20px;
+    grid-row: 2;
+  }
+  #site-dialog[data-mode="edit"] > #site-form > .dialog-header,
+  #site-dialog > dialog.site-settings-page .dialog-header {
+    padding: 16px 18px 8px;
+  }
+  #site-dialog[data-mode="edit"] > #site-form > .dialog-body,
+  #site-dialog > dialog.site-settings-page .dialog-body {
+    padding: 0 18px 20px;
   }
   #site-dialog[data-mode="edit"] .site-identity-grid {
     grid-template-columns: minmax(0, 1fr);
   }
-  #site-dialog[data-mode="edit"] .dialog-actions {
-    grid-column: 1;
-    grid-row: 4;
+  #site-dialog[data-mode="edit"] > #site-form > .dialog-actions,
+  #site-dialog > dialog.site-settings-page .dialog-actions {
     padding: 12px 18px;
   }
 }

@@ -40,8 +40,26 @@ function restoreDialogFocus(dialog: HTMLDialogElement) {
 
 function formSignature(dialog: HTMLDialogElement): string {
   return JSON.stringify(Array.from(dialog.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("input,textarea,select"))
-    .filter(field => field.name && !field.name.startsWith("ui-choice-"))
+    .filter(field => field.closest("dialog") === dialog && field.name && !field.name.startsWith("ui-choice-"))
     .map(field => [field.name, field.type === "checkbox" || field.type === "radio" ? (field as HTMLInputElement).checked : field.value]));
+}
+
+function hasOwnForm(dialog: HTMLDialogElement): boolean {
+  return Array.from(dialog.querySelectorAll("form")).some(form => form.closest("dialog") === dialog);
+}
+
+function hasOwnDisabledSubmit(dialog: HTMLDialogElement): boolean {
+  return Array.from(dialog.querySelectorAll<HTMLButtonElement>('button[type="submit"]:disabled')).some(button => button.closest("dialog") === dialog);
+}
+
+function syncSiteSettingsNav(parentModal: HTMLDialogElement, pageId: string) {
+  parentModal.dataset.page = pageId;
+  for (const item of parentModal.querySelectorAll<HTMLButtonElement>(".site-nav-item")) {
+    const active = item.dataset.page === pageId;
+    item.classList.toggle("is-active", active);
+    if (active) item.setAttribute("aria-current", "true");
+    else item.removeAttribute("aria-current");
+  }
 }
 
 export function rememberDialog(dialog: HTMLDialogElement) {
@@ -50,12 +68,19 @@ export function rememberDialog(dialog: HTMLDialogElement) {
 
 export function hasDialogChanges(document: Document): boolean {
   return Array.from(document.querySelectorAll<HTMLDialogElement>("dialog[open]")).some(dialog =>
-    !!dialog.querySelector("form") && baselines.get(dialog) !== formSignature(dialog));
+    hasOwnForm(dialog) && baselines.get(dialog) !== formSignature(dialog));
 }
 
 export function openDialog(dialog: HTMLDialogElement, opener?: HTMLElement) {
   if (dialog.open) return;
   const document = dialog.ownerDocument;
+  const parentModal = dialog.parentElement?.closest<HTMLDialogElement>("dialog");
+  const isInlinePage = !!parentModal && dialog.classList.contains("site-settings-page");
+  if (isInlinePage) {
+    for (const sibling of parentModal.querySelectorAll<HTMLDialogElement>("dialog.site-settings-page[open]")) {
+      if (sibling !== dialog) sibling.close();
+    }
+  }
   const trigger = opener ?? document.activeElement;
   const targets: HTMLElement[] = [];
   if (trigger instanceof document.defaultView!.HTMLElement) {
@@ -68,19 +93,32 @@ export function openDialog(dialog: HTMLDialogElement, opener?: HTMLElement) {
   }
   syncChoices(dialog);
   rememberDialog(dialog);
-  dialog.showModal();
+  if (isInlinePage) {
+    if (typeof dialog.show === "function") dialog.show();
+    else dialog.showModal();
+    syncSiteSettingsNav(parentModal, dialog.id);
+  } else {
+    dialog.showModal();
+  }
   dialogReturnTargets.set(dialog, targets);
   const stack = (dialogStacks.get(document) ?? []).filter(entry => entry !== dialog && entry.isConnected && entry.open);
   dialogStacks.set(document, [...stack, dialog]);
   if (!dialogCloseListeners.has(dialog)) {
     dialogCloseListeners.add(dialog);
-    dialog.addEventListener("close", () => restoreDialogFocus(dialog));
+    dialog.addEventListener("close", () => {
+      const hostModal = dialog.parentElement?.closest<HTMLDialogElement>("dialog");
+      if (hostModal && dialog.classList.contains("site-settings-page")) {
+        const activePage = hostModal.querySelector<HTMLDialogElement>("dialog.site-settings-page[open]");
+        syncSiteSettingsNav(hostModal, activePage?.id ?? "general");
+      }
+      restoreDialogFocus(dialog);
+    });
   }
 }
 
-function mayDismiss(dialog: HTMLDialogElement): boolean {
-  if (dialog.dataset.dismissWhileBusy !== "true" && dialog.querySelector('button[type="submit"]:disabled')) return false;
-  return !dialog.querySelector("form") || baselines.get(dialog) === formSignature(dialog)
+export function mayDismiss(dialog: HTMLDialogElement): boolean {
+  if (dialog.dataset.dismissWhileBusy !== "true" && hasOwnDisabledSubmit(dialog)) return false;
+  return !hasOwnForm(dialog) || baselines.get(dialog) === formSignature(dialog)
     || dialog.ownerDocument.defaultView!.confirm("有尚未保存的设置，确定放弃更改吗？");
 }
 
@@ -97,11 +135,14 @@ export function prepareDialogs(document: Document) {
     host.classList.add("dialog-layout"); host.append(header, body, footer);
     const h2 = header.querySelector("h2");
     if (h2) { h2.id ||= `${dialog.id}-heading`; dialog.setAttribute("aria-labelledby", h2.id); }
-    dialog.addEventListener("cancel", event => { if (!mayDismiss(dialog)) event.preventDefault(); });
+    dialog.addEventListener("cancel", event => {
+      const activePage = dialog.querySelector<HTMLDialogElement>("dialog.site-settings-page[open]");
+      if (!mayDismiss(dialog) || (activePage && !mayDismiss(activePage))) event.preventDefault();
+    });
     dialog.addEventListener("click", event => {
       const target = event.target as Element;
       const button = target.closest<HTMLButtonElement>("button");
-      if (button?.type === "button" && /^(取消|关闭)$/.test(button.textContent?.trim() ?? "") && !mayDismiss(dialog)) {
+      if (button?.closest("dialog") === dialog && button?.type === "button" && /^(取消|关闭)$/.test(button.textContent?.trim() ?? "") && !mayDismiss(dialog)) {
         event.preventDefault(); event.stopImmediatePropagation();
       }
     }, true);
