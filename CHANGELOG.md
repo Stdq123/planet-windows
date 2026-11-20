@@ -7,6 +7,8 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 ### Changed
 
 - Displayed each subscribed site's own icon or website favicon (from Planet `avatar.png` / `favicon.ico`, feed icons, HTML icon links, or `avatar.png` / `favicon.ico` fallbacks) in the sidebar and reading views, using a neutral website icon fallback instead of first-letter initials when no site icon is available.
+- Switched online IPNS publication (`name/publish`) from spawning `ipfs.exe` CLI subprocesses to Kubo's direct loopback HTTP RPC (`/api/v0/name/publish`) with proxy bypass, structured JSON/error parsing, context cancellation, and non-blocking execution relative to the command mutex.
+- Displayed each subscribed site's own icon or website favicon (from Planet `avatar.png` / `favicon.ico`, feed icons, HTML icon links, or `/favicon.ico`) in the sidebar and reading views, using a neutral website icon fallback instead of first-letter initials when no site icon is available.
 - Refined the macOS-style Windows UI/UX across all three panes and dialogs: continuous 52px top bar hairline across posts and workspace, left-gutter unread indicators so article titles align vertically, symmetric article selection cards, 6px overlay-style scrollbars without arrow buttons, aligned editor rail (title, metadata pill, body, footer), macOS Inset Grouped settings lists inside Site Settings with a fixed header divider, and a compact, HIG-ordered IPFS node status dialog.
 - Changed the default public IPFS gateway from `ipfs.io` (now rate-limited/sunsetting) to `eth.sucks`, labeled rate-limited gateways in Settings and the publication dialog, and surfaced public reachability and `/p2p-circuit` relay count in the IPFS node status dialog.
 

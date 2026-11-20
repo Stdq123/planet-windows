@@ -818,7 +818,7 @@ func (c *Client) PublishOffline(key, cid string) (string, error) {
 	return c.run("--offline", "name", "publish", "--allow-offline", "--quieter", "--key="+key, "/ipfs/"+cid)
 }
 
-// PublishOnline asks the running daemon to publish an IPNS record to the network.
+// PublishOnline asks the running daemon to publish an IPNS record via loopback RPC.
 func (c *Client) PublishOnline(key, cid string) (string, error) {
 	return c.PublishOnlineContext(context.Background(), key, cid)
 }
@@ -827,18 +827,29 @@ func (c *Client) PublishOnlineContext(ctx context.Context, key, cid string) (str
 	if !safeName.MatchString(key) || !safeName.MatchString(cid) {
 		return "", errors.New("invalid key or CID")
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.process == nil {
+	snap := c.snapshot()
+	if !snap.running {
 		return "", errors.New("Kubo daemon is not running")
 	}
-	select {
-	case <-c.exited:
-		c.clearDaemonState()
-		return "", errors.New("Kubo daemon is not running")
-	default:
+	if !snap.online {
+		return "", errors.New("Kubo 在线节点未运行")
 	}
-	return c.runContext(ctx, 3*time.Minute, "name", "publish", "--quieter", "--key="+key, "--lifetime=7200h", "/ipfs/"+cid)
+	query := url.Values{
+		"arg":      []string{"/ipfs/" + cid},
+		"key":      []string{key},
+		"lifetime": []string{"7200h"},
+	}
+	var result struct {
+		Name  string `json:"Name"`
+		Value string `json:"Value"`
+	}
+	if err := postRPCAPIContext(ctx, snap.api, 3*time.Minute, "/api/v0/name/publish?"+query.Encode(), 64<<10, &result); err != nil {
+		return "", err
+	}
+	if !safeName.MatchString(result.Name) || result.Value != "/ipfs/"+cid {
+		return "", errors.New("Kubo 发布响应无效")
+	}
+	return result.Name, nil
 }
 
 func (c *Client) ResolveOffline(name string) (string, error) {
