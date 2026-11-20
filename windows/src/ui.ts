@@ -88,7 +88,7 @@ export function prepareDialogs(document: Document) {
   for (const dialog of document.querySelectorAll<HTMLDialogElement>("dialog")) {
     const host = dialog.querySelector<HTMLFormElement>(":scope > form") ?? dialog;
     const footer = host.querySelector<HTMLElement>(":scope > .dialog-actions");
-    const heading = host.querySelector<HTMLElement>(":scope > h2, :scope > .template-gallery-header, :scope > .ipfs-dialog-heading");
+    const heading = host.querySelector<HTMLElement>(":scope > h2, :scope > .template-gallery-header, :scope > .ipfs-dialog-heading, :scope > .site-dialog-heading");
     if (!footer || !heading) continue;
     const header = document.createElement("div"); header.className = "dialog-header";
     const body = document.createElement("div"); body.className = "dialog-body";
