@@ -93,6 +93,14 @@ export interface DeploymentInfo {
   lastUrl: string;
 }
 
+export interface DownloadItem {
+  name: string;
+  sourceName: string;
+  url: string;
+  size: number;
+  status: string;
+}
+
 export interface Draft {
   id: string;
   siteId: string;
@@ -105,6 +113,12 @@ export interface Draft {
   baseModified?: string;
   attachments?: string[];
   removedAttachments?: string[];
+}
+
+export interface Entry {
+  time: string;
+  category: string;
+  message: string;
 }
 
 export interface Feed {
@@ -140,6 +154,11 @@ export interface Item {
   media?: RemoteMedia[];
   offlineMedia?: Record<string, OfflineAsset>;
   offlineBase?: string;
+}
+
+export interface KeyInfo {
+  name: string;
+  id: string;
 }
 
 export interface KuboStatus {
@@ -280,6 +299,11 @@ export interface Site {
   publishAsIPNS?: boolean;
   saveRoundAvatar?: boolean;
   aggregation?: string[];
+  acceptsDonation?: boolean;
+  acceptsDonationMessage?: string;
+  acceptsDonationETHAddress?: string;
+  juiceboxEnabled?: boolean;
+  juiceboxProjectID?: number;
   avatarPng?: string;
   created: string;
   ipns?: string;
@@ -383,6 +407,7 @@ export const Library = {
   addDraftAttachment: bind<[string, string], Draft>("Library.AddDraftAttachment", (siteID: string, draftID: string) => [siteID, draftID]),
   addDraftAttachmentBytes: bind<[string, string, string, string], Draft>("Library.AddDraftAttachmentBytes", (siteID: string, draftID: string, name: string, dataBase64: string) => [siteID, draftID, name, dataBase64]),
   addPublishedFolder: bind<[string, boolean], PublishedFolder>("Library.AddPublishedFolder", (name: string, autoPublish: boolean) => [name, autoPublish]),
+  appLogs: bind<[string], Entry[]>("Library.AppLogs", (category: string) => [category]),
   applyBuiltinTemplate: bind<[string, string], Site>("Library.ApplyBuiltinTemplate", (siteID: string, id: string) => [siteID, id]),
   applyPresetAvatar: bind<[string, string], Site>("Library.ApplyPresetAvatar", (siteID: string, key: string) => [siteID, key]),
   articles: bind<[string], Article[]>("Library.Articles", (siteID: string) => [siteID]),
@@ -392,9 +417,11 @@ export const Library = {
   builtinTemplatePreview: bind<[string], string>("Library.BuiltinTemplatePreview", (id: string) => [id]),
   builtinTemplates: bind<[], Builtin[]>("Library.BuiltinTemplates", () => []),
   cancelUpdateOperation: bind<[], void>("Library.CancelUpdateOperation", () => []),
+  checkTemplateModified: bind<[string], number>("Library.CheckTemplateModified", (siteID: string) => [siteID]),
   checkUpdates: bind<[], UpdateCheckInfo>("Library.CheckUpdates", () => []),
   /** CleanupOfflineMedia removes only files no saved article or active player references. */
   cleanupOfflineMedia: bind<[], Usage>("Library.CleanupOfflineMedia", () => []),
+  clearAppLogs: bind<[string], void>("Library.ClearAppLogs", (category: string) => [category]),
   clearLocalAPILogs: bind<[], void>("Library.ClearLocalAPILogs", () => []),
   configureAI: bind<[string, string, string], AIConfig>("Library.ConfigureAI", (baseURL: string, model: string, token: string) => [baseURL, model, token]),
   /** ConfigureDeployment stores a target locally; credentials never enter backups. */
@@ -428,6 +455,7 @@ export const Library = {
   disableXSync: bind<[string], void>("Library.DisableXSync", (siteID: string) => [siteID]),
   downloadUpdate: bind<[string, string], string>("Library.DownloadUpdate", (version: string, sha256: string) => [version, sha256]),
   drafts: bind<[string], Draft[]>("Library.Drafts", (siteID: string) => [siteID]),
+  exportIPNSKey: bind<[string], string>("Library.ExportIPNSKey", (name: string) => [name]),
   /** ExportPlanet writes a .planet backup containing the site's private key. */
   exportPlanet: bind<[string], string>("Library.ExportPlanet", (siteID: string) => [siteID]),
   /** ExportWebsite creates a new folder containing a basic static website. */
@@ -442,8 +470,12 @@ export const Library = {
    * active publish or subscription refresh operations.
    */
   ipfsStatus: bind<[], KuboStatus>("Library.IPFSStatus", () => []),
+  importIPNSKey: bind<[string], string>("Library.ImportIPNSKey", (name: string) => [name]),
   /** ImportPlanet imports a selected original .planet folder. */
   importPlanet: bind<[], Site>("Library.ImportPlanet", () => []),
+  listDownloads: bind<[], DownloadItem[]>("Library.ListDownloads", () => []),
+  /** Phase 5: Key Manager, Categorized Live Log Viewer, Downloads Manager, Template Live Reload */
+  listIPNSKeys: bind<[], KeyInfo[]>("Library.ListIPNSKeys", () => []),
   localAPIStatus: bind<[], Status>("Library.LocalAPIStatus", () => []),
   markSubscriptionRead: bind<[string], void>("Library.MarkSubscriptionRead", (address: string) => [address]),
   /** OfflineMediaUsage reports managed feed-cache usage without modifying files. */
@@ -542,6 +574,8 @@ export const Library = {
   updateSiteDetails: bind<[string, string, string, boolean, string, string], Site>("Library.UpdateSiteDetails", (siteID: string, name: string, about: string, doNotIndex: boolean, slug: string, author: string) => [siteID, name, about, doNotIndex, slug, author]),
   updateSiteProfile: bind<[string, string], Site>("Library.UpdateSiteProfile", (siteID: string, profileJSON: string) => [siteID, profileJSON]),
   updateSiteSettings: bind<[string, string, string, boolean], Site>("Library.UpdateSiteSettings", (siteID: string, name: string, about: string, doNotIndex: boolean) => [siteID, name, about, doNotIndex]),
+  /** Phase 6: Web3 Donation / Juicebox Settings */
+  updateSiteWeb3: bind<[string, string], Site>("Library.UpdateSiteWeb3", (siteID: string, web3JSON: string) => [siteID, web3JSON]),
   /** UpdateSubscription edits an existing subscription's display name and/or address. */
   updateSubscription: bind<[string, string, string], Subscription>("Library.UpdateSubscription", (oldAddress: string, newAddress: string, customTitle: string) => [oldAddress, newAddress, customTitle]),
   xSyncInfo: bind<[string], XSyncInfo>("Library.XSyncInfo", (siteID: string) => [siteID]),

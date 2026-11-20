@@ -256,6 +256,15 @@ func (c *Client) Init() error {
 	if _, exists := resolvers["eth."]; !exists {
 		resolvers["eth."] = json.RawMessage(`"https://dns.eth.limo/dns-query"`)
 	}
+	if _, exists := resolvers["bit."]; !exists {
+		resolvers["bit."] = json.RawMessage(`"https://dns.eth.limo/dns-query"`)
+	}
+	if _, exists := resolvers["sol."]; !exists {
+		resolvers["sol."] = json.RawMessage(`"https://dns.eth.limo/dns-query"`)
+	}
+	if _, exists := resolvers["fc."]; !exists {
+		resolvers["fc."] = json.RawMessage(`"https://dns.eth.limo/dns-query"`)
+	}
 	dns["Resolvers"], err = json.Marshal(resolvers)
 	if err != nil {
 		return err
@@ -503,6 +512,28 @@ func (c *Client) closeLocked() error {
 	}
 	c.clearDaemonState()
 	return err
+}
+
+type KeyInfo struct {
+	Name string `json:"name"`
+	ID   string `json:"id"`
+}
+
+func (c *Client) ListKeys() ([]KeyInfo, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	out, err := c.run("key", "list", "-l")
+	if err != nil {
+		return nil, err
+	}
+	var keys []KeyInfo
+	for _, line := range strings.Split(out, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 {
+			keys = append(keys, KeyInfo{ID: fields[0], Name: fields[1]})
+		}
+	}
+	return keys, nil
 }
 
 func (c *Client) EnsureKey(name string) (string, error) {
