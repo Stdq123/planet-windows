@@ -1056,6 +1056,91 @@ func requireSubscription(s *store.Store, address string) error {
 	return errors.New("订阅不存在")
 }
 
+func isHTTPAddress(address string) bool {
+	lower := strings.ToLower(address)
+	return strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://")
+}
+
+// UpdateSubscription edits an existing subscription's display name and/or address.
+func (l *Library) UpdateSubscription(oldAddress, newAddress, customTitle string) (store.Subscription, error) {
+	oldAddress = strings.TrimSpace(oldAddress)
+	newAddress = strings.TrimSpace(newAddress)
+	if oldAddress == "" {
+		return store.Subscription{}, errors.New("订阅不存在")
+	}
+	if newAddress == "" {
+		return store.Subscription{}, errors.New("请输入订阅地址")
+	}
+	oldIsHTTP := isHTTPAddress(oldAddress)
+	if !oldIsHTTP {
+		normalized, err := follow.Normalize(oldAddress)
+		if err != nil {
+			return store.Subscription{}, err
+		}
+		oldAddress = normalized
+	}
+	newIsHTTP := isHTTPAddress(newAddress)
+	if !newIsHTTP {
+		normalized, err := follow.Normalize(newAddress)
+		if err != nil {
+			return store.Subscription{}, err
+		}
+		newAddress = normalized
+	}
+	s, err := l.open()
+	if err != nil {
+		return store.Subscription{}, err
+	}
+	if newAddress == oldAddress {
+		if oldIsHTTP {
+			l.feedMu.Lock()
+			defer l.feedMu.Unlock()
+		} else {
+			l.publicMu.Lock()
+			defer l.publicMu.Unlock()
+		}
+		return s.UpdateSubscriptionTitle(oldAddress, customTitle)
+	}
+	if !oldIsHTTP || !newIsHTTP {
+		l.publicMu.Lock()
+		defer l.publicMu.Unlock()
+	}
+	if oldIsHTTP || newIsHTTP {
+		l.feedMu.Lock()
+		defer l.feedMu.Unlock()
+	}
+	subs, err := s.ListSubscriptions()
+	if err != nil {
+		return store.Subscription{}, err
+	}
+	found := false
+	for _, sub := range subs {
+		if sub.URL == oldAddress {
+			found = true
+		} else if sub.URL == newAddress {
+			return store.Subscription{}, errors.New("该订阅地址已存在")
+		}
+	}
+	if !found {
+		return store.Subscription{}, errors.New("订阅不存在")
+	}
+	if newIsHTTP {
+		feed, err := feeds.Fetch(newAddress)
+		if err != nil {
+			return store.Subscription{}, err
+		}
+		return s.ReplaceSubscription(oldAddress, newAddress, feed, "", "", customTitle)
+	}
+	if _, _, err = l.ensureNode(true); err != nil {
+		return store.Subscription{}, err
+	}
+	result, err := follow.Fetch(l.node, newAddress, false)
+	if err != nil {
+		return store.Subscription{}, err
+	}
+	return s.ReplaceSubscription(oldAddress, newAddress, result.Feed, result.CID, "", customTitle)
+}
+
 // Unfollow removes the subscription and its saved item state. Shared IPFS pins
 // and cached files are not deleted by this operation.
 func (l *Library) Unfollow(address string) error {

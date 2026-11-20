@@ -66,7 +66,11 @@ func (s *Store) SearchArticles(query string) ([]SearchResult, error) {
 				if body == "" {
 					body = item.Content
 				}
-				results = append(results, SearchResult{Title: item.Title, SourceName: sub.Feed.Title, Snippet: snippet(body), SubscriptionURL: sub.URL, ItemKey: feeds.ItemKey(item)})
+				source := sub.CustomTitle
+				if source == "" {
+					source = sub.Feed.Title
+				}
+				results = append(results, SearchResult{Title: item.Title, SourceName: source, Snippet: snippet(body), SubscriptionURL: sub.URL, ItemKey: feeds.ItemKey(item)})
 			}
 			if len(results) >= 200 {
 				return results, nil
