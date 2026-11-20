@@ -27,6 +27,7 @@ type Feed struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Link        string `json:"link"`
+	IconPNG     string `json:"iconPng,omitempty"`
 	Items       []Item `json:"items"`
 }
 
@@ -85,20 +86,29 @@ func Fetch(address string) (Feed, error) {
 	if err != nil {
 		return Feed{}, err
 	}
-	feed, err := parseFeed(doc.body, doc.url)
-	if err == nil || !doc.isHTML {
-		return feed, err
+	feed, feedIcons, err := parseFeed(doc.body, doc.url)
+	if err == nil {
+		feed.IconPNG = fetchSiteIcon(doc.url, doc.url, feed.Link, feedIcons, nil)
+		return feed, nil
+	}
+	if !doc.isHTML {
+		return Feed{}, err
 	}
 	candidates := discoverFeeds(doc.body, doc.url)
 	if len(candidates) == 0 {
 		return Feed{}, errors.New("此网页没有提供可识别的 RSS、Atom 或 JSON Feed 地址，请填写订阅源地址")
 	}
+	pageIcons := discoverIcons(doc.body, doc.url)
+	if pageIcons == nil {
+		pageIcons = []*url.URL{}
+	}
 	for _, candidate := range candidates {
 		var next feedDocument
 		next, err = fetchDocument(ctx, client, candidate)
 		if err == nil {
-			feed, err = parseFeed(next.body, next.url)
+			feed, feedIcons, err = parseFeed(next.body, next.url)
 			if err == nil {
+				feed.IconPNG = fetchSiteIcon(doc.url, next.url, feed.Link, feedIcons, pageIcons)
 				return feed, nil
 			}
 		}
@@ -142,12 +152,13 @@ func fetchDocument(ctx context.Context, client *http.Client, u *url.URL) (feedDo
 	return feedDocument{body: body, url: resp.Request.URL, isHTML: isHTML}, nil
 }
 
-func parseFeed(body []byte, base *url.URL) (Feed, error) {
+func parseFeed(body []byte, base *url.URL) (Feed, []*url.URL, error) {
 	parsed, err := parseDocument(body)
 	if err != nil {
-		return Feed{}, fmt.Errorf("无法解析订阅：%w", err)
+		return Feed{}, nil, fmt.Errorf("无法解析订阅：%w", err)
 	}
 	out := Feed{Title: parsed.Title, Description: parsed.Description, Link: parsed.Link, Items: []Item{}}
+	iconURLs := extractFeedIconURLs(parsed, base)
 	var jsonFeed struct {
 		Version string `json:"version"`
 		Items   []struct {
@@ -204,7 +215,7 @@ func parseFeed(body []byte, base *url.URL) (Feed, error) {
 		}
 		out.Items = append(out.Items, Item{ID: entry.GUID, Title: entry.Title, Link: entry.Link, Description: entry.Description, Content: content, Published: entry.Published, AudioURL: audioURL, VideoURL: videoURL, Media: media})
 	}
-	return out, nil
+	return out, iconURLs, nil
 }
 
 func parseDocument(body []byte) (*gofeed.Feed, error) {

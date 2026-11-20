@@ -63,8 +63,8 @@ func TestFetchRejectsNullJSONItem(t *testing.T) {
 
 func TestFetchRSSAndAtom(t *testing.T) {
 	cases := []struct{ name, body, title, item string }{
-		{"rss", `<?xml version="1.0"?><rss version="2.0"><channel><title>RSS site</title><link>https://example.com/</link><description>Notes</description><item><title>Post one</title><link>https://example.com/1</link><guid>one</guid></item></channel></rss>`, "RSS site", "Post one"},
-		{"atom", `<feed xmlns="http://www.w3.org/2005/Atom"><title>Atom site</title><id>https://example.com/</id><updated>2026-01-01T00:00:00Z</updated><entry><title>Post two</title><id>two</id><updated>2026-01-01T00:00:00Z</updated></entry></feed>`, "Atom site", "Post two"},
+		{"rss", `<?xml version="1.0"?><rss version="2.0"><channel><title>RSS site</title><link>https://example.test/</link><description>Notes</description><item><title>Post one</title><link>https://example.test/1</link><guid>one</guid></item></channel></rss>`, "RSS site", "Post one"},
+		{"atom", `<feed xmlns="http://www.w3.org/2005/Atom"><title>Atom site</title><id>https://example.test/</id><updated>2026-01-01T00:00:00Z</updated><entry><title>Post two</title><id>two</id><updated>2026-01-01T00:00:00Z</updated></entry></feed>`, "Atom site", "Post two"},
 		{"json", `{"version":"https://jsonfeed.org/version/1.1","title":"JSON site","items":[{"id":"one","title":"Post three","content_text":"Hello"}]}`, "JSON site", "Post three"},
 	}
 	for _, tc := range cases {

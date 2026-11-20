@@ -396,13 +396,14 @@ func TestUnfollowRemovesSubscriptionAndQueuedRefreshCannotRestoreIt(t *testing.T
 	if _, err := lib.Follow(server.URL); err != nil {
 		t.Fatal(err)
 	}
+	afterFollow := requests.Load()
 	if err := lib.Unfollow(server.URL); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := lib.RefreshSubscription(server.URL); err == nil {
 		t.Fatal("queued refresh restored a removed subscription")
 	}
-	if requests.Load() != 1 {
+	if requests.Load() != afterFollow {
 		t.Fatal("removed subscription caused another network request")
 	}
 	reopened, err := store.Open(root)
@@ -422,6 +423,10 @@ func TestUnfollowWaitsForOngoingRefresh(t *testing.T) {
 	var count atomic.Int32
 	started, release := make(chan struct{}), make(chan struct{})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
 		if count.Add(1) == 2 {
 			close(started)
 			<-release
