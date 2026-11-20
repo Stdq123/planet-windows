@@ -31,6 +31,7 @@ const subscriptionsEl = $("#subscriptions"), feedDialog = $<HTMLDialogElement>("
 const reader = $("#reader"), readerTitle = $("#reader-title"), readerDate = $("#reader-date"), readerPreview = $<HTMLIFrameElement>("#reader-preview");
 const ownReader = $("#own-reader"), ownReaderPreview=$<HTMLIFrameElement>("#own-reader-preview");
 const refreshFeed = $<HTMLButtonElement>("#refresh-feed"), pinSubscription = $<HTMLButtonElement>("#pin-subscription");
+const editSubscription = $<HTMLButtonElement>("#edit-subscription"), menuEditSubscription = $<HTMLButtonElement>("#menu-edit-subscription"), deleteFeed = $<HTMLButtonElement>("#delete-feed");
 const unfollow = $<HTMLButtonElement>("#unfollow");
 const starItem = $<HTMLButtonElement>("#star-item"), shareItem = $<HTMLButtonElement>("#share-item"), shareURL = $<HTMLInputElement>("#share-url"), shareStatus = $("#share-status");
 const exportSite = $<HTMLButtonElement>("#export-site");
@@ -269,6 +270,7 @@ let sitesRevision = 0;
 const articleLoadFailures = new Set<string>();
 let drafts: Draft[] = [], draft: Draft | null = null, draftsView = false;
 let subscriptions: Subscription[] = [], subscription: Subscription | null = null, item: Item | null = null;
+let editingSubscriptionURL = "";
 let subscriptionsRevision = 0;
 let editing = false, dirty = false, saving = false, previewRevision = 0, previewTimer: ReturnType<typeof setTimeout> | undefined;
 let libraryLoading = false, libraryFailed: string[] = [];
@@ -462,12 +464,15 @@ function renderSites() {
     button.addEventListener("click", () => void selectSite(item)); sitesEl.append(button);
   }
 }
+function subscriptionName(entry: Subscription): string {
+  return entry.customTitle?.trim() || entry.feed.title || entry.url;
+}
 function renderSubscriptions() {
   subscriptionsEl.replaceChildren();
   for (const entry of subscriptions) {
     const button = document.createElement("button"); button.className = `site-item${!favoritesView && !smartView && entry.url === subscription?.url ? " active" : ""}`;
     button.setAttribute("aria-pressed", String(!favoritesView && !smartView && entry.url === subscription?.url));
-    const sourceName=entry.feed.title || entry.url;
+    const sourceName=subscriptionName(entry);
     button.append(subscriptionIconElement(entry.feed.iconPng, "site-icon"), label("span", sourceName, "site-name"));
     const unread = entry.feed.items.filter(item => !item.read).length;
     if (unread) { const badge = label("span", String(unread), "subscription-count"); badge.setAttribute("aria-label", `${unread} 篇未读`); button.append(badge); }
@@ -489,7 +494,7 @@ function renderArticles() {
     count.textContent=String(entries.length);
     if(!entries.length) articlesEl.append(label("p",smartView==="unread" ? "没有未读文章" : "今天没有文章","list-empty"));
     for(const {source,entry} of entries) {
-      const button=articleRow(entry.title,formatPublishedDate(entry.published || ""),entry.description || entry.content || "",source.url===subscription?.url && (entry.key || entry.id || entry.link)===(item?.key || item?.id || item?.link),source.feed.title || source.url,true,source.feed.iconPng);
+      const button=articleRow(entry.title,formatPublishedDate(entry.published || ""),entry.description || entry.content || "",source.url===subscription?.url && (entry.key || entry.id || entry.link)===(item?.key || item?.id || item?.link),subscriptionName(source),true,source.feed.iconPng);
       button.classList.toggle("unread",!entry.read);
       button.addEventListener("click",()=>{subscription=source;site=null;selectFeedItem(entry);});articlesEl.append(button);
     }
@@ -499,14 +504,14 @@ function renderArticles() {
     articlesEl.replaceChildren(); const favorites = subscriptions.flatMap(source => source.feed.items.filter(entry => entry.starred).map(entry => ({source,entry})));
     count.textContent = String(favorites.length);
     if (!favorites.length) articlesEl.append(label("p", "还没有收藏的文章", "list-empty"));
-    for (const favorite of favorites) { const button=articleRow(favorite.entry.title, formatPublishedDate(favorite.entry.published || ""), favorite.entry.description || favorite.entry.content || "", favorite.source.url===subscription?.url && favorite.entry===item, favorite.source.feed.title || favorite.source.url, true, favorite.source.feed.iconPng); button.addEventListener("click",()=>{subscription=favorite.source; site=null; selectFeedItem(favorite.entry);}); articlesEl.append(button); }
+    for (const favorite of favorites) { const button=articleRow(favorite.entry.title, formatPublishedDate(favorite.entry.published || ""), favorite.entry.description || favorite.entry.content || "", favorite.source.url===subscription?.url && favorite.entry===item, subscriptionName(favorite.source), true, favorite.source.feed.iconPng); button.addEventListener("click",()=>{subscription=favorite.source; site=null; selectFeedItem(favorite.entry);}); articlesEl.append(button); }
     return;
   }
   if (subscription) {
     articlesEl.replaceChildren(); count.textContent = String(subscription.feed.items.length);
     if (!subscription.feed.items.length) articlesEl.append(label("p", "订阅暂时没有文章", "list-empty"));
     for (const entry of subscription.feed.items) {
-      const button = articleRow(entry.title, formatPublishedDate(entry.published || ""), entry.description || entry.content || "", entry === item, subscription.feed.title || subscription.url, true, subscription.feed.iconPng);
+      const button = articleRow(entry.title, formatPublishedDate(entry.published || ""), entry.description || entry.content || "", entry === item, subscriptionName(subscription), true, subscription.feed.iconPng);
       button.classList.toggle("unread",!entry.read);
       button.addEventListener("click", () => selectFeedItem(entry)); articlesEl.append(button);
     }
@@ -554,7 +559,7 @@ function updateView() {
   shell.classList.toggle("local-site", !!site && !subscription && !smartView && !favoritesView);
   syncEditorView();
   const publication = site ? publicationStates.get(site.id) : undefined;
-  renderSites(); renderSubscriptions(); renderArticles(); siteTitle.textContent = smartView === "today" ? "今天" : smartView === "unread" ? "未读文章" : favoritesView ? "收藏的文章" : subscription?.feed.title || site?.name || "我的站点";
+  renderSites(); renderSubscriptions(); renderArticles(); siteTitle.textContent = smartView === "today" ? "今天" : smartView === "unread" ? "未读文章" : favoritesView ? "收藏的文章" : subscription ? subscriptionName(subscription) : site?.name || "我的站点";
   $("#show-favorites").classList.toggle("active",favoritesView);
   $("#show-favorites").setAttribute("aria-pressed",String(favoritesView));
   for(const [id,view] of [["#show-today","today"],["#show-unread","unread"]] as const){$(id).classList.toggle("active",smartView===view);$(id).setAttribute("aria-pressed",String(smartView===view));}
@@ -585,6 +590,10 @@ function updateView() {
   serviceButton.hidden=!!subscription; serviceButton.disabled=!site || saving;
   xSync.update();
   editSite.hidden = !site || !!subscription; editSite.disabled = !site || saving;
+  const subEditable = !!subscription && !favoritesView && !smartView;
+  const subBusy = !!subscription && (saving || refreshingSubscriptions.has(subscription.url));
+  editSubscription.hidden = !subEditable; editSubscription.disabled = !subEditable || subBusy;
+  menuEditSubscription.hidden = !subscription; menuEditSubscription.disabled = !subscription || subBusy;
   const profileButton=$<HTMLButtonElement>("#site-profile");profileButton.hidden=!!subscription;profileButton.disabled=!site || !!site.imported || saving;profileButton.title=site?.imported ? "导入站点暂不支持修改公开资料" : "";
   const podcastButton=$<HTMLButtonElement>("#podcast-settings");podcastButton.hidden=!!subscription;podcastButton.disabled=!site || !!site.imported || saving;
   const deploymentButton=$<HTMLButtonElement>("#deployment-settings");deploymentButton.hidden=!!subscription;deploymentButton.disabled=!site || !!site.imported || saving;
@@ -630,7 +639,7 @@ function updateView() {
   const ownReading=!!site && !!article && !editing && !subscription && !draftsView;
   empty.hidden = editing || !!item || ownReading; editor.hidden = !editing; reader.hidden = !item; ownReader.hidden=!ownReading;
   if(ownReading && article){$("#own-reader-title").textContent=article.title || "无标题";$("#own-reader-date").textContent=new Date(article.modified).toLocaleDateString("zh-CN");$("#own-reader-source").textContent=site?.name || "我的站点";$("#own-reader-author").textContent=site?.authorName || site?.name || "我的站点";}
-  if(subscription){$("#reader-source").textContent=subscription.feed.title || subscription.url;$("#reader-author").textContent=subscription.feed.title || subscription.url;}
+  if(subscription){const name=subscriptionName(subscription);$("#reader-source").textContent=name;$("#reader-author").textContent=name;}
   const ownSource = ownReader.querySelector<HTMLElement>(".reader-category > span:last-child")?.textContent || "P";
   const ownInitial = Array.from(ownSource.trim())[0] || "P";
   ownReader.querySelectorAll<HTMLElement>(".reader-source-icon, .reader-author-avatar").forEach(icon=>{icon.textContent=ownInitial;});
@@ -1154,10 +1163,46 @@ form.addEventListener("submit", async (event) => {
     busyMessage=""; updateView();siteFormErrors.focusFirst();
   }
 });
-$("#new-feed").addEventListener("click", () => { if (canLeave()) { navigationRevision++; feedForm.reset(); $("#feed-result").textContent=""; openDialog(feedDialog); } });
+function openFeedDialog(target?: Subscription) {
+  navigationRevision++;
+  editingSubscriptionURL = target?.url ?? "";
+  feedForm.reset();
+  const isEdit = !!target;
+  $("#feed-dialog-title").textContent = isEdit ? "编辑订阅" : "添加订阅";
+  $("#feed-dialog-description").textContent = isEdit ? "修改显示名称或更换订阅地址。更换地址会重新拉取订阅内容。" : "输入 RSS、Atom、JSON Feed、Planet/IPNS 或 ENS 地址。";
+  $("#feed-title-field").hidden = !isEdit;
+  deleteFeed.hidden = !isEdit;
+  deleteFeed.disabled = saving;
+  const titleInput = feedForm.querySelector<HTMLInputElement>('[name="title"]')!;
+  const urlInput = feedForm.querySelector<HTMLInputElement>('[name="url"]')!;
+  titleInput.value = target?.customTitle ?? "";
+  titleInput.placeholder = target?.feed.title || target?.url || "留空使用默认名称";
+  urlInput.value = target?.url ?? "";
+  feedForm.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent = isEdit ? "保存" : "添加";
+  $("#feed-result").textContent = "";
+  openDialog(feedDialog);
+  rememberDialog(feedDialog);
+}
+$("#new-feed").addEventListener("click", () => { if (canLeave()) openFeedDialog(); });
+editSubscription.addEventListener("click", () => { if (subscription && !saving && canLeave()) openFeedDialog(subscription); });
+menuEditSubscription.addEventListener("click", () => { workspaceMenu.open = false; if (subscription && !saving && canLeave()) openFeedDialog(subscription); });
 $("#cancel-feed").addEventListener("click", () => { if (!saving) feedDialog.close(); });
 feedDialog.addEventListener("cancel", event => { if (saving) event.preventDefault(); });
-feedDialog.addEventListener("close", () => { navigationRevision++; });
+feedDialog.addEventListener("close", () => { editingSubscriptionURL = ""; navigationRevision++; });
+async function unfollowSubscription(address: string, closeFeedModal = false) {
+  if (!address || saving) return;
+  if (!window.confirm("取消订阅将移除此订阅及其收藏记录。已固定的 IPFS 内容和本地缓存不会立即删除。继续吗？")) return;
+  navigationRevision++; readerRevision++; saving = true; busyMessage = "正在取消订阅…"; updateView(); clearError();
+  try {
+    await Library.unfollow(address); await reloadSubscriptions();
+    if (subscription?.url === address) { subscription = null; item = null; favoritesView = false; }
+    if (closeFeedModal && feedDialog.open) feedDialog.close();
+  } catch (e) {
+    if (closeFeedModal && feedDialog.open) $("#feed-result").textContent = `删除失败：${e instanceof Error ? e.message : String(e)}`;
+    else showError(e);
+  }
+  finally { saving = false; busyMessage = ""; updateView(); }
+}
 async function refreshSubscription(address: string): Promise<void> {
   if (refreshingSubscriptions.has(address)) return;
   refreshingSubscriptions.add(address); updateView();
@@ -1175,16 +1220,13 @@ refreshFeed.addEventListener("click", async () => {
   if (!subscription) return; clearError();
   try { await refreshSubscription(subscription.url); } catch (e) { showError(e); }
 });
-unfollow.addEventListener("click", async () => {
+unfollow.addEventListener("click", () => {
   if (!subscription || saving) return;
-  const address = subscription.url;
-  if (!window.confirm("取消订阅将移除此订阅及其收藏记录。已固定的 IPFS 内容和本地缓存不会立即删除。继续吗？")) return;
-  navigationRevision++; readerRevision++; saving = true; busyMessage = "正在取消订阅…"; updateView(); clearError();
-  try {
-    await Library.unfollow(address); await reloadSubscriptions();
-    if (subscription?.url === address) { subscription = null; item = null; favoritesView = false; }
-  } catch (e) { showError(e); }
-  finally { saving = false; busyMessage = ""; updateView(); }
+  void unfollowSubscription(subscription.url, false);
+});
+deleteFeed.addEventListener("click", () => {
+  if (!editingSubscriptionURL || saving) return;
+  void unfollowSubscription(editingSubscriptionURL, true);
 });
 pinSubscription.addEventListener("click", async () => {
   if (!subscription || pinSubscription.disabled) return; const address=subscription.url; pinSubscription.disabled=true; clearError();
@@ -1572,16 +1614,27 @@ deleteArticle.addEventListener("click", async () => {
 });
 feedForm.addEventListener("submit", async (event) => {
   event.preventDefault(); if (saving) return;
-  const button = feedForm.querySelector<HTMLButtonElement>('button[type="submit"]')!, cancel = $<HTMLButtonElement>("#cancel-feed"), input = feedForm.querySelector<HTMLInputElement>('[name="url"]')!;
-  const address = input.value; button.disabled = true; cancel.disabled = true; input.disabled = true;
-  saving=true; busyMessage="正在添加订阅…"; button.textContent="正在添加…"; $("#feed-result").textContent=""; updateView();
+  const button = feedForm.querySelector<HTMLButtonElement>('button[type="submit"]')!, cancel = $<HTMLButtonElement>("#cancel-feed");
+  const titleInput = feedForm.querySelector<HTMLInputElement>('[name="title"]')!, input = feedForm.querySelector<HTMLInputElement>('[name="url"]')!;
+  const isEdit = !!editingSubscriptionURL, oldAddress = editingSubscriptionURL;
+  const address = input.value, customTitle = titleInput.value;
+  button.disabled = true; cancel.disabled = true; deleteFeed.disabled = true; input.disabled = true; titleInput.disabled = true;
+  saving = true; busyMessage = isEdit ? "正在保存订阅…" : "正在添加订阅…"; button.textContent = isEdit ? "正在保存…" : "正在添加…"; $("#feed-result").textContent = ""; updateView();
   const revision = ++navigationRevision;
   try {
-    const entry = await Library.follow(address); await reloadSubscriptions();
+    const entry = isEdit ? await Library.updateSubscription(oldAddress, address, customTitle) : await Library.follow(address);
+    await reloadSubscriptions();
     if (revision !== navigationRevision) { updateView(); return; }
-    site = null; favoritesView = false; smartView=null; subscription = entry; item = null; article = null; draft=null; draftsView=false; editing = false; dirty = false; feedDialog.close(); clearError(); updateView();
-  } catch (e) { $("#feed-result").textContent=`添加失败：${e instanceof Error ? e.message : String(e)}。请检查地址后重试。`; }
-  finally { button.disabled = false; cancel.disabled=false; input.disabled=false; saving=false; busyMessage=""; button.textContent="添加订阅"; updateView(); }
+    const updated = subscriptions.find(s => s.url === entry.url) ?? entry;
+    site = null; favoritesView = false; smartView = null; subscription = updated;
+    if (!isEdit || oldAddress !== updated.url) item = null;
+    article = null; draft = null; draftsView = false; editing = false; dirty = false;
+    feedDialog.close(); clearError(); updateView();
+  } catch (e) { $("#feed-result").textContent = `${isEdit ? "保存" : "添加"}失败：${e instanceof Error ? e.message : String(e)}。请检查地址后重试。`; }
+  finally {
+    button.disabled = false; cancel.disabled = false; deleteFeed.disabled = false; input.disabled = false; titleInput.disabled = false;
+    saving = false; busyMessage = ""; button.textContent = isEdit ? "保存" : "添加"; updateView();
+  }
 });
 newArticle.addEventListener("click", startArticle);
 $("#new-article-header").addEventListener("click", startArticle);

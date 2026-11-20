@@ -327,6 +327,7 @@ func (s *Store) CompleteDraftCleanup(entry DraftCleanup) error {
 
 type Subscription struct {
 	URL             string     `json:"url"`
+	CustomTitle     string     `json:"customTitle,omitempty"`
 	Feed            feeds.Feed `json:"feed"`
 	CID             string     `json:"cid,omitempty"`
 	PinnedCID       string     `json:"pinnedCid,omitempty"`
@@ -1098,6 +1099,7 @@ func (s *Store) saveSubscription(address string, feed feeds.Feed, cid *string, p
 	found := false
 	for i, item := range next.Subscriptions {
 		if item.URL == address {
+			subscription.CustomTitle = item.CustomTitle
 			if subscription.Feed.IconPNG == "" && item.Feed.IconPNG != "" {
 				subscription.Feed.IconPNG = item.Feed.IconPNG
 			}
@@ -1150,6 +1152,92 @@ func (s *Store) saveSubscription(address string, feed feeds.Feed, cid *string, p
 		return Subscription{}, err
 	}
 	return subscription, nil
+}
+
+// UpdateSubscriptionTitle saves a user-chosen display name for an existing subscription.
+func (s *Store) UpdateSubscriptionTitle(address, customTitle string) (Subscription, error) {
+	customTitle = strings.TrimSpace(customTitle)
+	if len([]rune(customTitle)) > 200 {
+		return Subscription{}, errors.New("订阅名称不能超过 200 个字符")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	next := s.data
+	next.Subscriptions = append([]Subscription{}, s.data.Subscriptions...)
+	for i := range next.Subscriptions {
+		if next.Subscriptions[i].URL != address {
+			continue
+		}
+		next.Subscriptions[i].CustomTitle = customTitle
+		if err := s.write(next); err != nil {
+			return Subscription{}, err
+		}
+		return next.Subscriptions[i], nil
+	}
+	return Subscription{}, errors.New("订阅不存在")
+}
+
+// ReplaceSubscription updates a subscription's address, feed content and display name in place.
+func (s *Store) ReplaceSubscription(oldAddress, newAddress string, feed feeds.Feed, cid, pinnedCID, customTitle string) (Subscription, error) {
+	customTitle = strings.TrimSpace(customTitle)
+	if len([]rune(customTitle)) > 200 {
+		return Subscription{}, errors.New("订阅名称不能超过 200 个字符")
+	}
+	if newAddress == "" {
+		return Subscription{}, errors.New("订阅地址无效")
+	}
+	if feed.IconPNG != "" {
+		if _, _, err := siteimage.DecodePNG(feed.IconPNG); err != nil {
+			feed.IconPNG = ""
+		}
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	oldIndex := -1
+	for i, item := range s.data.Subscriptions {
+		if item.URL == oldAddress {
+			oldIndex = i
+		} else if item.URL == newAddress {
+			return Subscription{}, errors.New("该订阅地址已存在")
+		}
+	}
+	if oldIndex < 0 {
+		return Subscription{}, errors.New("订阅不存在")
+	}
+	old := s.data.Subscriptions[oldIndex]
+	feed.Items = append([]feeds.Item{}, feed.Items...)
+	stars := map[string]bool{}
+	reads := map[string]bool{}
+	for _, entry := range old.Feed.Items {
+		key := feeds.ItemKey(entry)
+		stars[key] = entry.Starred
+		reads[key] = entry.Read
+	}
+	for i := range feed.Items {
+		key := feeds.ItemKey(feed.Items[i])
+		feed.Items[i].Key = key
+		feed.Items[i].Starred = stars[key]
+		feed.Items[i].Read = reads[key]
+	}
+	if feed.IconPNG == "" && old.Feed.IconPNG != "" {
+		feed.IconPNG = old.Feed.IconPNG
+	}
+	now := time.Now().UTC()
+	updated := Subscription{
+		URL:         newAddress,
+		CustomTitle: customTitle,
+		Feed:        feed,
+		CID:         cid,
+		PinnedCID:   pinnedCID,
+		LastUpdated: &now,
+	}
+	next := s.data
+	next.Subscriptions = append([]Subscription{}, s.data.Subscriptions...)
+	next.Subscriptions[oldIndex] = updated
+	if err := s.write(next); err != nil {
+		return Subscription{}, err
+	}
+	return updated, nil
 }
 
 // SetSubscriptionPinned records only a pin for the current immutable revision.

@@ -396,6 +396,10 @@ body {
   border-radius: inherit;
   display: block;
 }
+#feed-dialog .danger-button {
+  margin-right: auto;
+  color: var(--pw-danger);
+}
 
 /* Pill count badges like Mac Planet (4, 51, 74) */
 .sidebar .smart-count,

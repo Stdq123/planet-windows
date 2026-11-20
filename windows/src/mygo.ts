@@ -246,6 +246,7 @@ export interface Status {
 
 export interface Subscription {
   url: string;
+  customTitle?: string;
   feed: Feed;
   cid?: string;
   pinnedCid?: string;
@@ -446,5 +447,7 @@ export const Library = {
   updateSiteDetails: bind<[string, string, string, boolean, string, string], Site>("Library.UpdateSiteDetails", (siteID: string, name: string, about: string, doNotIndex: boolean, slug: string, author: string) => [siteID, name, about, doNotIndex, slug, author]),
   updateSiteProfile: bind<[string, string], Site>("Library.UpdateSiteProfile", (siteID: string, profileJSON: string) => [siteID, profileJSON]),
   updateSiteSettings: bind<[string, string, string, boolean], Site>("Library.UpdateSiteSettings", (siteID: string, name: string, about: string, doNotIndex: boolean) => [siteID, name, about, doNotIndex]),
+  /** UpdateSubscription edits an existing subscription's display name and/or address. */
+  updateSubscription: bind<[string, string, string], Subscription>("Library.UpdateSubscription", (oldAddress: string, newAddress: string, customTitle: string) => [oldAddress, newAddress, customTitle]),
   xSyncInfo: bind<[string], XSyncInfo>("Library.XSyncInfo", (siteID: string) => [siteID]),
 } as const;

@@ -4,6 +4,10 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 ## [Unreleased]
 
+### Added
+
+- Added subscription settings (edit display name, change feed/Planet URL, and delete subscription directly from the subscription header or dialog) alongside the existing workspace menu actions.
+
 ### Changed
 
 - Redesigned the Site Settings modal into a wide two-column desktop preferences layout with left section navigation (`基本资料`, `外观与资料`, `发布与固定`, `内容同步`), a top-right close button, two-column site identity inputs, and structured horizontal setting rows while keeping the Create Site modal compact.
