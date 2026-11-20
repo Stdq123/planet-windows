@@ -111,3 +111,26 @@ test("site settings uses wide two-column multi-page navigation in edit mode and 
   expect(dialog.dataset.mode).toBe("create");
   expect(nav.hidden).toBe(true);
 });
+
+test("custom code and publication flags save from the dedicated site settings page",async()=>{
+  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});
+  const site={id:"s",name:"My Planet",about:"About",created:"2026-01-01T00:00:00Z"};
+  let savedPayload:any=null;
+  (globalThis as any).mygo={call:async(method:string,...args:any[])=>{switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":case "Library.Articles":return [];case "Library.UpdateSiteCustomCode":savedPayload=JSON.parse(args[1]);return {...site,customCodeHeadEnabled:savedPayload.headEnabled,customCodeHead:savedPayload.head,publishAsIPNS:savedPayload.publishAsIPNS,prewarmNewPost:savedPayload.prewarmNewPost};case "Library.PublishSite":return {cid:"test",ipns:"test"};default:throw new Error(method);}}};
+  await import("../src/main.ts?site-custom-code"); enterFirstSite(window);await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="My Planet");
+  window.document.querySelector<HTMLButtonElement>("#edit-site")!.click();
+  window.document.querySelector<HTMLButtonElement>("#custom-code-settings")!.click();
+  const page=window.document.querySelector<HTMLDialogElement>("#custom-code-dialog")!;
+  expect(page.open).toBe(true);
+  const form=window.document.querySelector<HTMLFormElement>("#custom-code-form")!;
+  form.querySelector<HTMLInputElement>('[name="headEnabled"]')!.checked=true;
+  form.querySelector<HTMLTextAreaElement>('[name="head"]')!.value="<meta name=\"test\" content=\"1\">";
+  form.querySelector<HTMLInputElement>('[name="publishAsIPNS"]')!.checked=false;
+  form.querySelector<HTMLInputElement>('[name="prewarmNewPost"]')!.checked=false;
+  form.dispatchEvent(new window.Event("submit",{cancelable:true}));
+  await waitFor(()=>savedPayload!==null);
+  expect(savedPayload.headEnabled).toBe(true);
+  expect(savedPayload.head).toBe("<meta name=\"test\" content=\"1\">");
+  expect(savedPayload.publishAsIPNS).toBe(false);
+  expect(savedPayload.prewarmNewPost).toBe(false);
+});

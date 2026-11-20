@@ -262,6 +262,30 @@ func Merge(original json.RawMessage, site store.Site, articles []store.Article) 
 		} else {
 			delete(root, "authorName")
 		}
+		for _, pair := range []struct {
+			enabledKey string
+			codeKey    string
+			enabled    bool
+			code       string
+		}{
+			{"customCodeHeadEnabled", "customCodeHead", site.CustomCodeHeadEnabled, site.CustomCodeHead},
+			{"customCodeBodyStartEnabled", "customCodeBodyStart", site.CustomCodeBodyStartEnabled, site.CustomCodeBodyStart},
+			{"customCodeBodyEndEnabled", "customCodeBodyEnd", site.CustomCodeBodyEndEnabled, site.CustomCodeBodyEnd},
+		} {
+			if pair.enabled || pair.code != "" {
+				put(root, pair.enabledKey, pair.enabled)
+				put(root, pair.codeKey, pair.code)
+			} else if len(original) == 0 {
+				delete(root, pair.enabledKey)
+				delete(root, pair.codeKey)
+			}
+		}
+		if site.PrewarmNewPost != nil {
+			put(root, "prewarmNewPost", *site.PrewarmNewPost)
+		}
+		if site.PublishAsIPNS != nil {
+			put(root, "publishAsIPNS", *site.PublishAsIPNS)
+		}
 	}
 	tagSource := original
 	if len(tagSource) == 0 {
@@ -393,6 +417,11 @@ func Merge(original json.RawMessage, site store.Site, articles []store.Article) 
 				put(item, "navigationWeight", article.NavigationWeight)
 			} else {
 				delete(item, "navigationWeight")
+			}
+			if article.Pinned != nil {
+				put(item, "pinned", appleDate(*article.Pinned))
+			} else {
+				delete(item, "pinned")
 			}
 		}
 		var oldContent string

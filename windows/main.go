@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -358,6 +359,18 @@ func (l *Library) UpdateSiteProfile(siteID, profileJSON string) (store.Site, err
 	return s.UpdateSiteProfile(siteID, profile)
 }
 
+func (l *Library) UpdateSiteCustomCode(siteID, customCodeJSON string) (store.Site, error) {
+	var cfg store.SiteCustomCode
+	if len(customCodeJSON) > 256<<10 || json.Unmarshal([]byte(customCodeJSON), &cfg) != nil {
+		return store.Site{}, errors.New("站点自定义代码设置无效")
+	}
+	s, err := l.open()
+	if err != nil {
+		return store.Site{}, err
+	}
+	return s.UpdateSiteCustomCode(siteID, cfg)
+}
+
 func (l *Library) UpdatePodcastSettings(siteID, language string, explicit bool, categoriesJSON string) (store.Site, error) {
 	var categories []string
 	if len(categoriesJSON) > 4096 || json.Unmarshal([]byte(categoriesJSON), &categories) != nil {
@@ -599,6 +612,14 @@ func (l *Library) UpdateArticleSettings(siteID, articleID, slug string, articleT
 		return store.Article{}, err
 	}
 	return s.UpdateArticleSettings(siteID, articleID, slug, articleType, externalLink, inNavigation, weight)
+}
+
+func (l *Library) SetArticlePinned(siteID, articleID string, pinned bool) (store.Article, error) {
+	s, err := l.open()
+	if err != nil {
+		return store.Article{}, err
+	}
+	return s.SetArticlePinned(siteID, articleID, pinned)
 }
 func (l *Library) SaveArticleWithTags(siteID, articleID, title, content, tagsJSON string) (store.Article, error) {
 	s, err := l.open()
@@ -1350,6 +1371,24 @@ func (l *Library) PublishSite(siteID string) (publisher.Result, error) {
 			return publisher.Result{}, fmt.Errorf("无法发布原版备份：%w", e)
 		}
 	}
+	if !site.ShouldPublishIPNS() {
+		root, e := mygo.App.Path(mygo.PathUserData)
+		if e != nil {
+			return publisher.Result{}, e
+		}
+		result := publisher.Result{CID: site.LastPublishedCID, IPNS: site.IPNS, Revision: site.ContentRevision}
+		if warning := l.autoDeploy(root, *site, articles); warning != "" {
+			result.PinnableWarning = "外部发布未完成：" + warning
+		}
+		if warning := l.syncPublishedX(root, *site, articles); warning != "" {
+			if result.PinnableWarning != "" {
+				result.PinnableWarning += " "
+			}
+			result.PinnableWarning += "X 同步未完成：" + warning
+		}
+		result.TelegramWarning = l.syncPublishedTelegram(root, *site, articles, raw)
+		return result, nil
+	}
 	if _, _, err := l.ensureNode(true); err != nil {
 		return publisher.Result{}, err
 	}
@@ -1386,6 +1425,9 @@ func (l *Library) PublishSite(siteID string) (publisher.Result, error) {
 		return result, fmt.Errorf("IPNS 已发布到 %s，但保存本地状态失败：%w", result.IPNS, err)
 	}
 	l.scheduleProvide(result.CID)
+	if site.ShouldPrewarmNewPost() && result.CID != "" {
+		l.schedulePrewarm(*site, result.CID)
+	}
 	// This integration is opt-in. IPNS publication has already succeeded, so a
 	// separate warning must not turn it into a failed publication.
 	root, e := mygo.App.Path(mygo.PathUserData)
@@ -1810,6 +1852,50 @@ func (l *Library) pushPinnableRecord(endpoint, ipns string) {
 	if err := pinnable.NewClient().PushRecord(endpoint, record); err != nil {
 		log.Printf("push IPNS record to Pinnable: %v", err)
 	}
+}
+
+func prewarmURLsForSite(site store.Site, cid string) []string {
+	var urls []string
+	if site.IPNS != "" {
+		base := "https://" + site.IPNS + ".eth.sucks"
+		for _, suffix := range []string{"/", "/avatar.png", "/favicon.ico", "/planet.json", "/tags.html", "/archive.html"} {
+			urls = append(urls, base+suffix)
+		}
+	}
+	if cid != "" {
+		if strings.HasPrefix(cid, "Qm") {
+			urls = append(urls, "https://dweb.link/ipfs/"+cid+"/")
+		} else {
+			urls = append(urls, "https://"+cid+".eth.sucks/")
+		}
+	}
+	return urls
+}
+
+func (l *Library) schedulePrewarm(site store.Site, cid string) {
+	node := l.getNode()
+	if node == nil {
+		return
+	}
+	status, err := node.Status()
+	if err != nil || !status.Running || !status.Online {
+		return
+	}
+	urls := prewarmURLsForSite(site, cid)
+	if len(urls) == 0 {
+		return
+	}
+	go func() {
+		client := &http.Client{Timeout: 15 * time.Second}
+		for _, target := range urls {
+			resp, err := client.Get(target)
+			if err != nil {
+				continue
+			}
+			_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
+			resp.Body.Close()
+		}
+	}()
 }
 
 func (l *Library) PinnableStatus(siteID string) (pinnable.Status, error) {
@@ -2238,7 +2324,7 @@ func (l *Library) maintainPublished(ctx context.Context) {
 			if ctx.Err() != nil {
 				return
 			}
-			if site.PublishPending || site.IPNS == "" || site.LastPublishedCID == "" || !publisher.RenewDue(time.Now().UTC(), site.LastPublished) {
+			if !site.ShouldPublishIPNS() || site.PublishPending || site.IPNS == "" || site.LastPublishedCID == "" || !publisher.RenewDue(time.Now().UTC(), site.LastPublished) {
 				continue
 			}
 			key, err := l.node.LookupKeyContext(ctx, site.ID)

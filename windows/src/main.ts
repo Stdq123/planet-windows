@@ -528,8 +528,16 @@ function renderArticles() {
   }
   articlesEl.replaceChildren(); count.textContent = String(articles.length);
   if (!articles.length) { articlesEl.append(label("p", site ? "还没有文章" : "选择一个站点开始", "list-empty")); return; }
-  for (const item of [...articles].sort((a, b) => b.modified.localeCompare(a.modified))) {
-    const button = articleRow(item.title, `${item.articleType===1 ? "页面  " : ""}${new Date(item.modified).toLocaleDateString("zh-CN")}`, item.content, item.id === article?.id, site?.name || "我的站点");
+  const sortedArticles = [...articles].sort((a, b) => {
+    const aPinned = !!a.pinned, bPinned = !!b.pinned;
+    if (aPinned !== bPinned) return aPinned ? -1 : 1;
+    if (aPinned && bPinned && a.pinned !== b.pinned) return b.pinned!.localeCompare(a.pinned!);
+    return b.modified.localeCompare(a.modified);
+  });
+  for (const item of sortedArticles) {
+    const prefix = `${item.pinned ? "置顶  " : ""}${item.articleType===1 ? "页面  " : ""}`;
+    const button = articleRow(item.title, `${prefix}${new Date(item.modified).toLocaleDateString("zh-CN")}`, item.content, item.id === article?.id, site?.name || "我的站点");
+    button.classList.toggle("is-pinned", !!item.pinned);
     button.addEventListener("click", () => selectArticle(item)); articlesEl.append(button);
   }
 }
@@ -596,6 +604,7 @@ function updateView() {
   menuEditSubscription.hidden = !subscription; menuEditSubscription.disabled = !subscription || subBusy;
   const profileButton=$<HTMLButtonElement>("#site-profile");profileButton.hidden=!!subscription;profileButton.disabled=!site || !!site.imported || saving;profileButton.title=site?.imported ? "导入站点暂不支持修改公开资料" : "";
   const podcastButton=$<HTMLButtonElement>("#podcast-settings");podcastButton.hidden=!!subscription;podcastButton.disabled=!site || !!site.imported || saving;
+  const customCodeButton=$<HTMLButtonElement>("#custom-code-settings");customCodeButton.hidden=!!subscription;customCodeButton.disabled=!site || !!site.imported || saving;
   const deploymentButton=$<HTMLButtonElement>("#deployment-settings");deploymentButton.hidden=!!subscription;deploymentButton.disabled=!site || !!site.imported || saving;
   removeSite.hidden = !!subscription; removeSite.disabled = !site || saving || !!publication?.running;
   const fixed = !!subscription && (subscription.cid ? subscription.pinnedCid === subscription.cid : !!subscription.offlinePinned);
@@ -751,6 +760,7 @@ $("#article-settings").addEventListener("click",()=>{
   articleSettingsForm.querySelector<HTMLInputElement>('[name="slug"]')!.value=article.slug || "";
   articleSettingsForm.querySelector<HTMLSelectElement>('[name="articleType"]')!.value=String(article.articleType || 0);
   articleSettingsForm.querySelector<HTMLInputElement>('[name="externalLink"]')!.value=article.externalLink || "";
+  articleSettingsForm.querySelector<HTMLInputElement>('[name="pinned"]')!.checked=!!article.pinned;
   articleSettingsForm.querySelector<HTMLInputElement>('[name="inNavigation"]')!.checked=!!article.isIncludedInNavigation;
   articleSettingsForm.querySelector<HTMLInputElement>('[name="weight"]')!.value=String(article.navigationWeight ?? 1);
   $("#article-settings-result").textContent="";openDialog(articleSettingsDialog);
@@ -762,11 +772,15 @@ articleSettingsForm.addEventListener("submit",async event=>{
   $("#article-settings-result").textContent="";if(!articleFormErrors.validate())return;
   const siteID=site.id,articleID=article.id,slug=articleSettingsForm.querySelector<HTMLInputElement>('[name="slug"]')!.value.trim();
   const type=Number(articleSettingsForm.querySelector<HTMLSelectElement>('[name="articleType"]')!.value),external=articleSettingsForm.querySelector<HTMLInputElement>('[name="externalLink"]')!.value.trim();
+  const wantPinned=articleSettingsForm.querySelector<HTMLInputElement>('[name="pinned"]')!.checked;
   const included=articleSettingsForm.querySelector<HTMLInputElement>('[name="inNavigation"]')!.checked,weight=Number(articleSettingsForm.querySelector<HTMLInputElement>('[name="weight"]')!.value);
   if(!Number.isSafeInteger(weight) || weight < -2147483648 || weight > 2147483647){articleFormErrors.show([{field:articleSettingsForm.querySelector<HTMLInputElement>('[name="weight"]')!,message:"请输入有效的整数权重。"}]);return;}
   const controls=Array.from(articleSettingsForm.querySelectorAll<HTMLInputElement|HTMLSelectElement|HTMLButtonElement>("input,select,button"));controls.forEach(control=>control.disabled=true);saving=true;updateView();
   try {
-    const saved=await Library.updateArticleSettings(siteID,articleID,slug,type,external,included,weight);
+    let saved=await Library.updateArticleSettings(siteID,articleID,slug,type,external,included,weight);
+    if(wantPinned!==!!article.pinned){
+      saved=await Library.setArticlePinned(siteID,articleID,wantPinned);
+    }
     articles=articles.map(entry=>entry.id===articleID ? saved : entry);if(site?.id===siteID && article?.id===articleID)article=saved;
     markLocalChange(siteID);articleSettingsDialog.close();clearError();void queuePublication(siteID);
   } catch(error){
@@ -1025,6 +1039,44 @@ async function changePodcastCover(remove:boolean){
   finally{controls.forEach((control,i)=>control.disabled=disabled[i]!);saving=false;updatePodcastCover(site?.id===siteID?site.podcastCoverPng:undefined);updateView();}
 }
 $("#choose-podcast-cover").addEventListener("click",()=>void changePodcastCover(false));$("#remove-podcast-cover").addEventListener("click",()=>void changePodcastCover(true));
+const customCodeDialog=$<HTMLDialogElement>("#custom-code-dialog"),customCodeForm=$<HTMLFormElement>("#custom-code-form");
+$("#custom-code-settings").addEventListener("click",()=>{
+  if(!site || site.imported || saving)return;
+  customCodeForm.querySelector<HTMLInputElement>('[name="headEnabled"]')!.checked=!!site.customCodeHeadEnabled;
+  customCodeForm.querySelector<HTMLTextAreaElement>('[name="head"]')!.value=site.customCodeHead || "";
+  customCodeForm.querySelector<HTMLInputElement>('[name="bodyStartEnabled"]')!.checked=!!site.customCodeBodyStartEnabled;
+  customCodeForm.querySelector<HTMLTextAreaElement>('[name="bodyStart"]')!.value=site.customCodeBodyStart || "";
+  customCodeForm.querySelector<HTMLInputElement>('[name="bodyEndEnabled"]')!.checked=!!site.customCodeBodyEndEnabled;
+  customCodeForm.querySelector<HTMLTextAreaElement>('[name="bodyEnd"]')!.value=site.customCodeBodyEnd || "";
+  customCodeForm.querySelector<HTMLInputElement>('[name="publishAsIPNS"]')!.checked=site.publishAsIPNS ?? true;
+  customCodeForm.querySelector<HTMLInputElement>('[name="prewarmNewPost"]')!.checked=site.prewarmNewPost ?? true;
+  $("#custom-code-result").textContent="";openDialog(customCodeDialog);
+});
+$("#close-custom-code").addEventListener("click",()=>{if(!saving)customCodeDialog.close();});
+customCodeDialog.addEventListener("cancel",event=>{if(saving)event.preventDefault();});
+customCodeForm.addEventListener("submit",async event=>{
+  event.preventDefault();if(!site || site.imported || saving)return;
+  const siteID=site.id,generation=publicationState(siteID).generation;
+  const payload={
+    headEnabled:customCodeForm.querySelector<HTMLInputElement>('[name="headEnabled"]')!.checked,
+    head:customCodeForm.querySelector<HTMLTextAreaElement>('[name="head"]')!.value,
+    bodyStartEnabled:customCodeForm.querySelector<HTMLInputElement>('[name="bodyStartEnabled"]')!.checked,
+    bodyStart:customCodeForm.querySelector<HTMLTextAreaElement>('[name="bodyStart"]')!.value,
+    bodyEndEnabled:customCodeForm.querySelector<HTMLInputElement>('[name="bodyEndEnabled"]')!.checked,
+    bodyEnd:customCodeForm.querySelector<HTMLTextAreaElement>('[name="bodyEnd"]')!.value,
+    publishAsIPNS:customCodeForm.querySelector<HTMLInputElement>('[name="publishAsIPNS"]')!.checked,
+    prewarmNewPost:customCodeForm.querySelector<HTMLInputElement>('[name="prewarmNewPost"]')!.checked,
+  };
+  const controls=Array.from(customCodeForm.querySelectorAll<HTMLInputElement|HTMLTextAreaElement|HTMLButtonElement>("input,textarea,button"));controls.forEach(control=>control.disabled=true);saving=true;updateView();
+  try{
+    const updated=await Library.updateSiteCustomCode(siteID,JSON.stringify(payload));
+    const selected=mergeSitePublication(sites.find(entry=>entry.id===siteID),updated,generation);
+    sitesRevision++;sites=sites.map(entry=>entry.id===siteID?selected:entry);if(site?.id===siteID)site=selected;
+    if(dialog.open){rememberDialog(customCodeDialog);$("#custom-code-result").textContent="已保存，正在重新发布站点。";}else customCodeDialog.close();
+    markLocalChange(siteID);void queuePublication(siteID);
+  }catch(error){$("#custom-code-result").textContent=`保存失败：${error instanceof Error ? error.message : String(error)}`;}
+  finally{controls.forEach(control=>control.disabled=false);saving=false;updateView();}
+});
 const deploymentDialog=$<HTMLDialogElement>("#deployment-dialog"),deploymentForm=$<HTMLFormElement>("#deployment-form"),deploymentKind=deploymentForm.querySelector<HTMLSelectElement>('[name="kind"]')!;
 let deploymentSiteID="",deploymentRevision=0,deploymentBusy=false,deploymentCurrent:{configured:boolean;name:string;server:string;autoDeploy:boolean;deleteRemote:boolean;pending:boolean;lastUrl:string}|null=null;
 function deploymentField(name:string){return deploymentForm.querySelector<HTMLInputElement>(`[name="${name}"]`)!;}

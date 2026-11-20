@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -58,6 +57,17 @@ func renderSiteTemplate(dir, name string, ctx map[string]any, site store.Site) (
 		if pos := strings.LastIndex(strings.ToLower(page), "</body>"); pos >= 0 {
 			extra := `<nav class="planet-social-extra" aria-label="Social links">` + missing.String() + `</nav>`
 			page = page[:pos] + extra + page[pos:]
+		}
+	}
+	if bodyStart := string(customCodeBodyStart(site)); bodyStart != "" && !strings.Contains(page, bodyStart) {
+		if pos := strings.Index(strings.ToLower(page), "<body>"); pos >= 0 {
+			insert := pos + len("<body>")
+			page = page[:insert] + bodyStart + page[insert:]
+		}
+	}
+	if bodyEnd := string(customCodeBodyEnd(site)); bodyEnd != "" && !strings.Contains(page, bodyEnd) {
+		if pos := strings.LastIndex(strings.ToLower(page), "</body>"); pos >= 0 {
+			page = page[:pos] + bodyEnd + page[pos:]
 		}
 	}
 	return page, nil
@@ -162,7 +172,7 @@ func renderWithTemplateSettings(dir string, site store.Site, articles []store.Ar
 		planet["plausibleEnabled"] = false
 	}
 	items := append([]store.Article{}, articles...)
-	sort.Slice(items, func(i, j int) bool { return items[i].Created.After(items[j].Created) })
+	sortSiteArticles(items)
 	rows := make([]map[string]any, 0, len(items))
 	byID := map[string]map[string]any{}
 	archive := map[string][]map[string]any{}
@@ -173,7 +183,11 @@ func renderWithTemplateSettings(dir string, site store.Site, articles []store.Ar
 		if err != nil {
 			return err
 		}
-		row := map[string]any{"id": a.ID, "link": articleLink(a), "title": a.Title, "content": a.Content, "contentRendered": html, "created": a.Created, "createdTimestamp": a.Created.Unix(), "modified": a.Modified, "attachments": a.Attachments, "articleReference": a.ArticleReference, "externalLink": a.ExternalLink, "articleType": a.ArticleType, "slug": a.Slug, "hasVideo": a.VideoFilename != "", "hasAudio": a.AudioFilename != "", "videoFilename": url.PathEscape(a.VideoFilename), "audioFilename": url.PathEscape(a.AudioFilename), "audioDuration": a.AudioDuration, "audioByteLength": a.AudioByteLength, "heroImage": nil, "tags": escapedTags(a.Tags)}
+		var pinnedVal any
+		if a.Pinned != nil {
+			pinnedVal = *a.Pinned
+		}
+		row := map[string]any{"id": a.ID, "link": articleLink(a), "title": a.Title, "content": a.Content, "contentRendered": html, "created": a.Created, "createdTimestamp": a.Created.Unix(), "modified": a.Modified, "pinned": pinnedVal, "attachments": a.Attachments, "articleReference": a.ArticleReference, "externalLink": a.ExternalLink, "articleType": a.ArticleType, "slug": a.Slug, "hasVideo": a.VideoFilename != "", "hasAudio": a.AudioFilename != "", "videoFilename": url.PathEscape(a.VideoFilename), "audioFilename": url.PathEscape(a.AudioFilename), "audioDuration": a.AudioDuration, "audioByteLength": a.AudioByteLength, "heroImage": nil, "tags": escapedTags(a.Tags)}
 		if metadata.Name == "Platinum" || metadata.Name == "Sepia" {
 			// These pinned templates escape article tag labels explicitly.
 			row["tags"] = a.Tags
@@ -222,7 +236,7 @@ func renderWithTemplateSettings(dir string, site store.Site, articles []store.Ar
 		navigation = append(navigation, map[string]any{"id": n.ID, "title": title, "slug": n.Slug, "externalLink": n.ExternalLink, "weight": n.Weight})
 	}
 	_, podcastErr := os.Stat(filepath.Join(dir, "podcast.xml"))
-	context := map[string]any{"planet": planet, "articles": rows, "assets_prefix": "./", "page_title": site.Name, "page_description": site.About, "page_description_html": aboutHTML, "article_summary": "", "current_item_type": "index", "site_navigation": navigation, "template_settings": map[string]any{}, "user_settings": userSettings, "og_image_url": ogImage, "style_css_sha256": cssHash, "custom_code_head": "", "custom_code_body_start": "", "custom_code_body_end": "", "total_pages": 1, "current_page": 1, "has_avatar": hasAvatar, "has_podcast": podcastErr == nil}
+	context := map[string]any{"planet": planet, "articles": rows, "assets_prefix": "./", "page_title": site.Name, "page_description": site.About, "page_description_html": aboutHTML, "article_summary": "", "current_item_type": "index", "site_navigation": navigation, "template_settings": map[string]any{}, "user_settings": userSettings, "og_image_url": ogImage, "style_css_sha256": cssHash, "custom_code_head": string(customCodeHead(site)), "custom_code_body_start": string(customCodeBodyStart(site)), "custom_code_body_end": string(customCodeBodyEnd(site)), "total_pages": 1, "current_page": 1, "has_avatar": hasAvatar, "has_podcast": podcastErr == nil}
 	if buildTimestamp != "" {
 		context["build_timestamp"] = buildTimestamp
 	}

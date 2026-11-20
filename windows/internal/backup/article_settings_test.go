@@ -61,3 +61,40 @@ func TestDefaultNativeBackupRemainsCompatibleWithExistingRebuildChecks(t *testin
 		t.Fatalf("default native backup no longer rebuilds: %v; %s", err, b)
 	}
 }
+
+func TestNativeBackupIncludesPinnedCustomCodeAndPublishFlags(t *testing.T) {
+	const siteID = "11111111-1111-4111-8111-111111111111"
+	const articleID = "22222222-2222-4222-8222-222222222222"
+	now := time.Now().UTC()
+	pubFalse := false
+	prewarmFalse := false
+	site := store.Site{
+		ID:                    siteID,
+		Name:                  "Site",
+		Created:               now,
+		CustomCodeHeadEnabled: true,
+		CustomCodeHead:        "<meta name=\"x\" content=\"1\">",
+		PublishAsIPNS:         &pubFalse,
+		PrewarmNewPost:        &prewarmFalse,
+	}
+	article := store.Article{ID: articleID, SiteID: siteID, Title: "Pinned", Content: "Body", Created: now, Modified: now, Pinned: &now, NavigationWeight: 1}
+	b, err := Merge(nil, site, []store.Article{article})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		CustomHeadEnabled bool   `json:"customCodeHeadEnabled"`
+		CustomHead        string `json:"customCodeHead"`
+		PublishAsIPNS     *bool  `json:"publishAsIPNS"`
+		PrewarmNewPost    *bool  `json:"prewarmNewPost"`
+		Articles          []struct {
+			Pinned *float64 `json:"pinned"`
+		} `json:"articles"`
+	}
+	if err := json.Unmarshal(b, &got); err != nil {
+		t.Fatal(err)
+	}
+	if !got.CustomHeadEnabled || got.CustomHead == "" || got.PublishAsIPNS == nil || *got.PublishAsIPNS || got.PrewarmNewPost == nil || *got.PrewarmNewPost || len(got.Articles) != 1 || got.Articles[0].Pinned == nil {
+		t.Fatalf("unexpected merged backup: %s", b)
+	}
+}

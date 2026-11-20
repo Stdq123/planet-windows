@@ -111,3 +111,49 @@ func (s *Store) UpdateArticleSettings(siteID, articleID, slug string, articleTyp
 	}
 	return Article{}, errors.New("文章不存在")
 }
+
+// SetArticlePinned pins or unpins a local article and marks the site for publication.
+func (s *Store) SetArticlePinned(siteID, articleID string, pinned bool) (Article, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var site *Site
+	for i := range s.data.Sites {
+		if s.data.Sites[i].ID == siteID && !s.data.Sites[i].Removed && !s.data.Sites[i].DeletionPending {
+			site = &s.data.Sites[i]
+			break
+		}
+	}
+	if site == nil {
+		return Article{}, errors.New("站点不存在")
+	}
+	if site.Imported {
+		return Article{}, errors.New("导入站点暂不支持修改文章设置")
+	}
+	if site.ContentRevision == ^uint64(0) {
+		return Article{}, errors.New("站点修订版本已达到上限")
+	}
+	next := s.data
+	next.Articles = append([]Article{}, s.data.Articles...)
+	for i, article := range next.Articles {
+		if article.SiteID != siteID || article.ID != articleID {
+			continue
+		}
+		if (article.Pinned != nil) == pinned {
+			return cloneArticle(article), nil
+		}
+		now := time.Now().UTC()
+		if pinned {
+			article.Pinned = &now
+		} else {
+			article.Pinned = nil
+		}
+		article.Modified = now
+		next.Articles[i] = article
+		markContentChange(&next, siteID, true)
+		if err := s.write(next); err != nil {
+			return Article{}, err
+		}
+		return cloneArticle(article), nil
+	}
+	return Article{}, errors.New("文章不存在")
+}

@@ -52,3 +52,25 @@ test("article settings focus native, custom and server field errors and clear th
   error="自定义路径与其他文章冲突";submit();await waitFor(()=>calls===3 && !slug.disabled);
   window.document.querySelector<HTMLButtonElement>("#close-article-settings")!.click();open.click();expect(form.querySelector('[aria-invalid="true"]')).toBeNull();expect(result.textContent).toBe("");
 });
+
+test("pinning an article calls SetArticlePinned and sorts pinned articles first",async()=>{
+  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});
+  const site={id:"site",name:"Site",about:"",created:"2026-01-01T00:00:00Z"};
+  const older={id:"older",siteId:"site",title:"Older Post",content:"Body 1",created:"2026-01-01T00:00:00Z",modified:"2026-01-01T00:00:00Z",tags:{}};
+  const newer={id:"newer",siteId:"site",title:"Newer Post",content:"Body 2",created:"2026-01-02T00:00:00Z",modified:"2026-01-02T00:00:00Z",tags:{}};
+  let pinCall:any[]=[];
+  (globalThis as any).mygo={call:async(method:string,...args:any[])=>{switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":return [];case "Library.Articles":return [newer,older];case "Library.PreviewArticle":return "Body";case "Library.UpdateArticleSettings":return older;case "Library.SetArticlePinned":pinCall=args;return {...older,pinned:"2026-01-03T00:00:00Z"};case "Library.PublishSite":return {cid:"test",ipns:"test"};default:throw new Error(method);}}};
+  await import("../src/main.ts?article-pinning"); enterFirstSite(window);await waitFor(()=>window.document.querySelectorAll(".article-item").length===2);
+  const itemsBefore=Array.from(window.document.querySelectorAll<HTMLButtonElement>(".article-item"));
+  expect(itemsBefore[0]!.textContent).toContain("Newer Post");
+  itemsBefore[1]!.click();
+  window.document.querySelector<HTMLButtonElement>("#article-settings")!.click();
+  const form=window.document.querySelector<HTMLFormElement>("#article-settings-form")!;
+  form.querySelector<HTMLInputElement>('[name="pinned"]')!.checked=true;
+  form.dispatchEvent(new window.Event("submit",{cancelable:true}));
+  await waitFor(()=>pinCall.length>0);
+  expect(pinCall).toEqual(["site","older",true]);
+  const itemsAfter=Array.from(window.document.querySelectorAll<HTMLButtonElement>(".article-item"));
+  expect(itemsAfter[0]!.textContent).toContain("Older Post");
+  expect(itemsAfter[0]!.textContent).toContain("置顶");
+});
