@@ -15,6 +15,7 @@ import (
 	"windows/internal/backup"
 	"windows/internal/feeds"
 	"windows/internal/preview"
+	"windows/internal/siteimage"
 )
 
 type Node interface {
@@ -98,6 +99,7 @@ func Fetch(node Node, address string, pin bool) (Result, error) {
 	}
 	base := &url.URL{Scheme: "https", Host: "ipfs.io", Path: "/ipns/" + name + "/"}
 	feed := feeds.Feed{Title: planet.Name, Description: planet.About, Link: base.String(), Items: []feeds.Item{}}
+	feed.IconPNG = readPlanetIcon(node, cid, basePath)
 	for _, a := range planet.Articles {
 		if !articleID.MatchString(a.ID) || len(a.ID) > 128 {
 			return Result{}, errors.New("文章标识无效")
@@ -152,4 +154,21 @@ func Fetch(node Node, address string, pin bool) (Result, error) {
 		}
 	}
 	return Result{Feed: feed, CID: cid}, nil
+}
+
+func readPlanetIcon(node Node, cid, basePath string) string {
+	for _, filename := range []string{"avatar.png", "favicon.ico"} {
+		iconPath := filename
+		if basePath != "" {
+			iconPath = basePath + "/" + filename
+		}
+		raw, err := node.Read(cid, iconPath)
+		if err != nil || len(raw) == 0 {
+			continue
+		}
+		if encoded, err := siteimage.NormalizeIcon(raw); err == nil && encoded != "" {
+			return encoded
+		}
+	}
+	return ""
 }

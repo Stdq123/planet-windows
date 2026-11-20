@@ -19,6 +19,7 @@ const $ = <T extends HTMLElement>(selector: string): T => {
   return element;
 };
 const sitesEl = $("#sites"), articlesEl = $("#articles");
+const defaultSubscriptionIcon = new URL("../resources/workspace/globe.svg", import.meta.url).href;
 const siteTitle = $("#site-title"), count = $("#post-count"), workspaceTitle = $("#workspace-title");
 const empty = $("#empty"), editor = $("#editor"), errorEl = $("#error"), saveState = $("#save-state");
 const title = $<HTMLInputElement>("#title"), content = $<HTMLTextAreaElement>("#content");
@@ -406,11 +407,44 @@ function canLeave() { return !saving && (!dirty || window.confirm("当前文章�
 function label(tag: string, value: string, className: string) {
   const el = document.createElement(tag); el.className = className; el.textContent = value; return el;
 }
-function articleRow(title: string, date: string, content: string, selected = false, source = ""): HTMLButtonElement {
+function subscriptionIconElement(iconPng: string | undefined, className: string): HTMLElement {
+  if (iconPng) {
+    const image = document.createElement("img");
+    image.className = `${className} site-avatar subscription-icon`;
+    image.alt = "";
+    image.src = `data:image/png;base64,${iconPng}`;
+    return image;
+  }
+  const fallback = document.createElement("span");
+  fallback.className = `${className} subscription-icon subscription-icon-fallback`;
+  fallback.setAttribute("aria-hidden", "true");
+  const glyph = document.createElement("img");
+  glyph.className = "subscription-fallback-glyph";
+  glyph.alt = "";
+  glyph.src = defaultSubscriptionIcon;
+  fallback.append(glyph);
+  return fallback;
+}
+function fillIconSlot(slot: HTMLElement, iconPng: string | undefined) {
+  slot.replaceChildren();
+  slot.classList.add("subscription-icon");
+  slot.classList.toggle("subscription-icon-fallback", !iconPng);
+  const image = document.createElement("img");
+  image.className = iconPng ? "subscription-slot-image" : "subscription-fallback-glyph";
+  image.alt = "";
+  image.src = iconPng ? `data:image/png;base64,${iconPng}` : defaultSubscriptionIcon;
+  slot.append(image);
+}
+function articleRow(title: string, date: string, content: string, selected = false, source = "", subscriptionSource = false, sourceIconPng?: string): HTMLButtonElement {
   const button=document.createElement("button"); button.className=`article-item${selected ? " active" : ""}`;
   button.setAttribute("aria-pressed", String(selected));
   const heading=document.createElement("span"); heading.className="article-row-heading";
-  if (source) { const icon=label("span",Array.from(source.trim())[0] || "P","article-source-icon"); icon.setAttribute("aria-hidden","true"); heading.append(icon,label("span",source,"article-source")); }
+  if (source) {
+    const icon = subscriptionSource
+      ? subscriptionIconElement(sourceIconPng, "article-source-icon")
+      : (() => { const el = label("span", Array.from(source.trim())[0] || "P", "article-source-icon"); el.setAttribute("aria-hidden", "true"); return el; })();
+    heading.append(icon, label("span", source, "article-source"));
+  }
   heading.append(label("span",date,"article-date"));
   const excerpt=content.slice(0,2000).replace(/<[^>]*>/g," ").replace(/!?\[([^\]]*)\]\([^)]*\)/g,"$1").replace(/(^|\s)[#>*_`~-]+/g,"$1").replace(/\s+/g," ").trim();
   button.append(heading, label("span",title || "无标题","article-title"));
@@ -434,8 +468,7 @@ function renderSubscriptions() {
     const button = document.createElement("button"); button.className = `site-item${!favoritesView && !smartView && entry.url === subscription?.url ? " active" : ""}`;
     button.setAttribute("aria-pressed", String(!favoritesView && !smartView && entry.url === subscription?.url));
     const sourceName=entry.feed.title || entry.url;
-    const icon=label("span", Array.from(sourceName.trim())[0] || "P", "site-icon"); icon.setAttribute("aria-hidden","true");
-    button.append(icon, label("span", sourceName, "site-name"));
+    button.append(subscriptionIconElement(entry.feed.iconPng, "site-icon"), label("span", sourceName, "site-name"));
     const unread = entry.feed.items.filter(item => !item.read).length;
     if (unread) { const badge = label("span", String(unread), "subscription-count"); badge.setAttribute("aria-label", `${unread} 篇未读`); button.append(badge); }
     if (entry.lastError) { const warning=label("span", "!", "site-error"); warning.setAttribute("aria-label", "更新失败"); button.append(warning); }
@@ -456,7 +489,7 @@ function renderArticles() {
     count.textContent=String(entries.length);
     if(!entries.length) articlesEl.append(label("p",smartView==="unread" ? "没有未读文章" : "今天没有文章","list-empty"));
     for(const {source,entry} of entries) {
-      const button=articleRow(entry.title,formatPublishedDate(entry.published || ""),entry.description || entry.content || "",source.url===subscription?.url && (entry.key || entry.id || entry.link)===(item?.key || item?.id || item?.link),source.feed.title || source.url);
+      const button=articleRow(entry.title,formatPublishedDate(entry.published || ""),entry.description || entry.content || "",source.url===subscription?.url && (entry.key || entry.id || entry.link)===(item?.key || item?.id || item?.link),source.feed.title || source.url,true,source.feed.iconPng);
       button.classList.toggle("unread",!entry.read);
       button.addEventListener("click",()=>{subscription=source;site=null;selectFeedItem(entry);});articlesEl.append(button);
     }
@@ -466,14 +499,14 @@ function renderArticles() {
     articlesEl.replaceChildren(); const favorites = subscriptions.flatMap(source => source.feed.items.filter(entry => entry.starred).map(entry => ({source,entry})));
     count.textContent = String(favorites.length);
     if (!favorites.length) articlesEl.append(label("p", "还没有收藏的文章", "list-empty"));
-    for (const favorite of favorites) { const button=articleRow(favorite.entry.title, formatPublishedDate(favorite.entry.published || ""), favorite.entry.description || favorite.entry.content || "", favorite.source.url===subscription?.url && favorite.entry===item, favorite.source.feed.title || favorite.source.url); button.addEventListener("click",()=>{subscription=favorite.source; site=null; selectFeedItem(favorite.entry);}); articlesEl.append(button); }
+    for (const favorite of favorites) { const button=articleRow(favorite.entry.title, formatPublishedDate(favorite.entry.published || ""), favorite.entry.description || favorite.entry.content || "", favorite.source.url===subscription?.url && favorite.entry===item, favorite.source.feed.title || favorite.source.url, true, favorite.source.feed.iconPng); button.addEventListener("click",()=>{subscription=favorite.source; site=null; selectFeedItem(favorite.entry);}); articlesEl.append(button); }
     return;
   }
   if (subscription) {
     articlesEl.replaceChildren(); count.textContent = String(subscription.feed.items.length);
     if (!subscription.feed.items.length) articlesEl.append(label("p", "订阅暂时没有文章", "list-empty"));
     for (const entry of subscription.feed.items) {
-      const button = articleRow(entry.title, formatPublishedDate(entry.published || ""), entry.description || entry.content || "", entry === item, subscription.feed.title || subscription.url);
+      const button = articleRow(entry.title, formatPublishedDate(entry.published || ""), entry.description || entry.content || "", entry === item, subscription.feed.title || subscription.url, true, subscription.feed.iconPng);
       button.classList.toggle("unread",!entry.read);
       button.addEventListener("click", () => selectFeedItem(entry)); articlesEl.append(button);
     }
@@ -598,11 +631,10 @@ function updateView() {
   empty.hidden = editing || !!item || ownReading; editor.hidden = !editing; reader.hidden = !item; ownReader.hidden=!ownReading;
   if(ownReading && article){$("#own-reader-title").textContent=article.title || "无标题";$("#own-reader-date").textContent=new Date(article.modified).toLocaleDateString("zh-CN");$("#own-reader-source").textContent=site?.name || "我的站点";$("#own-reader-author").textContent=site?.authorName || site?.name || "我的站点";}
   if(subscription){$("#reader-source").textContent=subscription.feed.title || subscription.url;$("#reader-author").textContent=subscription.feed.title || subscription.url;}
-  for (const container of [ownReader, reader]) {
-    const source=container.querySelector<HTMLElement>(".reader-category > span:last-child")?.textContent || "P";
-    const initial=Array.from(source.trim())[0] || "P";
-    container.querySelectorAll<HTMLElement>(".reader-source-icon, .reader-author-avatar").forEach(icon=>{icon.textContent=initial;});
-  }
+  const ownSource = ownReader.querySelector<HTMLElement>(".reader-category > span:last-child")?.textContent || "P";
+  const ownInitial = Array.from(ownSource.trim())[0] || "P";
+  ownReader.querySelectorAll<HTMLElement>(".reader-source-icon, .reader-author-avatar").forEach(icon=>{icon.textContent=ownInitial;});
+  reader.querySelectorAll<HTMLElement>(".reader-source-icon, .reader-author-avatar").forEach(icon=>{fillIconSlot(icon, subscription?.feed.iconPng);});
   workspaceTitle.textContent = subscription ? "阅读订阅" : smartView === "today" ? "今天" : smartView === "unread" ? "未读文章" : favoritesView ? "收藏的文章" : editing ? "撰写文章" : ownReading ? "阅读文章" : site?.name ?? "欢迎来到 Planet";
   siteAddress.hidden = !site?.ipns || !!subscription; siteAddress.textContent = site?.ipns ? `IPNS: ${site.ipns}` : ""; siteAddress.title = site?.ipns ?? "";
   publishedAddress.hidden = !site?.ipns || !site?.lastPublishedCID || !!subscription;

@@ -1,8 +1,16 @@
 package follow
 
 import (
+	"bytes"
+	"encoding/binary"
+	"errors"
+	"image"
+	"image/color"
+	"image/png"
 	"strings"
 	"testing"
+
+	"windows/internal/siteimage"
 )
 
 type fakeNode struct {
@@ -78,20 +86,74 @@ func TestFollowUnicodeAndSubdirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if node.readCID != "bafytest" || node.readPath != "folder/site/planet.json" || node.pinned != "bafytest" || result.CID != "bafytest" || result.Feed.Items[0].ContentPath != "folder/site" {
+	if node.readCID != "bafytest" || len(node.readPaths) == 0 || node.readPaths[0] != "folder/site/planet.json" || node.pinned != "bafytest" || result.CID != "bafytest" || result.Feed.Items[0].ContentPath != "folder/site" {
 		t.Fatalf("result=%+v node=%+v", result, node)
 	}
 }
 
 type pathNode struct {
-	data                      []byte
-	readCID, readPath, pinned string
+	data            []byte
+	files           map[string][]byte
+	readCID, pinned string
+	readPaths       []string
 }
 
 func (n *pathNode) Resolve(string) (string, error) { return "bafytest/folder/site", nil }
 func (n *pathNode) Read(cid, path string) ([]byte, error) {
 	n.readCID = cid
-	n.readPath = path
+	n.readPaths = append(n.readPaths, path)
+	if n.files != nil {
+		if b, ok := n.files[path]; ok {
+			return b, nil
+		}
+		return nil, errors.New("not found")
+	}
 	return n.data, nil
 }
 func (n *pathNode) Pin(cid string) error { n.pinned = cid; return nil }
+
+func TestFollowReadsPlanetAvatarAndFaviconFallback(t *testing.T) {
+	var pngBuf bytes.Buffer
+	img := image.NewNRGBA(image.Rect(0, 0, 32, 32))
+	img.SetNRGBA(0, 0, color.NRGBA{R: 10, G: 120, B: 220, A: 255})
+	if err := png.Encode(&pngBuf, img); err != nil {
+		t.Fatal(err)
+	}
+	meta := []byte(`{"name":"Planet","articles":[]}`)
+
+	avatarNode := &pathNode{files: map[string][]byte{
+		"folder/site/planet.json": meta,
+		"folder/site/avatar.png":  pngBuf.Bytes(),
+	}}
+	res, err := Fetch(avatarNode, "alice.eth", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, _, err := siteimage.DecodePNG(res.Feed.IconPNG)
+	if err != nil || decoded.Bounds().Dx() != 32 {
+		t.Fatalf("avatar icon failed: err=%v", err)
+	}
+
+	header := make([]byte, 22)
+	binary.LittleEndian.PutUint16(header[2:4], 1)
+	binary.LittleEndian.PutUint16(header[4:6], 1)
+	header[6], header[7] = 32, 32
+	binary.LittleEndian.PutUint16(header[10:12], 1)
+	binary.LittleEndian.PutUint16(header[12:14], 32)
+	binary.LittleEndian.PutUint32(header[14:18], uint32(pngBuf.Len()))
+	binary.LittleEndian.PutUint32(header[18:22], 22)
+	ico := append(header, pngBuf.Bytes()...)
+
+	faviconNode := &pathNode{files: map[string][]byte{
+		"folder/site/planet.json": meta,
+		"folder/site/favicon.ico": ico,
+	}}
+	res, err = Fetch(faviconNode, "alice.eth", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, _, err = siteimage.DecodePNG(res.Feed.IconPNG)
+	if err != nil || decoded.Bounds().Dx() != 32 {
+		t.Fatalf("favicon fallback failed: err=%v", err)
+	}
+}

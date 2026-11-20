@@ -1,13 +1,18 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 
 	"github.com/egoist/mygo"
+	"windows/internal/siteimage"
 )
 
 func TestFollowHomepageRefreshPreservesReadingState(t *testing.T) {
@@ -82,4 +87,44 @@ func TestLiveFollowOlividaHomepage(t *testing.T) {
 		t.Fatalf("subscription was not persisted: %v", err)
 	}
 	t.Logf("Followed %s: title=%q items=%d first=%q", sub.URL, sub.Feed.Title, len(sub.Feed.Items), sub.Feed.Items[0].Title)
+}
+
+func TestFollowHomepageFetchesAndPersistsSiteIcon(t *testing.T) {
+	mygo.App.SetPath(mygo.PathUserData, t.TempDir())
+	t.Cleanup(func() { mygo.App.SetPath(mygo.PathUserData, "") })
+	img := image.NewNRGBA(image.Rect(0, 0, 32, 32))
+	img.SetNRGBA(0, 0, color.NRGBA{R: 25, G: 130, B: 230, A: 255})
+	var iconBuf bytes.Buffer
+	if err := png.Encode(&iconBuf, img); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/":
+			w.Header().Set("Content-Type", "text/html")
+			fmt.Fprint(w, `<!doctype html><head><link rel="apple-touch-icon" href="/avatar.png"><link rel="alternate" type="application/rss+xml" href="/rss.xml"></head>`)
+		case "/rss.xml":
+			fmt.Fprint(w, `<rss version="2.0"><channel><title>Icon Site</title><item><guid>1</guid><title>Hello</title></item></channel></rss>`)
+		case "/avatar.png":
+			w.Header().Set("Content-Type", "image/png")
+			_, _ = w.Write(iconBuf.Bytes())
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	lib := &Library{}
+	sub, err := lib.Follow(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, _, err := siteimage.DecodePNG(sub.Feed.IconPNG)
+	if err != nil || decoded.Bounds().Dx() != 32 {
+		t.Fatalf("expected persisted 32x32 icon, err=%v", err)
+	}
+	saved, err := (&Library{}).Subscriptions()
+	if err != nil || len(saved) != 1 || saved[0].Feed.IconPNG != sub.Feed.IconPNG {
+		t.Fatalf("saved subscription icon mismatch: %v", err)
+	}
 }

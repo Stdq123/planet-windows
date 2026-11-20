@@ -26,6 +26,8 @@ func TestFetchDiscoversAdvertisedFeeds(t *testing.T) {
 					fmt.Fprintf(w, "<!doctype html><html><head>%s</head><body>Home</body></html>", tc.head)
 				case "/rss.xml":
 					fmt.Fprint(w, tc.body)
+				case "/favicon.ico":
+					http.NotFound(w, r)
 				default:
 					t.Errorf("unexpected request: %s", r.URL)
 					http.NotFound(w, r)
@@ -94,6 +96,8 @@ func TestFetchDiscoverySkipsUnsafeDuplicateAndBrokenLinks(t *testing.T) {
 			fmt.Fprint(w, "not a feed")
 		case "/rss.xml":
 			fmt.Fprint(w, discoveryRSS)
+		case "/favicon.ico":
+			http.NotFound(w, r)
 		default:
 			t.Errorf("unexpected request: %s", r.URL)
 			http.NotFound(w, r)

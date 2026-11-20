@@ -18,6 +18,7 @@ import (
 
 	"windows/internal/feeds"
 	"windows/internal/services"
+	"windows/internal/siteimage"
 )
 
 type PlausibleTracking struct {
@@ -1069,6 +1070,11 @@ func (s *Store) SaveOfflineSubscription(address string, feed feeds.Feed, snapsho
 	return s.saveSubscription(address, feed, nil, "", &snapshot)
 }
 func (s *Store) saveSubscription(address string, feed feeds.Feed, cid *string, pinnedCID string, offlineSnapshot *string) (Subscription, error) {
+	if feed.IconPNG != "" {
+		if _, _, err := siteimage.DecodePNG(feed.IconPNG); err != nil {
+			feed.IconPNG = ""
+		}
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	feed.Items = append([]feeds.Item{}, feed.Items...)
@@ -1092,6 +1098,9 @@ func (s *Store) saveSubscription(address string, feed feeds.Feed, cid *string, p
 	found := false
 	for i, item := range next.Subscriptions {
 		if item.URL == address {
+			if subscription.Feed.IconPNG == "" && item.Feed.IconPNG != "" {
+				subscription.Feed.IconPNG = item.Feed.IconPNG
+			}
 			if offlineSnapshot == nil {
 				subscription.OfflinePinned = item.OfflinePinned
 				subscription.OfflineSnapshot = item.OfflineSnapshot

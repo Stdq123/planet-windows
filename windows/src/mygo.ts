@@ -97,6 +97,7 @@ export interface Feed {
   title: string;
   description: string;
   link: string;
+  iconPng?: string;
   items: Item[];
 }
 
