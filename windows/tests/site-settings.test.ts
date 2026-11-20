@@ -210,3 +210,24 @@ test("reader supports related articles, local AI chat, and TTS speech player",as
   window.document.querySelector<HTMLFormElement>("#ai-chat-form")!.dispatchEvent(new window.Event("submit",{cancelable:true}));
   await waitFor(()=>aiAsked && window.document.querySelectorAll(".ai-chat-bubble").length===2);
 });
+
+test("local REST API console loads status, saves config, and displays request logs",async()=>{
+  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});
+  let savedArgs:any[]=[];
+  (globalThis as any).mygo={call:async(method:string,...args:any[])=>{switch(method){
+    case "Library.Sites":case "Library.Subscriptions":case "Library.Articles":return [];
+    case "Library.LocalAPIStatus":return {running:false,enabled:false,port:8086,authEnabled:false,username:"Planet",hasPasscode:false,logs:[]};
+    case "Library.ConfigureLocalAPI":savedArgs=args;return {running:true,enabled:true,port:8086,authEnabled:true,username:"Planet",hasPasscode:true,logs:[{time:"00:55:00",method:"GET",path:"/v0/ping",status:200,durationMs:1}]};
+    default:throw new Error(method);
+  }}};
+  await import("../src/main.ts?local-api-console");
+  window.document.querySelector<HTMLButtonElement>("#show-local-api")!.click();
+  await waitFor(()=>window.document.querySelector<HTMLDialogElement>("#local-api-dialog")!.open);
+  window.document.querySelector<HTMLInputElement>("#local-api-enabled")!.checked=true;
+  window.document.querySelector<HTMLInputElement>("#local-api-auth")!.checked=true;
+  window.document.querySelector<HTMLInputElement>("#local-api-passcode")!.value="pass123";
+  window.document.querySelector<HTMLFormElement>("#local-api-form")!.dispatchEvent(new window.Event("submit",{cancelable:true}));
+  await waitFor(()=>savedArgs.length>0);
+  expect(savedArgs).toEqual([true,8086,true,"Planet","pass123"]);
+  expect(window.document.querySelector("#local-api-logs")?.textContent).toContain("/v0/ping");
+});

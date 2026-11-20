@@ -22,6 +22,7 @@ import (
 	"windows/internal/feeds"
 	"windows/internal/follow"
 	"windows/internal/ipfs"
+	"windows/internal/localapi"
 	"windows/internal/migration"
 	"windows/internal/offline"
 	"windows/internal/pinnable"
@@ -66,6 +67,32 @@ type Library struct {
 	updateWorkers       sync.WaitGroup
 	xPoster             services.XPoster
 	telegramAPI         services.TelegramAPI
+	apiMu               sync.Mutex
+	apiServer           *localapi.Server
+}
+
+func (l *Library) ensureAPIServer() *localapi.Server {
+	l.apiMu.Lock()
+	defer l.apiMu.Unlock()
+	if l.apiServer == nil {
+		l.apiServer = localapi.NewServer(localapi.Backend{
+			OpenStore: l.open,
+			PublishSite: func(siteID string) error {
+				_, err := l.PublishSite(siteID)
+				return err
+			},
+		})
+	}
+	return l.apiServer
+}
+
+func (l *Library) closeAPIServer() {
+	l.apiMu.Lock()
+	srv := l.apiServer
+	l.apiMu.Unlock()
+	if srv != nil {
+		_ = srv.Close()
+	}
 }
 
 func (l *Library) open() (*store.Store, error) {
@@ -1048,6 +1075,33 @@ func (l *Library) AskAI(prompt, contextTitle, contextBody, historyJSON string) (
 	}
 	msgs = append(msgs, services.AIChatMessage{Role: "user", Content: prompt})
 	return services.ChatCompletion(root, msgs)
+}
+
+func (l *Library) LocalAPIStatus() (localapi.Status, error) {
+	root, err := mygo.App.Path(mygo.PathUserData)
+	if err != nil {
+		return localapi.Status{}, err
+	}
+	return l.ensureAPIServer().Status(root)
+}
+
+func (l *Library) ConfigureLocalAPI(enabled bool, port int, authEnabled bool, username, passcode string) (localapi.Status, error) {
+	root, err := mygo.App.Path(mygo.PathUserData)
+	if err != nil {
+		return localapi.Status{}, err
+	}
+	if _, err := localapi.SaveConfig(root, enabled, port, authEnabled, username, passcode); err != nil {
+		return localapi.Status{}, err
+	}
+	srv := l.ensureAPIServer()
+	if err := srv.Sync(root); err != nil {
+		return localapi.Status{}, err
+	}
+	return srv.Status(root)
+}
+
+func (l *Library) ClearLocalAPILogs() {
+	l.ensureAPIServer().ClearLogs()
 }
 
 // OfflineMediaUsage reports managed feed-cache usage without modifying files.
@@ -2622,6 +2676,7 @@ func main() {
 	var maintenance sync.WaitGroup
 	mygo.Bind(library)
 	defer func() {
+		library.closeAPIServer()
 		library.closeUpdates()
 		cancelMaintenance()
 		maintenance.Wait()
@@ -2629,6 +2684,9 @@ func main() {
 		library.closeAudio()
 	}()
 	mygo.App.WhenReady(func() {
+		if root, err := mygo.App.Path(mygo.PathUserData); err == nil {
+			_ = library.ensureAPIServer().Sync(root)
+		}
 		maintenance.Add(1)
 		go func() { defer maintenance.Done(); library.maintainPublished(maintenanceCtx) }()
 		win := mygo.NewWindow(mygo.WindowOptions{
