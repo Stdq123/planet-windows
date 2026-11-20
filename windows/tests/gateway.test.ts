@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { gatewayURL, planetShareURL, selectedGateway, sitePublicURL } from "../src/gateway";
+import { gatewayURL, isRateLimitedGateway, planetShareURL, selectedGateway, sitePublicURL } from "../src/gateway";
 
 test("custom domain addresses use the chosen gateway for ENS and HTTPS for DNS",()=>{
   expect(sitePublicURL("eth.sucks","k51example","example.eth","/post/")).toBe("https://example.eth.sucks/post/");
@@ -30,6 +30,11 @@ test("unsupported names and stored preferences do not produce unsafe links", () 
   expect(() => gatewayURL("eth.sucks","QmLegacyIdentity")).toThrow();
   expect(() => gatewayURL("eth.sucks","k51example.attacker.test")).toThrow();
   expect(() => gatewayURL("aleph","../bad")).toThrow();
-  expect(selectedGateway("unknown")).toBe("ipfs.io");
-  expect(selectedGateway(null)).toBe("ipfs.io");
+  expect(selectedGateway("unknown")).toBe("eth.sucks");
+  expect(selectedGateway(null)).toBe("eth.sucks");
+  expect(selectedGateway("ipfs.io")).toBe("ipfs.io");
+  expect(isRateLimitedGateway("ipfs.io")).toBe(true);
+  expect(isRateLimitedGateway("dweb.link")).toBe(true);
+  expect(isRateLimitedGateway("eth.sucks")).toBe(false);
+  expect(isRateLimitedGateway("aleph")).toBe(false);
 });

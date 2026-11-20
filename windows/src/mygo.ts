@@ -133,6 +133,8 @@ export interface KuboStatus {
   rateIn: number;
   rateOut: number;
   gateway: string;
+  reachability?: string;
+  relayPeers?: number;
 }
 
 export interface OfflineAsset {
@@ -354,7 +356,10 @@ export const Library = {
   follow: bind<[string], Subscription>("Library.Follow", (address: string) => [address]),
   ipfsGarbageCollect: bind<[], void>("Library.IPFSGarbageCollect", () => []),
   ipfsRepoSize: bind<[], number>("Library.IPFSRepoSize", () => []),
-  /** IPFSStatus observes the existing daemon without waiting for an active operation. */
+  /**
+   * IPFSStatus observes the existing daemon concurrently without blocking behind
+   * active publish or subscription refresh operations.
+   */
   ipfsStatus: bind<[], KuboStatus>("Library.IPFSStatus", () => []),
   /** ImportPlanet imports a selected original .planet folder. */
   importPlanet: bind<[], Site>("Library.ImportPlanet", () => []),

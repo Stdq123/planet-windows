@@ -143,13 +143,75 @@ body {
   grid-template-columns: 228px minmax(0, 1fr);
 }
 
-/* Unified subtle scrollbars */
+/* Unified sleek macOS overlay-style scrollbars (avoid scrollbar-width so Chromium/WebView2 uses ::-webkit-scrollbar without arrow buttons) */
 .sidebar-scroll,
 .articles,
 .dashboard,
-.dialog-body {
-  scrollbar-width: thin;
-  scrollbar-color: var(--mac-line) transparent;
+.dialog-body,
+.workspace-menu-content,
+.editor-metadata {
+  scrollbar-gutter: auto;
+  scrollbar-width: auto;
+}
+.sidebar-scroll::-webkit-scrollbar,
+.articles::-webkit-scrollbar,
+.dashboard::-webkit-scrollbar,
+.dialog-body::-webkit-scrollbar,
+.workspace-menu-content::-webkit-scrollbar,
+.editor-metadata::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.sidebar-scroll::-webkit-scrollbar-button,
+.articles::-webkit-scrollbar-button,
+.dashboard::-webkit-scrollbar-button,
+.dialog-body::-webkit-scrollbar-button,
+.workspace-menu-content::-webkit-scrollbar-button,
+.editor-metadata::-webkit-scrollbar-button {
+  display: none;
+}
+.sidebar-scroll::-webkit-scrollbar-track,
+.articles::-webkit-scrollbar-track,
+.dashboard::-webkit-scrollbar-track,
+.dialog-body::-webkit-scrollbar-track,
+.workspace-menu-content::-webkit-scrollbar-track,
+.editor-metadata::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb,
+.articles::-webkit-scrollbar-thumb,
+.dashboard::-webkit-scrollbar-thumb,
+.dialog-body::-webkit-scrollbar-thumb,
+.workspace-menu-content::-webkit-scrollbar-thumb,
+.editor-metadata::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.16);
+  border-radius: 99px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb:hover,
+.articles::-webkit-scrollbar-thumb:hover,
+.dashboard::-webkit-scrollbar-thumb:hover,
+.dialog-body::-webkit-scrollbar-thumb:hover,
+.workspace-menu-content::-webkit-scrollbar-thumb:hover,
+.editor-metadata::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.28);
+}
+@media (prefers-color-scheme: dark) {
+  .sidebar-scroll::-webkit-scrollbar-thumb,
+  .articles::-webkit-scrollbar-thumb,
+  .dashboard::-webkit-scrollbar-thumb,
+  .dialog-body::-webkit-scrollbar-thumb,
+  .workspace-menu-content::-webkit-scrollbar-thumb,
+  .editor-metadata::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.18);
+  }
+  .sidebar-scroll::-webkit-scrollbar-thumb:hover,
+  .articles::-webkit-scrollbar-thumb:hover,
+  .dashboard::-webkit-scrollbar-thumb:hover,
+  .dialog-body::-webkit-scrollbar-thumb:hover,
+  .workspace-menu-content::-webkit-scrollbar-thumb:hover,
+  .editor-metadata::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.32);
+  }
 }
 
 /* ==================== LEFT SIDEBAR ==================== */
@@ -465,7 +527,7 @@ body {
   padding: 0 14px;
   gap: 8px;
   align-items: center;
-  border-bottom: 0;
+  border-bottom: 1px solid var(--mac-line);
 }
 .posts-header > div:first-child {
   min-width: 0;
@@ -486,16 +548,17 @@ body {
 }
 
 .posts-caption {
-  min-height: 30px;
-  padding: 0 14px 6px;
-  gap: 10px;
-  border-bottom: 1px solid var(--mac-line);
+  min-height: 32px;
+  padding: 0 14px;
+  gap: 8px;
+  background: var(--mac-subtle);
+  border-bottom: 0.5px solid var(--mac-line);
   font: 400 11px/16px var(--mac-font);
   color: var(--mac-muted);
 }
 .posts-caption #posts-kind {
   height: auto;
-  font: 500 11px/16px var(--mac-font);
+  font: 600 11px/16px var(--mac-font);
   color: var(--mac-secondary);
 }
 .posts-caption #posts-kind::after {
@@ -504,10 +567,12 @@ body {
 .posts-caption #show-drafts {
   min-height: 22px;
   padding: 2px 8px;
+  border: 0.5px solid var(--mac-line);
   border-radius: 5px;
-  background: var(--mac-subtle);
+  background: var(--mac-surface);
   color: var(--mac-secondary);
   font: 500 11px/16px var(--mac-font);
+  box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.04);
 }
 .posts-caption #show-drafts:hover:not(:disabled) {
   background: var(--mac-hover);
@@ -515,22 +580,23 @@ body {
 }
 .posts-total {
   font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 .articles {
-  padding: 6px;
+  padding: 6px 8px;
 }
 
-/* Classic macOS Planet article list rows */
+/* Classic macOS Planet article list rows with dedicated left unread gutter */
 .article-item {
   position: relative;
   display: flex;
   flex-direction: column;
   gap: 3px;
   margin: 0;
-  padding: 10px 12px;
+  padding: 10px 12px 10px 22px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 7px;
   background: transparent;
   transition: background-color 80ms ease;
 }
@@ -538,7 +604,7 @@ body {
   content: "";
   position: absolute;
   top: 0;
-  left: 12px;
+  left: 22px;
   right: 12px;
   height: 0.5px;
   background: var(--mac-line);
@@ -591,12 +657,17 @@ body {
   color: var(--mac-muted);
 }
 
+/* macOS Mail/Planet style left-gutter unread dot (keeps all titles vertically aligned) */
 .article-item.unread .article-title::before {
+  content: none;
+}
+.article-item.unread::after {
   content: "";
-  display: inline-block;
+  position: absolute;
+  left: 8px;
+  top: 15px;
   width: 7px;
   height: 7px;
-  margin: 0 6px 1px 0;
   border-radius: 50%;
   background: var(--mac-accent);
 }
@@ -611,7 +682,7 @@ body {
 .article-item.active .article-date {
   color: var(--mac-list-selected-muted);
 }
-.article-item.active.unread .article-title::before {
+.article-item.active.unread::after {
   background: #ffffff;
 }
 
@@ -658,6 +729,7 @@ body {
   background: var(--mac-accent);
   border: 1px solid transparent;
   color: var(--mac-accent-ink);
+  box-shadow: 0 0.5px 1px rgba(0, 122, 255, 0.25);
 }
 .primary:hover:not(:disabled) {
   background: var(--mac-accent-hover);
@@ -669,14 +741,19 @@ body {
   background: var(--mac-surface);
   border: 0.5px solid var(--mac-control-line);
   color: var(--mac-ink);
+  box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.05);
 }
 .secondary:hover:not(:disabled) {
   background: var(--mac-hover);
+}
+.secondary:active:not(:disabled) {
+  background: var(--mac-active);
 }
 .secondary.danger {
   color: var(--mac-danger);
   border-color: var(--mac-danger-line);
   background: var(--mac-danger-surface);
+  box-shadow: none;
 }
 .secondary.danger:hover:not(:disabled) {
   background: var(--mac-danger-line);
@@ -684,8 +761,8 @@ body {
 
 /* ==================== READER & EDITOR ==================== */
 .reader .document-head {
-  width: min(100%, 780px);
-  padding: 32px 32px 0;
+  width: min(100%, 740px);
+  padding: 32px 36px 0;
 }
 .reader h2 {
   font: 700 28px/1.3 var(--mac-font);
@@ -704,6 +781,7 @@ body {
   height: 30px;
   min-height: 30px;
   border-radius: 6px;
+  box-shadow: none;
 }
 .reader-actions button:hover,
 .own-reader-actions button:hover {
@@ -714,21 +792,39 @@ body {
 #star-item::before { content: "\E734"; color: var(--mac-secondary); }
 #star-item[aria-pressed="true"]::before { content: "\E735"; color: var(--mac-yellow); }
 
+/* Align editor title, metadata pill, body and footer on ONE crisp rail */
+.editor:not([data-view="split"]) .document-head,
+.editor:not([data-view="split"]) .editor-controls,
+.editor:not([data-view="split"]) .editor-footer {
+  width: min(100%, 760px);
+  padding-inline: 32px;
+}
+.editor:not([data-view="split"]) .writing-grid {
+  width: min(calc(100% - 64px), 696px);
+}
 .editor-options {
   flex: 1;
   min-width: 0;
 }
 #toggle-metadata {
   display: inline-flex;
+  margin-left: 0;
   padding: 4px 10px;
   border-radius: 6px;
   background: var(--mac-subtle);
   border: 0.5px solid var(--mac-line);
   color: var(--mac-secondary);
+  box-shadow: none;
 }
 #toggle-metadata:hover {
   background: var(--mac-hover);
   color: var(--mac-ink);
+}
+.editor-metadata {
+  border-radius: 10px;
+  border: 0.5px solid var(--mac-line);
+  box-shadow: var(--mac-popover-shadow);
+  padding: 14px 16px;
 }
 .view-switch {
   padding: 2px;
@@ -765,6 +861,9 @@ body {
 }
 .dashboard-summary {
   border-bottom: 0.5px solid var(--mac-line);
+}
+.dashboard-summary > .dashboard-caption {
+  display: none;
 }
 .dashboard-row {
   border-bottom: 0.5px solid var(--mac-line);
@@ -818,36 +917,196 @@ dialog,
   box-shadow: var(--mac-shadow);
   font-family: var(--mac-font);
 }
+dialog .dialog-header,
+:is(#search-dialog, #site-dialog, #dashboard-compose-dialog) .dialog-header {
+  padding: 16px 22px 14px;
+  border-bottom: 0.5px solid var(--mac-line);
+}
+dialog .dialog-header h2,
+:is(#search-dialog, #site-dialog, #dashboard-compose-dialog) .dialog-header h2 {
+  font: 600 16px/22px var(--mac-font);
+  letter-spacing: -0.01em;
+}
+dialog .dialog-body,
+:is(#search-dialog, #site-dialog, #dashboard-compose-dialog) .dialog-body {
+  padding: 16px 22px 20px;
+}
+dialog textarea {
+  resize: none;
+}
+dialog input:not([type="checkbox"]):not([type="radio"]),
+dialog textarea,
+dialog select {
+  border-radius: 7px;
+  font-size: 13px;
+}
+dialog input:focus:not(:focus-visible),
+dialog textarea:focus:not(:focus-visible),
+dialog select:focus:not(:focus-visible) {
+  outline: none;
+}
 .dialog-body > p:last-child {
   margin-bottom: 0;
 }
-dialog .dialog-actions {
+dialog .dialog-actions,
+:is(#search-dialog, #site-dialog, #dashboard-compose-dialog) .dialog-actions,
+#ipfs-status-dialog .dialog-actions {
+  padding: 12px 22px;
   background: var(--pw-footer);
   border-top: 0.5px solid var(--mac-line);
 }
 
-/* Grouped site configuration links inside Site Settings dialog */
+/* macOS Inset Grouped Settings List inside Site Settings dialog */
 .site-more-settings {
-  margin-top: 20px;
+  margin-top: 18px;
   padding-top: 16px;
   border-top: 0.5px solid var(--mac-line);
   display: grid;
   gap: 14px;
 }
 .site-settings-group h3 {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
+  padding-left: 10px;
   font: 600 11px/16px var(--mac-font);
   color: var(--mac-muted);
 }
 .site-settings-links {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-direction: column;
+  border: 0.5px solid var(--mac-line);
+  border-radius: 9px;
+  background: var(--mac-subtle);
+  overflow: hidden;
 }
 .site-settings-links button {
-  min-height: 28px;
-  padding: 4px 10px;
-  font: 400 12px/18px var(--mac-font);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--mac-ink);
+  font: 400 13px/18px var(--mac-font);
+  text-align: left;
+}
+.site-settings-links button + button::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 0;
+  height: 0.5px;
+  background: var(--mac-line);
+}
+.site-settings-links button::after {
+  content: "›";
+  font-size: 16px;
+  line-height: 1;
+  color: var(--mac-muted);
+  opacity: 0.7;
+}
+.site-settings-links button:hover:not(:disabled) {
+  background: var(--mac-hover);
+}
+.site-settings-links button:disabled {
+  color: var(--mac-muted);
+  opacity: 0.55;
+}
+
+/* Compact, HIG-aligned IPFS Status Dialog */
+#ipfs-status-dialog {
+  width: min(490px, calc(100vw - 40px));
+}
+#ipfs-status-message {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 12px;
+  font: 500 12px/18px var(--mac-font);
+  color: var(--mac-ink);
+}
+#ipfs-status-message::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mac-green);
+  flex: none;
+}
+#ipfs-status-message[data-state="local"]::before {
+  background: #e69500;
+}
+#ipfs-status-message[data-state="offline"]::before {
+  background: var(--mac-muted);
+}
+#ipfs-reachability[data-reachability="direct"] {
+  color: var(--mac-green);
+  font-weight: 500;
+}
+#ipfs-reachability[data-reachability="relay"] {
+  color: var(--mac-accent);
+  font-weight: 500;
+}
+#ipfs-reachability[data-reachability="local"] {
+  color: #b25e09;
+  font-weight: 500;
+}
+.ipfs-stats {
+  border-radius: 9px;
+  border: 0.5px solid var(--mac-line);
+  background: var(--mac-subtle);
+}
+.ipfs-stats div {
+  padding: 8px 12px;
+  font-size: 12px;
+}
+.ipfs-stats div + div {
+  border-top: 0.5px solid var(--mac-line);
+}
+#ipfs-open-site {
+  color: var(--mac-accent);
+  font-weight: 500;
+}
+.ipfs-resource {
+  margin-top: 12px;
+}
+.ipfs-resource input {
+  height: 34px;
+  padding: 0 10px;
+}
+.ipfs-resource a.secondary {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 12px;
+}
+.ipfs-traffic {
+  margin-top: 12px;
+  border: 0.5px solid var(--mac-line);
+  border-radius: 9px;
+}
+.ipfs-traffic-heading {
+  padding: 7px 12px;
+  background: var(--mac-subtle);
+}
+#ipfs-chart {
+  height: 70px;
+}
+#ipfs-chart-empty {
+  top: 42px;
+}
+.ipfs-status-note {
+  margin-top: 10px !important;
+  font-size: 11px;
+}
+#ipfs-status-dialog #ipfs-gc {
+  margin-right: auto;
 }
 
 /* Subtle divider before destructive items in the slim workspace menu */
