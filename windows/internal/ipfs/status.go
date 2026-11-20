@@ -1,6 +1,7 @@
 package ipfs
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -78,26 +79,67 @@ func (c *Client) postRPC(timeout time.Duration, endpoint string, maxBytes int64,
 }
 
 func postRPCAPI(api string, timeout time.Duration, endpoint string, maxBytes int64, target any) error {
+	return postRPCAPIContext(context.Background(), api, timeout, endpoint, maxBytes, target)
+}
+
+func postRPCAPIContext(parent context.Context, api string, timeout time.Duration, endpoint string, maxBytes int64, target any) error {
 	if !loopbackAPI.MatchString(api) {
 		return errors.New("Kubo API 地址无效")
 	}
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(parent, timeout)
+	defer cancel()
 	port := strings.TrimPrefix(api, "/ip4/127.0.0.1/tcp/")
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://127.0.0.1:"+port+endpoint, nil)
+	if err != nil {
+		return err
+	}
 	client := http.Client{
-		Timeout:       timeout,
 		Transport:     &http.Transport{Proxy: nil},
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
 	defer client.CloseIdleConnections()
-	response, err := client.Post("http://127.0.0.1:"+port+endpoint, "application/json", nil)
+	response, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("Kubo RPC %s 失败: HTTP %d", endpoint, response.StatusCode)
+		return formatRPCError(endpoint, response.StatusCode, response.Body)
 	}
-	if err := json.NewDecoder(io.LimitReader(response.Body, maxBytes)).Decode(target); err != nil {
+	if target == nil {
+		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, maxBytes))
+		return nil
+	}
+	b, err := io.ReadAll(io.LimitReader(response.Body, maxBytes+1))
+	if err != nil {
+		return fmt.Errorf("无法读取 Kubo 响应: %w", err)
+	}
+	if int64(len(b)) > maxBytes {
+		return errors.New("Kubo 响应超过大小限制")
+	}
+	if err := json.Unmarshal(b, target); err != nil {
 		return fmt.Errorf("无法读取 Kubo 状态: %w", err)
 	}
 	return nil
+}
+
+func formatRPCError(endpoint string, statusCode int, body io.Reader) error {
+	path := endpoint
+	if i := strings.IndexByte(path, '?'); i >= 0 {
+		path = path[:i]
+	}
+	b, _ := io.ReadAll(io.LimitReader(body, 64<<10))
+	var rpcErr struct {
+		Message string `json:"Message"`
+	}
+	if json.Unmarshal(b, &rpcErr) == nil && strings.TrimSpace(rpcErr.Message) != "" {
+		return fmt.Errorf("Kubo RPC %s 失败 (HTTP %d): %s", path, statusCode, strings.TrimSpace(rpcErr.Message))
+	}
+	if text := strings.TrimSpace(string(b)); text != "" {
+		return fmt.Errorf("Kubo RPC %s 失败 (HTTP %d): %s", path, statusCode, text)
+	}
+	return fmt.Errorf("Kubo RPC %s 失败: HTTP %d", path, statusCode)
 }
