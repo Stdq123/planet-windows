@@ -883,15 +883,68 @@ async function queuePublication(siteID: string, manual = false) {
     } while (state.pending);
   } finally { state.running = false; updateView(); if (isDashboard()) void dashboard.refresh(); }
 }
-$("#new-site").addEventListener("click", () => { if (canLeave()) { navigationRevision++; editingSiteID=""; form.reset(); $("#site-index-setting").hidden=true;$("#site-avatar-setting").hidden=true;$("#site-identity-settings").hidden=true;$("#site-more-settings").hidden=true;$("#site-avatar-result").textContent="";$("#site-settings-result").textContent=""; form.querySelector("h2")!.textContent="创建站点";$("#site-dialog-description").textContent="为你的新空间起个名字。"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="创建站点"; openDialog(dialog); } });
+const siteSettingsNav = $<HTMLElement>("#site-settings-nav");
+const siteSettingsMain = $<HTMLElement>("#site-settings-main");
+const siteNavItems = Array.from(siteSettingsNav.querySelectorAll<HTMLButtonElement>(".site-nav-item"));
+function setActiveSiteNav(targetId: string) {
+  for (const item of siteNavItems) {
+    const active = item.dataset.target === targetId;
+    item.classList.toggle("is-active", active);
+    if (active) item.setAttribute("aria-current", "true");
+    else item.removeAttribute("aria-current");
+  }
+}
+function updateSiteNavSummary(currentSite: Site | null) {
+  $("#site-nav-name").textContent = currentSite?.name || "";
+  $("#site-nav-kind").textContent = currentSite ? (currentSite.imported ? "已导入站点" : "本地站点") : "";
+  const navAvatar = $("#site-nav-avatar");
+  navAvatar.replaceChildren();
+  if (currentSite?.avatarPng) {
+    const img = document.createElement("img");
+    img.src = `data:image/png;base64,${currentSite.avatarPng}`;
+    img.alt = "";
+    navAvatar.append(img);
+  } else {
+    const icon = document.createElement("span");
+    icon.className = "system-icon";
+    icon.textContent = "\uE774";
+    navAvatar.append(icon);
+  }
+}
+for (const item of siteNavItems) {
+  item.addEventListener("click", () => {
+    const targetId = item.dataset.target;
+    if (!targetId) return;
+    setActiveSiteNav(targetId);
+    const section = document.getElementById(targetId);
+    if (section && typeof section.scrollIntoView === "function") {
+      section.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  });
+}
+siteSettingsMain.addEventListener("scroll", () => {
+  if (dialog.dataset.mode !== "edit") return;
+  const top = siteSettingsMain.scrollTop + 48;
+  let activeId = siteNavItems[0]?.dataset.target ?? "site-section-general";
+  for (const item of siteNavItems) {
+    const targetId = item.dataset.target;
+    if (!targetId) continue;
+    const section = document.getElementById(targetId);
+    if (section && section.offsetTop - siteSettingsMain.offsetTop <= top) activeId = targetId;
+  }
+  setActiveSiteNav(activeId);
+});
+$("#close-site-x").addEventListener("click", () => { $("#cancel-site").click(); });
+$("#new-site").addEventListener("click", () => { if (canLeave()) { navigationRevision++; editingSiteID=""; dialog.dataset.mode="create"; siteSettingsNav.hidden=true; form.reset(); $("#site-index-setting").hidden=true;$("#site-avatar-setting").hidden=true;$("#site-identity-settings").hidden=true;$("#site-more-settings").hidden=true;$("#site-avatar-result").textContent="";$("#site-settings-result").textContent=""; form.querySelector("h2")!.textContent="创建站点";$("#site-dialog-description").textContent="为你的新空间起个名字。"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="创建站点"; siteSettingsMain.scrollTop=0; openDialog(dialog); } });
 function updateSiteAvatarPreview(value?:string) {
   const image=$<HTMLImageElement>("#site-avatar-preview");image.hidden=!value;$("#site-avatar-placeholder").hidden=!!value;
   if(value)image.src=`data:image/png;base64,${value}`;else image.removeAttribute("src");
   $<HTMLButtonElement>("#remove-site-avatar").disabled=!value || saving;
+  if (site && site.id === editingSiteID) updateSiteNavSummary({ ...site, avatarPng: value });
 }
 editSite.addEventListener("click", () => {
   if (!site || saving) return;
-  editingSiteID=site.id; form.reset();$("#site-settings-result").textContent="";
+  editingSiteID=site.id; dialog.dataset.mode="edit"; siteSettingsNav.hidden=false; form.reset();$("#site-settings-result").textContent="";
   form.querySelector<HTMLInputElement>('input[name="name"]')!.value=site.name;
   form.querySelector<HTMLTextAreaElement>('textarea[name="about"]')!.value=site.about;
   form.querySelector<HTMLInputElement>('input[name="doNotIndex"]')!.checked=!!site.doNotIndex;
@@ -901,7 +954,10 @@ editSite.addEventListener("click", () => {
   $("#site-identity-settings").hidden=!!site.imported;
   $("#site-more-settings").hidden=false;
   $("#site-avatar-setting").hidden=!!site.imported;$("#site-avatar-result").textContent="";updateSiteAvatarPreview(site.avatarPng);
+  updateSiteNavSummary(site);
+  setActiveSiteNav("site-section-general");
   form.querySelector("h2")!.textContent="站点设置";$("#site-dialog-description").textContent="站点信息保存后需重新发布；头像选择后会自动发布。"; form.querySelector<HTMLButtonElement>('button[type="submit"]')!.textContent="保存设置";
+  siteSettingsMain.scrollTop=0;
   openDialog(dialog);
 });
 async function changeSiteAvatar(remove:boolean) {

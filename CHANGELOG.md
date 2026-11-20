@@ -10,6 +10,7 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 ### Changed
 
+- Redesigned the Site Settings modal into a wide two-column desktop preferences layout with left section navigation (`基本资料`, `外观与资料`, `发布与固定`, `内容同步`), a top-right close button, two-column site identity inputs, and structured horizontal setting rows while keeping the Create Site modal compact.
 - Displayed each subscribed site's own icon or website favicon (from Planet `avatar.png` / `favicon.ico`, feed icons, HTML icon links, or `avatar.png` / `favicon.ico` fallbacks) in the sidebar and reading views, using a neutral website icon fallback instead of first-letter initials when no site icon is available.
 - Switched online IPNS publication (`name/publish`) from spawning `ipfs.exe` CLI subprocesses to Kubo's direct loopback HTTP RPC (`/api/v0/name/publish`) with proxy bypass, structured JSON/error parsing, context cancellation, and non-blocking execution relative to the command mutex.
 - Displayed each subscribed site's own icon or website favicon (from Planet `avatar.png` / `favicon.ico`, feed icons, HTML icon links, or `/favicon.ico`) in the sidebar and reading views, using a neutral website icon fallback instead of first-letter initials when no site icon is available.

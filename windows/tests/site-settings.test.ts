@@ -69,3 +69,32 @@ test("site setting errors associate native and known server failures without los
   window.document.querySelector<HTMLButtonElement>("#cancel-site")!.click();open.click();
   expect(slug.hasAttribute("aria-invalid")).toBe(false);expect(slug.getAttribute("aria-describedby")).toBe("site-slug-hint");expect(result.textContent).toBe("");
 });
+
+test("site settings uses wide two-column navigation in edit mode and compact layout in create mode",async()=>{
+  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});
+  let confirmCalls=0;window.confirm=()=>{confirmCalls++;return false;};
+  const site={id:"s",name:"My Planet",about:"About",created:"2026-01-01T00:00:00Z"};
+  (globalThis as any).mygo={call:async(method:string)=>{switch(method){case "Library.Sites":return [site];case "Library.Subscriptions":case "Library.Articles":return [];default:throw new Error(method);}}};
+  await import("../src/main.ts?site-settings-layout"); enterFirstSite(window);await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="My Planet");
+  const dialog=window.document.querySelector<HTMLDialogElement>("#site-dialog")!;
+  const nav=window.document.querySelector<HTMLElement>("#site-settings-nav")!;
+  window.document.querySelector<HTMLButtonElement>("#edit-site")!.click();
+  expect(dialog.dataset.mode).toBe("edit");
+  expect(nav.hidden).toBe(false);
+  expect(window.document.querySelector("#site-nav-name")?.textContent).toBe("My Planet");
+  const publishNav=window.document.querySelector<HTMLButtonElement>('.site-nav-item[data-target="site-section-publish"]')!;
+  publishNav.click();
+  expect(publishNav.classList.contains("is-active")).toBe(true);
+  expect(publishNav.getAttribute("aria-current")).toBe("true");
+  const nameInput=window.document.querySelector<HTMLInputElement>('#site-form input[name="name"]')!;
+  nameInput.value="Edited Name";
+  window.document.querySelector<HTMLButtonElement>("#close-site-x")!.click();
+  expect(confirmCalls).toBe(1);
+  expect(dialog.open).toBe(true);
+  window.confirm=()=>true;
+  window.document.querySelector<HTMLButtonElement>("#close-site-x")!.click();
+  expect(dialog.open).toBe(false);
+  window.document.querySelector<HTMLButtonElement>("#new-site")!.click();
+  expect(dialog.dataset.mode).toBe("create");
+  expect(nav.hidden).toBe(true);
+});
