@@ -167,3 +167,46 @@ test("avatar gallery applies preset avatar and toggles saveRoundAvatar, and arti
   window.document.querySelector<HTMLFormElement>("#avatar-gallery-form")!.dispatchEvent(new window.Event("submit",{cancelable:true}));
   await waitFor(()=>appliedKey==="NSTG-0001");
 });
+
+test("reader supports related articles, local AI chat, and TTS speech player",async()=>{
+  const window=new Window({url:"http://localhost/"});window.document.write(await Bun.file("index.html").text());Object.assign(globalThis,{window,document:window.document});
+  const site={id:"s",name:"My Planet",about:"About",created:"2026-01-01T00:00:00Z",imported:true};
+  const article={id:"a1",siteId:"s",title:"IPFS 去中心化发布",content:"通过 Kubo 与 IPNS 构建去中心化站点。",created:"2026-01-01T00:00:00Z",modified:"2026-01-01T00:00:00Z"};
+  let relatedCalled=false,aiAsked=false;
+  (globalThis as any).mygo={call:async(method:string,...args:any[])=>{switch(method){
+    case "Library.Sites":return [site];
+    case "Library.Subscriptions":return [];
+    case "Library.Articles":return [article];
+    case "Library.PreviewArticle":return "<p>通过 Kubo 与 IPNS 构建去中心化站点。</p>";
+    case "Library.RelatedArticles":relatedCalled=true;return [{title:"Kubo 节点指南",sourceName:"My Planet",snippet:"Kubo 配置",siteId:"s",articleId:"a1"}];
+    case "Library.AIConfig":return {baseUrl:"http://localhost:11434/v1",model:"qwen2.5:7b",hasKey:false};
+    case "Library.AskAI":aiAsked=true;expect(args[0]).toBe("这篇文章讲了什么？");return "本文介绍了如何使用 Kubo 和 IPNS 发布去中心化网站。";
+    default:throw new Error(method);
+  }}};
+  await import("../src/main.ts?related-ai-tts"); enterFirstSite(window);await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="My Planet");
+  // Imported site settings are unlocked
+  expect(window.document.querySelector<HTMLButtonElement>("#site-profile")!.disabled).toBe(false);
+  window.document.querySelector<HTMLButtonElement>(".article-item")!.click();
+  await waitFor(()=>!window.document.querySelector<HTMLElement>("#own-reader")!.hidden);
+  expect(window.document.querySelector<HTMLButtonElement>("#article-settings")!.disabled).toBe(false);
+
+  // TTS Speech Player
+  window.document.querySelector<HTMLButtonElement>("#speak-own-article")!.click();
+  const speechBar=window.document.querySelector<HTMLElement>("#speech-player")!;
+  expect(speechBar.hidden).toBe(false);
+  expect(window.document.querySelector("#speech-title")?.textContent).toContain("IPFS 去中心化发布");
+  window.document.querySelector<HTMLButtonElement>("#speech-stop")!.click();
+  expect(speechBar.hidden).toBe(true);
+
+  // Related Articles
+  window.document.querySelector<HTMLButtonElement>("#related-own-article")!.click();
+  await waitFor(()=>relatedCalled && window.document.querySelectorAll("#related-articles-results .article-item").length===1);
+  window.document.querySelector<HTMLButtonElement>("#close-related-articles")!.click();
+
+  // Local AI Chat
+  window.document.querySelector<HTMLButtonElement>("#chat-own-article")!.click();
+  await waitFor(()=>window.document.querySelector<HTMLDialogElement>("#ai-dialog")!.open);
+  window.document.querySelector<HTMLInputElement>("#ai-chat-input")!.value="这篇文章讲了什么？";
+  window.document.querySelector<HTMLFormElement>("#ai-chat-form")!.dispatchEvent(new window.Event("submit",{cancelable:true}));
+  await waitFor(()=>aiAsked && window.document.querySelectorAll(".ai-chat-bubble").length===2);
+});

@@ -35,9 +35,6 @@ func (s *Store) UpdateSiteCustomCode(siteID string, cfg SiteCustomCode) (Site, e
 		if site.ID != siteID || site.Removed || site.DeletionPending {
 			continue
 		}
-		if site.Imported {
-			return Site{}, errors.New("导入站点暂不支持修改自定义代码或发布偏好")
-		}
 		if site.CustomCodeHeadEnabled == cfg.HeadEnabled &&
 			site.CustomCodeHead == cfg.Head &&
 			site.CustomCodeBodyStartEnabled == cfg.BodyStartEnabled &&

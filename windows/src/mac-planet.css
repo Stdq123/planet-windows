@@ -1501,6 +1501,39 @@ dialog .dialog-actions,
   text-align: center;
 }
 
+/* AI Assistant Dialog */
+.ai-chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  min-height: 120px;
+  overflow-y: auto;
+  padding: 10px;
+  margin: 8px 0;
+  border: 0.5px solid var(--mac-line);
+  border-radius: 8px;
+  background: var(--mac-subtle);
+}
+.ai-chat-bubble {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.ai-chat-bubble[data-role="user"] {
+  align-self: flex-end;
+  background: var(--mac-accent);
+  color: var(--mac-accent-ink);
+}
+.ai-chat-bubble[data-role="assistant"] {
+  align-self: flex-start;
+  background: var(--mac-surface);
+  color: var(--mac-ink);
+  border: 0.5px solid var(--mac-line);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     transition-duration: 0.01ms !important;

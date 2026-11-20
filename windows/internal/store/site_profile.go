@@ -91,9 +91,6 @@ func (s *Store) UpdateSiteProfile(siteID string, p SiteProfile) (Site, error) {
 		if site.ID != siteID || site.Removed || site.DeletionPending {
 			continue
 		}
-		if site.Imported {
-			return Site{}, errors.New("导入站点暂不支持修改域名或社交资料")
-		}
 		if site.Domain == p.Domain && site.TwitterUsername == p.TwitterUsername && site.GithubUsername == p.GithubUsername && site.TelegramUsername == p.TelegramUsername && site.MastodonUsername == p.MastodonUsername && site.DiscordLink == p.DiscordLink {
 			return cloneSite(*site), nil
 		}

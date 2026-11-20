@@ -31,9 +31,6 @@ func (s *Store) UpdateSiteDetails(siteID, name, about string, doNotIndex bool, s
 		if site.ID != siteID || site.Removed || site.DeletionPending {
 			continue
 		}
-		if site.Imported {
-			return Site{}, errors.New("导入站点暂不支持修改站点标识或作者")
-		}
 		if site.Name == name && site.About == about && site.DoNotIndex == doNotIndex && site.Slug == slug && site.AuthorName == author {
 			return cloneSite(*site), nil
 		}

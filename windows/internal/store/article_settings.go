@@ -77,9 +77,6 @@ func (s *Store) UpdateArticleSettings(siteID, articleID, slug string, articleTyp
 	if site == nil {
 		return Article{}, errors.New("站点不存在")
 	}
-	if site.Imported {
-		return Article{}, errors.New("导入站点暂不支持修改文章设置")
-	}
 	if site.ContentRevision == ^uint64(0) {
 		return Article{}, errors.New("站点修订版本已达到上限")
 	}
@@ -125,9 +122,6 @@ func (s *Store) SetArticlePinned(siteID, articleID string, pinned bool) (Article
 	}
 	if site == nil {
 		return Article{}, errors.New("站点不存在")
-	}
-	if site.Imported {
-		return Article{}, errors.New("导入站点暂不支持修改文章设置")
 	}
 	if site.ContentRevision == ^uint64(0) {
 		return Article{}, errors.New("站点修订版本已达到上限")

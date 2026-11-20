@@ -21,9 +21,6 @@ func (s *Store) SetSiteAvatar(siteID, avatar string) (Site, error) {
 		if site.ID != siteID || site.Removed || site.DeletionPending {
 			continue
 		}
-		if site.Imported {
-			return Site{}, errors.New("导入站点暂不支持修改头像")
-		}
 		if avatar != "" && site.SaveRoundAvatar {
 			cropped, err := siteimage.CircleCropPNG(avatar)
 			if err != nil {
@@ -58,9 +55,6 @@ func (s *Store) SetSaveRoundAvatar(siteID string, round bool) (Site, error) {
 		site := &next.Sites[i]
 		if site.ID != siteID || site.Removed || site.DeletionPending {
 			continue
-		}
-		if site.Imported {
-			return Site{}, errors.New("导入站点暂不支持修改头像")
 		}
 		nextAvatar := site.AvatarPNG
 		if round && nextAvatar != "" {

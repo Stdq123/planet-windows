@@ -4,6 +4,18 @@ import { bind } from "mygo-runtime";
 
 // ---- Types ----
 
+export interface AIConfig {
+  baseUrl: string;
+  model: string;
+  hasKey: boolean;
+}
+
+export interface AIProbeResult {
+  ollamaDetected: boolean;
+  lmStudioDetected: boolean;
+  models: string[];
+}
+
 export interface Article {
   id: string;
   siteId: string;
@@ -192,6 +204,9 @@ export interface SearchResult {
   articleId?: string;
   subscriptionUrl?: string;
   itemKey?: string;
+  relevanceScore?: number;
+  bm25Score?: number;
+  vectorScore?: number;
 }
 
 export interface ServiceInfo {
@@ -324,6 +339,7 @@ export interface XSyncPostInfo {
 
 /** Library exposes the local authoring functions to the application window. */
 export const Library = {
+  aiConfig: bind<[], AIConfig>("Library.AIConfig", () => []),
   /** AddAttachment copies a selected local file into a saved Windows article. */
   addAttachment: bind<[string, string], Article>("Library.AddAttachment", (siteID: string, articleID: string) => [siteID, articleID]),
   addAttachmentBytes: bind<[string, string, string, string], Article>("Library.AddAttachmentBytes", (siteID: string, articleID: string, name: string, dataBase64: string) => [siteID, articleID, name, dataBase64]),
@@ -332,6 +348,7 @@ export const Library = {
   applyBuiltinTemplate: bind<[string, string], Site>("Library.ApplyBuiltinTemplate", (siteID: string, id: string) => [siteID, id]),
   applyPresetAvatar: bind<[string, string], Site>("Library.ApplyPresetAvatar", (siteID: string, key: string) => [siteID, key]),
   articles: bind<[string], Article[]>("Library.Articles", (siteID: string) => [siteID]),
+  askAI: bind<[string, string, string, string], string>("Library.AskAI", (prompt: string, contextTitle: string, contextBody: string, historyJSON: string) => [prompt, contextTitle, contextBody, historyJSON]),
   /** AudioURL provides a revocable loopback stream for the selected article audio. */
   audioURL: bind<[string, string], string>("Library.AudioURL", (siteID: string, articleID: string) => [siteID, articleID]),
   builtinTemplatePreview: bind<[string], string>("Library.BuiltinTemplatePreview", (id: string) => [id]),
@@ -340,6 +357,7 @@ export const Library = {
   checkUpdates: bind<[], UpdateCheckInfo>("Library.CheckUpdates", () => []),
   /** CleanupOfflineMedia removes only files no saved article or active player references. */
   cleanupOfflineMedia: bind<[], Usage>("Library.CleanupOfflineMedia", () => []),
+  configureAI: bind<[string, string, string], AIConfig>("Library.ConfigureAI", (baseURL: string, model: string, token: string) => [baseURL, model, token]),
   /** ConfigureDeployment stores a target locally; credentials never enter backups. */
   configureDeployment: bind<[string, string, string, string, string, boolean, boolean], void>("Library.ConfigureDeployment", (siteID: string, kind: string, name: string, server: string, token: string, auto: boolean, deleteRemote: boolean) => [siteID, kind, name, server, token, auto, deleteRemote]),
   /**
@@ -403,6 +421,7 @@ export const Library = {
   previewArticle: bind<[string, string, string], string>("Library.PreviewArticle", (siteID: string, articleID: string, content: string) => [siteID, articleID, content]),
   /** PreviewDraft supports both private new files and the original article's files. */
   previewDraft: bind<[string, string, string], string>("Library.PreviewDraft", (siteID: string, draftID: string, content: string) => [siteID, draftID, content]),
+  probeAI: bind<[string], AIProbeResult>("Library.ProbeAI", (baseURL: string) => [baseURL]),
   publishDraft: bind<[string, string, string, string], Article>("Library.PublishDraft", (siteID: string, draftID: string, title: string, content: string) => [siteID, draftID, title, content]),
   publishDraftWithTags: bind<[string, string, string, string, string], Article>("Library.PublishDraftWithTags", (siteID: string, draftID: string, title: string, content: string, tagsJSON: string) => [siteID, draftID, title, content, tagsJSON]),
   /** PublishSite publishes the saved snapshot; Kubo is started only on request. */
@@ -412,6 +431,7 @@ export const Library = {
    * queued before removal must not recreate the removed subscription.
    */
   refreshSubscription: bind<[string], Subscription>("Library.RefreshSubscription", (address: string) => [address]),
+  relatedArticles: bind<[string, string, string, string], SearchResult[]>("Library.RelatedArticles", (siteID: string, articleID: string, subscriptionURL: string, itemKey: string) => [siteID, articleID, subscriptionURL, itemKey]),
   /** RemoveAttachment removes a file previously added to a Windows article. */
   removeAttachment: bind<[string, string, string], Article>("Library.RemoveAttachment", (siteID: string, articleID: string, name: string) => [siteID, articleID, name]),
   removeDraftAttachment: bind<[string, string, string], Draft>("Library.RemoveDraftAttachment", (siteID: string, draftID: string, name: string) => [siteID, draftID, name]),

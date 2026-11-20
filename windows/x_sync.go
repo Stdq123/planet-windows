@@ -37,9 +37,6 @@ func (l *Library) xSyncSite(siteID string) (store.Site, []store.Article, string,
 	if err != nil {
 		return store.Site{}, nil, "", err
 	}
-	if site.Imported {
-		return store.Site{}, nil, "", errors.New("导入站点暂不支持 X 同步")
-	}
 	root, err := mygo.App.Path(mygo.PathUserData)
 	return site, articles, root, err
 }
@@ -211,9 +208,6 @@ func (l *Library) sendXArticle(root string, site store.Site, article store.Artic
 // syncPublishedX receives precisely the successful publication snapshot. X is
 // independent of IPNS success and never participates in the IPNS retry loop.
 func (l *Library) syncPublishedX(root string, site store.Site, articles []store.Article) string {
-	if site.Imported {
-		return ""
-	}
 	cfg, err := services.LoadConfig(root, site.ID, "x")
 	if err != nil {
 		return "无法读取 X 同步配置：" + err.Error()

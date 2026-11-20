@@ -48,6 +48,7 @@
             <button type="button" id="import-planet" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE8B5;</span>导入 .planet 备份</button>
             <button type="button" id="show-removed-sites" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE74D;</span>已移除的站点</button>
             <button type="button" id="offline-storage" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE8B7;</span>离线媒体空间</button>
+            <button type="button" id="show-ai-settings" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE99A;</span>AI 助手与设置</button>
             <button type="button" id="show-updates" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE895;</span>检查更新</button>
             <label class="gateway-setting" for="public-gateway">公共网关<select id="public-gateway"><option value="eth.sucks">eth.sucks（推荐）</option><option value="aleph">Aleph Cloud</option><option value="ipfs.io">IPFS.io（易限流）</option><option value="dweb.link">dweb.link（易限流）</option></select></label>
             <div class="sidebar-footer"><span class="system-icon" aria-hidden="true">&#xE770;</span><span>本地工作区</span><span class="version"></span></div>
@@ -151,8 +152,9 @@
         <div class="writing-grid"><section id="writing-pane" class="writing-pane"><div class="pane-label">编辑 <span>MARKDOWN</span></div><label class="sr-only" for="content">文章内容</label><textarea id="content" placeholder="从这里开始写作…" spellcheck="false"></textarea></section><section id="preview-pane" class="preview-pane" hidden><div class="pane-label">预览 <span>LIVE PREVIEW</span></div><iframe id="preview" sandbox="" title="文章预览"></iframe></section></div>
         <div class="editor-footer">草稿仅保存在本机；保存并发布会公开整个站点及其附件。</div>
       </div>
-      <div id="own-reader" class="reader" hidden><div class="document-head"><div class="reader-category"><span class="reader-source-icon" aria-hidden="true">P</span><span id="own-reader-source"></span></div><h2 id="own-reader-title"></h2><div class="reader-meta"><span class="reader-author-avatar" aria-hidden="true">P</span><div class="reader-byline"><strong id="own-reader-author"></strong><div id="own-reader-date" class="document-meta"></div></div><div class="own-reader-actions"><button id="play-own-audio" class="secondary" type="button" aria-label="播放音频" title="播放音频" hidden>播放音频</button><button id="share-own-article" class="secondary" type="button" aria-label="复制链接" title="复制链接">复制链接</button><button id="article-settings" class="secondary" type="button" aria-label="文章设置" title="文章设置">文章设置</button><button id="edit-article" class="secondary" type="button" aria-label="编辑文章" title="编辑文章">编辑文章</button></div></div><input id="own-share-url" readonly hidden aria-label="文章分享链接"/><span id="own-share-status" role="status"></span></div><iframe id="own-reader-preview" sandbox="" title="本地文章"></iframe></div>
-      <div id="reader" class="reader" hidden><div class="document-head"><div class="reader-category"><span class="reader-source-icon" aria-hidden="true"></span><span id="reader-source"></span></div><h2 id="reader-title"></h2><div class="reader-meta"><span class="reader-author-avatar" aria-hidden="true"></span><div class="reader-byline"><strong id="reader-author"></strong><div class="document-meta" id="reader-date"></div></div><div class="reader-actions"><button id="play-feed-audio" class="secondary" aria-label="播放音频" title="播放音频" hidden>播放音频</button><button id="play-feed-video" class="secondary" aria-label="播放视频" title="播放视频" hidden>播放视频</button><button id="toggle-read" class="secondary">标为未读</button><button id="star-item" class="secondary">收藏</button><button id="share-item" class="secondary" aria-label="复制链接" title="复制链接">复制链接</button></div></div><div id="subscription-status" class="subscription-status"></div><input id="share-url" readonly hidden aria-label="文章分享链接"/><span id="share-status" role="status"></span></div><iframe id="reader-preview" sandbox="" title="订阅文章"></iframe></div>
+      <div id="own-reader" class="reader" hidden><div class="document-head"><div class="reader-category"><span class="reader-source-icon" aria-hidden="true">P</span><span id="own-reader-source"></span></div><h2 id="own-reader-title"></h2><div class="reader-meta"><span class="reader-author-avatar" aria-hidden="true">P</span><div class="reader-byline"><strong id="own-reader-author"></strong><div id="own-reader-date" class="document-meta"></div></div><div class="own-reader-actions"><button id="play-own-audio" class="secondary" type="button" aria-label="播放音频" title="播放音频" hidden>播放音频</button><button id="speak-own-article" class="secondary" type="button" aria-label="朗读文章" title="朗读文章">朗读</button><button id="chat-own-article" class="secondary" type="button" aria-label="AI 问答" title="针对本文 AI 问答">AI 问答</button><button id="related-own-article" class="secondary" type="button" aria-label="相关文章" title="查找相关文章">相关文章</button><button id="share-own-article" class="secondary" type="button" aria-label="复制链接" title="复制链接">复制链接</button><button id="article-settings" class="secondary" type="button" aria-label="文章设置" title="文章设置">文章设置</button><button id="edit-article" class="secondary" type="button" aria-label="编辑文章" title="编辑文章">编辑文章</button></div></div><input id="own-share-url" readonly hidden aria-label="文章分享链接"/><span id="own-share-status" role="status"></span></div><iframe id="own-reader-preview" sandbox="" title="本地文章"></iframe></div>
+      <div id="reader" class="reader" hidden><div class="document-head"><div class="reader-category"><span class="reader-source-icon" aria-hidden="true"></span><span id="reader-source"></span></div><h2 id="reader-title"></h2><div class="reader-meta"><span class="reader-author-avatar" aria-hidden="true"></span><div class="reader-byline"><strong id="reader-author"></strong><div class="document-meta" id="reader-date"></div></div><div class="reader-actions"><button id="play-feed-audio" class="secondary" aria-label="播放音频" title="播放音频" hidden>播放音频</button><button id="play-feed-video" class="secondary" aria-label="播放视频" title="播放视频" hidden>播放视频</button><button id="speak-feed-item" class="secondary" type="button" aria-label="朗读文章" title="朗读文章">朗读</button><button id="chat-feed-item" class="secondary" type="button" aria-label="AI 问答" title="针对本文 AI 问答">AI 问答</button><button id="related-feed-item" class="secondary" type="button" aria-label="相关文章" title="查找相关文章">相关文章</button><button id="toggle-read" class="secondary">标为未读</button><button id="star-item" class="secondary">收藏</button><button id="share-item" class="secondary" aria-label="复制链接" title="复制链接">复制链接</button></div></div><div id="subscription-status" class="subscription-status"></div><input id="share-url" readonly hidden aria-label="文章分享链接"/><span id="share-status" role="status"></span></div><iframe id="reader-preview" sandbox="" title="订阅文章"></iframe></div>
+      <section id="speech-player" class="audio-player" aria-label="语音朗读状态栏" hidden><span id="speech-title"></span><button id="speech-pause-resume" class="secondary" type="button">暂停</button><select id="speech-rate" aria-label="朗读语速"><option value="0.8">0.8x</option><option value="1" selected>1.0x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option></select><button id="speech-stop" class="secondary" type="button">停止朗读</button></section>
       <section id="audio-player" class="audio-player" aria-label="全局音频播放器" hidden><span id="audio-title"></span><button id="audio-back" class="secondary" aria-label="后退 10 秒">−10 秒</button><audio id="global-audio" controls preload="metadata"></audio><video id="global-video" controls preload="metadata" hidden></video><button id="audio-forward" class="secondary" aria-label="前进 10 秒">+10 秒</button><button id="close-audio" class="secondary" aria-label="关闭播放器">关闭</button></section>
       <div id="error" class="error" role="alert" hidden></div>
     </main>
@@ -176,6 +178,33 @@
     <p>下载完成后关闭 Planet，再运行已验证的安装包。</p>
     <div class="dialog-actions"><button id="close-updates" type="button" class="secondary">关闭</button><button type="submit" class="secondary">保存设置</button><button id="check-updates" type="button" class="secondary" disabled>检查更新</button><button id="download-update" type="button" class="primary" disabled>下载已验证安装包</button><button id="reveal-update" type="button" class="secondary" hidden>在文件夹中显示</button></div>
   </form></dialog>
+  <dialog id="related-articles-dialog" aria-labelledby="related-articles-title">
+    <h2 id="related-articles-title">相关文章</h2>
+    <p id="related-articles-status" role="status">正在查找语义相关文章…</p>
+    <div id="related-articles-results" aria-label="相关文章列表"></div>
+    <div class="dialog-actions"><button type="button" id="close-related-articles" class="secondary">关闭</button></div>
+  </dialog>
+  <dialog id="ai-dialog" aria-labelledby="ai-dialog-title">
+    <h2 id="ai-dialog-title">AI 助手与本地模型设置</h2>
+    <details id="ai-settings-details">
+      <summary>OpenAI 兼容端点配置（支持本地 Ollama / LM Studio）</summary>
+      <form id="ai-settings-form">
+        <label>API Base URL<input id="ai-base-url" name="baseUrl" placeholder="http://localhost:11434/v1 或 http://localhost:1234/v1" /></label>
+        <div id="ai-local-detect" class="pinnable-actions"><button type="button" id="use-ollama-btn" class="secondary" hidden>使用本机 Ollama</button><button type="button" id="use-lmstudio-btn" class="secondary" hidden>使用本机 LM Studio</button><button type="button" id="probe-ai-btn" class="secondary">探测服务与模型</button></div>
+        <label>首选模型<input id="ai-model-input" name="model" placeholder="例如 llama3、qwen2.5 或 claude-sonnet-4-6" /></label>
+        <label>API 令牌（本机模型可留空，公网服务加密保存）<input id="ai-token-input" name="token" type="password" autocomplete="off" /></label>
+        <p id="ai-settings-result" role="status"></p>
+        <div class="dialog-actions"><button type="submit" class="primary">保存 AI 配置</button></div>
+      </form>
+    </details>
+    <p id="ai-chat-context" role="status"></p>
+    <div id="ai-chat-messages" class="ai-chat-messages" aria-live="polite"></div>
+    <form id="ai-chat-form">
+      <label for="ai-chat-input">提问</label>
+      <input id="ai-chat-input" placeholder="针对当前文章或本地库提问…" autocomplete="off" />
+      <div class="dialog-actions"><button type="button" id="clear-ai-chat" class="secondary">清空对话</button><button type="button" id="close-ai-dialog" class="secondary">关闭</button><button type="submit" id="send-ai-chat" class="primary">发送</button></div>
+    </form>
+  </dialog>
   <script type="module" src="./src/main.ts"></script>
 </body>
 </html>
