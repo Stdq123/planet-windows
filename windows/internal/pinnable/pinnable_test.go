@@ -1,8 +1,10 @@
 package pinnable
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -120,6 +122,59 @@ func TestEndpointIsProtectedAtRestAndCanBeRemoved(t *testing.T) {
 	}
 }
 
+func TestPushRecordSendsMultipartAndValidatesSizeAndStatus(t *testing.T) {
+	var gotRecord []byte
+	var gotContentType string
+	statusCode := http.StatusAccepted
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/pin/test/record" {
+			http.NotFound(w, r)
+			return
+		}
+		gotContentType = r.Header.Get("Content-Type")
+		file, _, err := r.FormFile("record")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+		gotRecord, _ = io.ReadAll(file)
+		w.WriteHeader(statusCode)
+	}))
+	defer server.Close()
+
+	c := newClient(server.Client())
+	endpoint := server.URL + "/pin/test"
+	record := []byte("signed-ipns-record")
+
+	if err := c.pushRecord(endpoint, record); err != nil {
+		t.Fatalf("pushRecord 202 failed: %v", err)
+	}
+	if !bytes.Equal(gotRecord, record) || !strings.HasPrefix(gotContentType, "multipart/form-data;") {
+		t.Fatalf("unexpected multipart payload: record=%q contentType=%q", gotRecord, gotContentType)
+	}
+
+	statusCode = http.StatusOK
+	if err := c.pushRecord(endpoint, record); err != nil {
+		t.Fatalf("pushRecord 200 failed: %v", err)
+	}
+
+	statusCode = http.StatusBadRequest
+	if err := c.pushRecord(endpoint, record); err == nil {
+		t.Fatal("pushRecord 400 was accepted")
+	}
+
+	if err := c.pushRecord(endpoint, nil); err == nil {
+		t.Fatal("empty record was accepted")
+	}
+	if err := c.pushRecord(endpoint, make([]byte, MaxRecordBytes+1)); err == nil {
+		t.Fatal("oversized record was accepted")
+	}
+	if err := c.PushRecord("http://pinnable.xyz/pin/test", record); err == nil {
+		t.Fatal("non-HTTPS endpoint was accepted")
+	}
+}
+
 type failingTransport struct{}
 
 func (failingTransport) RoundTrip(*http.Request) (*http.Response, error) {
@@ -127,7 +182,11 @@ func (failingTransport) RoundTrip(*http.Request) (*http.Response, error) {
 }
 func TestNetworkErrorsDoNotExposeEndpoint(t *testing.T) {
 	c := newClient(&http.Client{Transport: failingTransport{}})
-	for _, err := range []error{c.request("https://pinnable.xyz/pin/secret-token"), func() error { _, err := c.status("https://pinnable.xyz/pin/secret-token"); return err }()} {
+	for _, err := range []error{
+		c.request("https://pinnable.xyz/pin/secret-token"),
+		func() error { _, err := c.status("https://pinnable.xyz/pin/secret-token"); return err }(),
+		c.pushRecord("https://pinnable.xyz/pin/secret-token", []byte("record")),
+	} {
 		if err == nil || strings.Contains(err.Error(), "secret") {
 			t.Fatalf("credential leaked: %v", err)
 		}

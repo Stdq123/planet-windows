@@ -2,10 +2,13 @@
 package pinnable
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -13,6 +16,8 @@ import (
 	"strings"
 	"time"
 )
+
+const MaxRecordBytes = 2048
 
 var safeSite = regexp.MustCompile(`^[A-Za-z0-9-]{1,100}$`)
 var tokenPath = regexp.MustCompile(`^/pin/[A-Za-z0-9-]{1,128}$`)
@@ -89,6 +94,53 @@ func (c *Client) Status(endpoint string) (Status, error) {
 		return Status{}, err
 	}
 	return c.status(u.String())
+}
+
+// PushRecord posts a local Kubo signed IPNS record to POST <endpoint>/record.
+// The private key never leaves the local machine; Pinnable validates the
+// record's signature and sequence number before re-announcing it to the DHT.
+func (c *Client) PushRecord(endpoint string, record []byte) error {
+	u, err := ParseEndpoint(endpoint)
+	if err != nil {
+		return err
+	}
+	return c.pushRecord(u.String(), record)
+}
+
+func (c *Client) pushRecord(endpoint string, record []byte) error {
+	if len(record) == 0 || len(record) > MaxRecordBytes {
+		return errors.New("IPNS 签名记录大小无效")
+	}
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	header := make(textproto.MIMEHeader)
+	header.Set("Content-Disposition", `form-data; name="record"; filename="record"`)
+	header.Set("Content-Type", "application/octet-stream")
+	part, err := writer.CreatePart(header)
+	if err != nil {
+		return errors.New("无法准备 IPNS 记录请求")
+	}
+	if _, err = part.Write(record); err != nil {
+		return errors.New("无法写入 IPNS 记录请求")
+	}
+	if err = writer.Close(); err != nil {
+		return errors.New("无法完成 IPNS 记录请求")
+	}
+	req, err := http.NewRequest(http.MethodPost, endpoint+"/record", &body)
+	if err != nil {
+		return errors.New("无法创建 Pinnable 记录请求")
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return errors.New("无法连接 Pinnable 服务")
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
+		return errors.New("Pinnable 未接受 IPNS 记录")
+	}
+	return nil
 }
 func (c *Client) request(endpoint string) error {
 	resp, err := c.http.Get(endpoint)

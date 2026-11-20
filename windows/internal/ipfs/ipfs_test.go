@@ -2,6 +2,7 @@ package ipfs
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
@@ -590,6 +591,81 @@ func TestPublishOnlineContextUsesLoopbackHTTPRPC(t *testing.T) {
 	nonLoopback.setDaemonState(&exec.Cmd{}, make(chan error, 1), false, "/ip4/192.168.1.2/tcp/5001", "http://127.0.0.1:8080")
 	if _, err := nonLoopback.PublishOnlineContext(context.Background(), "site-one", "QmTestCid123"); err == nil {
 		t.Fatal("non-loopback API accepted PublishOnlineContext")
+	}
+}
+
+func TestLocalIPNSRecordContextReadsRoutingGetType5(t *testing.T) {
+	var mu sync.Mutex
+	var gotMethod, gotPath, gotArg string
+	mode := "ok"
+	setMode := func(next string) {
+		mu.Lock()
+		mode = next
+		mu.Unlock()
+	}
+	wantRecord := []byte("signed-ipns-record-bytes")
+	encodedRecord := base64.StdEncoding.EncodeToString(wantRecord)
+	oversizedRecord := base64.StdEncoding.EncodeToString(make([]byte, MaxIPNSRecordBytes+1))
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		gotArg = r.URL.Query().Get("arg")
+		current := mode
+		mu.Unlock()
+		switch current {
+		case "ok":
+			_, _ = io.WriteString(w, `{"ID":"peer1","Type":1,"Extra":""}`+"\n")
+			_, _ = io.WriteString(w, `{"ID":"peer2","Type":5,"Extra":"`+encodedRecord+`"}`+"\n")
+		case "oversized":
+			_, _ = io.WriteString(w, `{"ID":"peer2","Type":5,"Extra":"`+oversizedRecord+`"}`+"\n")
+		case "missing":
+			_, _ = io.WriteString(w, `{"ID":"peer1","Type":1,"Extra":""}`+"\n")
+		}
+	}))
+	defer server.Close()
+
+	port := strings.TrimPrefix(server.URL, "http://127.0.0.1:")
+	client := &Client{}
+	client.setDaemonState(&exec.Cmd{}, make(chan error, 1), false, "/ip4/127.0.0.1/tcp/"+port, "http://127.0.0.1:8080")
+
+	// Must not block on c.mu while another command is running.
+	client.mu.Lock()
+	defer client.mu.Unlock()
+
+	record, err := client.LocalIPNSRecord("k51qzi5uqu5testkey")
+	if err != nil {
+		t.Fatalf("LocalIPNSRecord failed: %v", err)
+	}
+	if string(record) != string(wantRecord) {
+		t.Fatalf("record = %q, want %q", record, wantRecord)
+	}
+	mu.Lock()
+	if gotMethod != http.MethodPost || gotPath != "/api/v0/routing/get" || gotArg != "/ipns/k51qzi5uqu5testkey" {
+		mu.Unlock()
+		t.Fatalf("unexpected request: %s %s arg=%q", gotMethod, gotPath, gotArg)
+	}
+	mu.Unlock()
+
+	setMode("oversized")
+	if _, err := client.LocalIPNSRecord("k51qzi5uqu5testkey"); err == nil {
+		t.Fatal("oversized IPNS record was accepted")
+	}
+
+	setMode("missing")
+	if _, err := client.LocalIPNSRecord("k51qzi5uqu5testkey"); err == nil {
+		t.Fatal("missing Type 5 record was accepted")
+	}
+
+	if _, err := client.LocalIPNSRecord("../bad"); err == nil {
+		t.Fatal("unsafe IPNS name was accepted")
+	}
+
+	offline := &Client{}
+	offline.setDaemonState(&exec.Cmd{}, make(chan error, 1), true, "/ip4/127.0.0.1/tcp/"+port, "http://127.0.0.1:8080")
+	if _, err := offline.LocalIPNSRecord("k51qzi5uqu5testkey"); err == nil {
+		t.Fatal("offline daemon accepted LocalIPNSRecord")
 	}
 }
 

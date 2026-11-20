@@ -6,6 +6,7 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 ### Added
 
+- Pushed the locally signed IPNS routing record (`Type 5` from Kubo `/api/v0/routing/get`, up to 2048 bytes) directly to `POST <pinnable>/record` after verified Pinnable pin requests so Pinnable can immediately re-announce the record to the DHT while the local node is offline.
 - Added subscription settings (edit display name, change feed/Planet URL, and delete subscription directly from the subscription header or dialog) alongside the existing workspace menu actions.
 
 ### Changed
