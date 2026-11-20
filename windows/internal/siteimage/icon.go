@@ -109,7 +109,8 @@ func downscaleIcon(src image.Image, dstW, dstH int) *image.NRGBA {
 				continue
 			}
 			// Convert averaged premultiplied 16-bit RGBA back to non-premultiplied 8-bit NRGBA.
-			a := uint8((sumA/count + 0x80) >> 8)
+			avgA := sumA / count
+			a := uint8(minUint64((avgA*255+0x7fff)/0xffff, 255))
 			r := uint8(minUint64((sumR*255+sumA/2)/sumA, 255))
 			g := uint8(minUint64((sumG*255+sumA/2)/sumA, 255))
 			b := uint8(minUint64((sumB*255+sumA/2)/sumA, 255))

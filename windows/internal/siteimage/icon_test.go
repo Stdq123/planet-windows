@@ -68,6 +68,11 @@ func TestNormalizeIconDownscalesOversizedImagesAndPreservesSmallOnes(t *testing.
 
 	var largeJPEG bytes.Buffer
 	large := image.NewRGBA(image.Rect(0, 0, 512, 256))
+	for y := 0; y < 256; y++ {
+		for x := 0; x < 512; x++ {
+			large.SetRGBA(x, y, color.RGBA{R: 108, G: 166, B: 212, A: 255})
+		}
+	}
 	if err := jpeg.Encode(&largeJPEG, large, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -78,6 +83,24 @@ func TestNormalizeIconDownscalesOversizedImagesAndPreservesSmallOnes(t *testing.
 	img, _, err = DecodePNG(encoded)
 	if err != nil || img.Bounds().Dx() != 128 || img.Bounds().Dy() != 64 {
 		t.Fatalf("large icon size=%v err=%v", img.Bounds(), err)
+	}
+	if _, _, _, a := img.At(64, 32).RGBA(); a != 0xffff {
+		t.Fatalf("downscaled opaque JPEG lost alpha: a=%d", a)
+	}
+
+	// Regression: 144x144 opaque PNG downscaled to 128x128 must keep A=255 (no uint8 overflow).
+	avatar144 := encodeTestPNG(t, 144, 144, color.NRGBA{R: 108, G: 166, B: 212, A: 255})
+	encoded, err = NormalizeIcon(avatar144)
+	if err != nil {
+		t.Fatal(err)
+	}
+	img, _, err = DecodePNG(encoded)
+	if err != nil || img.Bounds().Dx() != 128 || img.Bounds().Dy() != 128 {
+		t.Fatalf("144x144 downscale size=%v err=%v", img.Bounds(), err)
+	}
+	r, g, b, a := img.At(64, 64).RGBA()
+	if r>>8 != 108 || g>>8 != 166 || b>>8 != 212 || a>>8 != 255 {
+		t.Fatalf("downscaled pixel corrupted: rgba=%d,%d,%d,%d", r>>8, g>>8, b>>8, a>>8)
 	}
 }
 
