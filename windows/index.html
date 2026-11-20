@@ -49,6 +49,7 @@
             <button type="button" id="show-removed-sites" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE74D;</span>已移除的站点</button>
             <button type="button" id="offline-storage" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE8B7;</span>离线媒体空间</button>
             <button type="button" id="show-ai-settings" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE99A;</span>AI 助手与设置</button>
+            <button type="button" id="show-local-api" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE968;</span>本地 API 控制台</button>
             <button type="button" id="show-updates" class="sidebar-action"><span class="system-icon" aria-hidden="true">&#xE895;</span>检查更新</button>
             <label class="gateway-setting" for="public-gateway">公共网关<select id="public-gateway"><option value="eth.sucks">eth.sucks（推荐）</option><option value="aleph">Aleph Cloud</option><option value="ipfs.io">IPFS.io（易限流）</option><option value="dweb.link">dweb.link（易限流）</option></select></label>
             <div class="sidebar-footer"><span class="system-icon" aria-hidden="true">&#xE770;</span><span>本地工作区</span><span class="version"></span></div>
@@ -204,6 +205,21 @@
       <input id="ai-chat-input" placeholder="针对当前文章或本地库提问…" autocomplete="off" />
       <div class="dialog-actions"><button type="button" id="clear-ai-chat" class="secondary">清空对话</button><button type="button" id="close-ai-dialog" class="secondary">关闭</button><button type="submit" id="send-ai-chat" class="primary">发送</button></div>
     </form>
+  </dialog>
+  <dialog id="local-api-dialog" aria-labelledby="local-api-title">
+    <h2 id="local-api-title">本地 RESTful HTTP API 与控制台</h2>
+    <p>仅监听本机回环地址（127.0.0.1），兼容原版 Planet `/v0/planets/my` 与 `pn` 命令行工具。</p>
+    <form id="local-api-form">
+      <label class="setting-check"><input id="local-api-enabled" name="enabled" type="checkbox" />启用本地 HTTP API 服务</label>
+      <label>监听端口<input id="local-api-port" name="port" type="number" min="1024" max="65535" value="8086" required /></label>
+      <label class="setting-check"><input id="local-api-auth" name="authEnabled" type="checkbox" />启用 HTTP Basic Auth 认证</label>
+      <label>用户名<input id="local-api-username" name="username" value="Planet" /></label>
+      <label>访问口令（留空保留已保存口令）<input id="local-api-passcode" name="passcode" type="password" autocomplete="off" /></label>
+      <p id="local-api-status" role="status">正在读取状态…</p>
+      <div class="dialog-actions"><button type="button" id="refresh-local-api" class="secondary">刷新日志</button><button type="button" id="clear-local-api-logs" class="secondary">清空日志</button><button type="button" id="close-local-api" class="secondary">关闭</button><button type="submit" class="primary">保存并应用</button></div>
+    </form>
+    <h3>最近请求日志</h3>
+    <pre id="local-api-logs" class="api-log-viewer">暂无请求日志。</pre>
   </dialog>
   <script type="module" src="./src/main.ts"></script>
 </body>

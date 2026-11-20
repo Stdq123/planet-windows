@@ -152,6 +152,14 @@ export interface KuboStatus {
   relayPeers?: number;
 }
 
+export interface LogEntry {
+  time: string;
+  method: string;
+  path: string;
+  status: number;
+  durationMs: number;
+}
+
 export interface OfflineAsset {
   snapshot: string;
   file: string;
@@ -166,6 +174,12 @@ export interface PinStatus {
   requestid: string;
   status: string;
   pin: { cid: string };
+}
+
+export interface PinnableStatus {
+  status: string;
+  last_known_ipns: string;
+  last_known_cid: string;
 }
 
 export interface PlausibleTracking {
@@ -272,9 +286,13 @@ export interface Stats {
 }
 
 export interface Status {
-  status: string;
-  last_known_ipns: string;
-  last_known_cid: string;
+  running: boolean;
+  enabled: boolean;
+  port: number;
+  authEnabled: boolean;
+  username: string;
+  hasPasscode: boolean;
+  logs: LogEntry[];
 }
 
 export interface Subscription {
@@ -357,9 +375,11 @@ export const Library = {
   checkUpdates: bind<[], UpdateCheckInfo>("Library.CheckUpdates", () => []),
   /** CleanupOfflineMedia removes only files no saved article or active player references. */
   cleanupOfflineMedia: bind<[], Usage>("Library.CleanupOfflineMedia", () => []),
+  clearLocalAPILogs: bind<[], void>("Library.ClearLocalAPILogs", () => []),
   configureAI: bind<[string, string, string], AIConfig>("Library.ConfigureAI", (baseURL: string, model: string, token: string) => [baseURL, model, token]),
   /** ConfigureDeployment stores a target locally; credentials never enter backups. */
   configureDeployment: bind<[string, string, string, string, string, boolean, boolean], void>("Library.ConfigureDeployment", (siteID: string, kind: string, name: string, server: string, token: string, auto: boolean, deleteRemote: boolean) => [siteID, kind, name, server, token, auto, deleteRemote]),
+  configureLocalAPI: bind<[boolean, number, boolean, string, string], Status>("Library.ConfigureLocalAPI", (enabled: boolean, port: number, authEnabled: boolean, username: string, passcode: string) => [enabled, port, authEnabled, username, passcode]),
   /**
    * ConfigurePinnable saves an explicitly supplied endpoint using Windows DPAPI.
    * An empty endpoint disables the integration for this site.
@@ -404,6 +424,7 @@ export const Library = {
   ipfsStatus: bind<[], KuboStatus>("Library.IPFSStatus", () => []),
   /** ImportPlanet imports a selected original .planet folder. */
   importPlanet: bind<[], Site>("Library.ImportPlanet", () => []),
+  localAPIStatus: bind<[], Status>("Library.LocalAPIStatus", () => []),
   markSubscriptionRead: bind<[string], void>("Library.MarkSubscriptionRead", (address: string) => [address]),
   /** OfflineMediaUsage reports managed feed-cache usage without modifying files. */
   offlineMediaUsage: bind<[], Usage>("Library.OfflineMediaUsage", () => []),
@@ -412,7 +433,7 @@ export const Library = {
   /** PinSubscription stores the current Planet revision in Kubo for offline use. */
   pinSubscription: bind<[string], void>("Library.PinSubscription", (address: string) => [address]),
   pinnableConfigured: bind<[string], boolean>("Library.PinnableConfigured", (siteID: string) => [siteID]),
-  pinnableStatus: bind<[string], Status>("Library.PinnableStatus", (siteID: string) => [siteID]),
+  pinnableStatus: bind<[string], PinnableStatus>("Library.PinnableStatus", (siteID: string) => [siteID]),
   plausibleStats: bind<[string], Stats>("Library.PlausibleStats", (siteID: string) => [siteID]),
   plausibleStatsRange: bind<[string, string], Stats>("Library.PlausibleStatsRange", (siteID: string, period: string) => [siteID, period]),
   presetAvatars: bind<[], PresetAvatar[]>("Library.PresetAvatars", () => []),

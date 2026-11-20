@@ -1659,6 +1659,45 @@ $("#speech-stop").addEventListener("click",()=>{
   speechPlayer.hidden=true;
   speechPaused=false;
 });
+
+// Local RESTful HTTP API Console (Phase 3.1)
+const localAPIDialog=$<HTMLDialogElement>("#local-api-dialog"),localAPIForm=$<HTMLFormElement>("#local-api-form"),localAPIStatusEl=$("#local-api-status"),localAPILogsEl=$("#local-api-logs");
+function renderLocalAPIStatus(st:{running:boolean;enabled:boolean;port:number;authEnabled:boolean;username:string;hasPasscode:boolean;logs?:Array<{time:string;method:string;path:string;status:number;durationMs:number}>}){
+  $<HTMLInputElement>("#local-api-enabled").checked=!!st.enabled;
+  $<HTMLInputElement>("#local-api-port").value=String(st.port || 8086);
+  $<HTMLInputElement>("#local-api-auth").checked=!!st.authEnabled;
+  $<HTMLInputElement>("#local-api-username").value=st.username || "Planet";
+  $<HTMLInputElement>("#local-api-passcode").value="";
+  localAPIStatusEl.textContent=st.running ? `运行中：http://127.0.0.1:${st.port}/v0/planets/my${st.authEnabled ? "（已启用 Basic Auth）" : ""}` : "已停止。";
+  const logs=st.logs ?? [];
+  localAPILogsEl.textContent=logs.length ? logs.map(e=>`[${e.time}] ${e.method} ${e.path} -> ${e.status} (${e.durationMs}ms)`).join("\n") : "暂无请求日志。";
+}
+async function refreshLocalAPI(){
+  try{
+    const st=await Library.localAPIStatus();
+    renderLocalAPIStatus(st);
+  }catch(error){
+    localAPIStatusEl.textContent=`读取失败：${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+$("#show-local-api").addEventListener("click",()=>{openDialog(localAPIDialog);void refreshLocalAPI();});
+$("#refresh-local-api").addEventListener("click",()=>void refreshLocalAPI());
+$("#clear-local-api-logs").addEventListener("click",async()=>{await Library.clearLocalAPILogs();await refreshLocalAPI();});
+$("#close-local-api").addEventListener("click",()=>localAPIDialog.close());
+localAPIForm.addEventListener("submit",async event=>{
+  event.preventDefault();
+  const enabled=$<HTMLInputElement>("#local-api-enabled").checked;
+  const port=Number($<HTMLInputElement>("#local-api-port").value) || 8086;
+  const authEnabled=$<HTMLInputElement>("#local-api-auth").checked;
+  const username=$<HTMLInputElement>("#local-api-username").value.trim();
+  const passcode=$<HTMLInputElement>("#local-api-passcode").value;
+  try{
+    const st=await Library.configureLocalAPI(enabled,port,authEnabled,username,passcode);
+    renderLocalAPIStatus(st);
+  }catch(error){
+    localAPIStatusEl.textContent=`保存失败：${error instanceof Error ? error.message : String(error)}`;
+  }
+});
 starItem.addEventListener("click",async()=>{
   if(!subscription || !item) return; const address=subscription.url, key=item.key || item.id || item.link; if(!key) { showError("文章缺少可用标识"); return; } const starred=!item.starred;
   const operation=`${address}\u0000${key}`;
