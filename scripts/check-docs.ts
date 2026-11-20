@@ -6,7 +6,7 @@ type Link = { target: string; line: number };
 type Markdown = { headings: Set<string>; links: Link[] };
 
 const rootDocuments = new Set([
-  "README.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "CHANGELOG.md", "SECURITY.md",
+  "README.md", "README_zh.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "CHANGELOG.md", "SECURITY.md",
   "windows/README.md", ".github/PULL_REQUEST_TEMPLATE.md",
 ]);
 const backtick = String.fromCharCode(96);

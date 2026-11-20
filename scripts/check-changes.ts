@@ -19,7 +19,7 @@ function commit(root: string, ref: string): string {
 function documentationPath(path: string): boolean {
   // Release metadata, license materials, agent instructions and embedded assets
   // are intentionally outside this list, even when their extension is Markdown.
-  if (["README.md", "windows/README.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "SECURITY.md", ".github/PULL_REQUEST_TEMPLATE.md"].includes(path)) return true;
+  if (["README.md", "README_zh.md", "windows/README.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", "SECURITY.md", ".github/PULL_REQUEST_TEMPLATE.md"].includes(path)) return true;
   if (/(?:^|\/)AGENTS\.md$/.test(path)) return false;
   return /^(?:docs|windows\/docs)\/.+\.md$/.test(path)
     || /^docs\/(?:screenshots|uiux)\/.+\.png$/.test(path);

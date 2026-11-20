@@ -32,7 +32,7 @@ Pop-Location
 
 仅修改以下普通文件时，本地 pre-push 与 CI 使用轻量检查：
 
-- `README.md`、`windows/README.md`、`CONTRIBUTING.md`、`CODE_OF_CONDUCT.md`、`SECURITY.md`。
+- `README.md`、`README_zh.md`、`windows/README.md`、`CONTRIBUTING.md`、`CODE_OF_CONDUCT.md`、`SECURITY.md`。
 - `docs/`、`windows/docs/` 下的 `.md` 文档，但不包括 `AGENTS.md`。
 - `docs/screenshots/`、`docs/uiux/` 下的 `.png` 图片。
 - `.github/PULL_REQUEST_TEMPLATE.md`。
