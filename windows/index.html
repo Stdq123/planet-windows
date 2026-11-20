@@ -201,31 +201,33 @@
         <label>首选模型<input id="ai-model-input" name="model" placeholder="例如 llama3、qwen2.5 或 claude-sonnet-4-6" /></label>
         <label>API 令牌（本机模型可留空，公网服务加密保存）<input id="ai-token-input" name="token" type="password" autocomplete="off" /></label>
         <p id="ai-settings-result" role="status"></p>
-        <div class="dialog-actions"><button type="submit" class="primary">保存 AI 配置</button></div>
+        <div class="pinnable-actions"><button type="submit" class="primary">保存 AI 配置</button></div>
       </form>
     </details>
     <p id="ai-chat-context" role="status"></p>
     <div id="ai-chat-messages" class="ai-chat-messages" aria-live="polite"></div>
-    <form id="ai-chat-form">
-      <label for="ai-chat-input">提问</label>
-      <input id="ai-chat-input" placeholder="针对当前文章或本地库提问…" autocomplete="off" />
-      <div class="dialog-actions"><button type="button" id="clear-ai-chat" class="secondary">清空对话</button><button type="button" id="close-ai-dialog" class="secondary">关闭</button><button type="submit" id="send-ai-chat" class="primary">发送</button></div>
-    </form>
+    <div class="ai-chat-composer">
+      <form id="ai-chat-form">
+        <label for="ai-chat-input">提问</label>
+        <input id="ai-chat-input" placeholder="针对当前文章或本地库提问…" autocomplete="off" />
+      </form>
+    </div>
+    <div class="dialog-actions"><button type="button" id="clear-ai-chat" class="secondary">清空对话</button><button type="button" id="close-ai-dialog" class="secondary">关闭</button><button type="submit" id="send-ai-chat" class="primary" form="ai-chat-form">发送</button></div>
   </dialog>
   <dialog id="local-api-dialog" aria-labelledby="local-api-title">
-    <h2 id="local-api-title">本地 RESTful HTTP API 与控制台</h2>
-    <p>仅监听本机回环地址（127.0.0.1），兼容原版 Planet `/v0/planets/my` 与 `pn` 命令行工具。</p>
     <form id="local-api-form">
+      <h2 id="local-api-title">本地 RESTful HTTP API 与控制台</h2>
+      <p>仅监听本机回环地址（127.0.0.1），兼容原版 Planet `/v0/planets/my` 与 `pn` 命令行工具。</p>
       <label class="setting-check"><input id="local-api-enabled" name="enabled" type="checkbox" />启用本地 HTTP API 服务</label>
       <label>监听端口<input id="local-api-port" name="port" type="number" min="1024" max="65535" value="8086" required /></label>
       <label class="setting-check"><input id="local-api-auth" name="authEnabled" type="checkbox" />启用 HTTP Basic Auth 认证</label>
       <label>用户名<input id="local-api-username" name="username" value="Planet" /></label>
       <label>访问口令（留空保留已保存口令）<input id="local-api-passcode" name="passcode" type="password" autocomplete="off" /></label>
       <p id="local-api-status" role="status">正在读取状态…</p>
+      <h3>最近请求日志</h3>
+      <pre id="local-api-logs" class="api-log-viewer">暂无请求日志。</pre>
       <div class="dialog-actions"><button type="button" id="refresh-local-api" class="secondary">刷新日志</button><button type="button" id="clear-local-api-logs" class="secondary">清空日志</button><button type="button" id="close-local-api" class="secondary">关闭</button><button type="submit" class="primary">保存并应用</button></div>
     </form>
-    <h3>最近请求日志</h3>
-    <pre id="local-api-logs" class="api-log-viewer">暂无请求日志。</pre>
   </dialog>
   <dialog id="published-folders-dialog" aria-labelledby="published-folders-title">
     <h2 id="published-folders-title">发布本地文件夹 (Published Folders)</h2>
@@ -236,8 +238,8 @@
     <div class="dialog-actions"><button type="button" id="close-published-folders" class="secondary">关闭</button></div>
   </dialog>
   <dialog id="quick-post-dialog" aria-labelledby="quick-post-title">
-    <h2 id="quick-post-title">快速发帖 (Quick Post)</h2>
     <form id="quick-post-form">
+      <h2 id="quick-post-title">快速发帖 (Quick Post)</h2>
       <label>发布站点<select id="quick-post-site"></select></label>
       <label>标题（留空自动生成）<input id="quick-post-headline" placeholder="快速记录想法…" /></label>
       <label>正文内容<textarea id="quick-post-content" rows="4" placeholder="支持 Markdown 与拖拽图片文件到下方区域…"></textarea></label>
