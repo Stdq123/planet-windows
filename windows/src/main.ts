@@ -624,6 +624,7 @@ function updateView() {
   const profileButton=$<HTMLButtonElement>("#site-profile");profileButton.hidden=!!subscription;profileButton.disabled=!site || saving;profileButton.title="";
   const podcastButton=$<HTMLButtonElement>("#podcast-settings");podcastButton.hidden=!!subscription;podcastButton.disabled=!site || saving;
   const customCodeButton=$<HTMLButtonElement>("#custom-code-settings");customCodeButton.hidden=!!subscription;customCodeButton.disabled=!site || saving;
+  const aggregationButton=$<HTMLButtonElement>("#aggregation-settings");aggregationButton.hidden=!!subscription;aggregationButton.disabled=!site || saving;
   const deploymentButton=$<HTMLButtonElement>("#deployment-settings");deploymentButton.hidden=!!subscription;deploymentButton.disabled=!site || saving;
   removeSite.hidden = !!subscription; removeSite.disabled = !site || saving || !!publication?.running;
   const fixed = !!subscription && (subscription.cid ? subscription.pinnedCid === subscription.cid : !!subscription.offlinePinned);
@@ -1697,6 +1698,137 @@ localAPIForm.addEventListener("submit",async event=>{
   }catch(error){
     localAPIStatusEl.textContent=`保存失败：${error instanceof Error ? error.message : String(error)}`;
   }
+});
+
+// Published Folders Dashboard (Phase 4.1)
+const foldersDialog=$<HTMLDialogElement>("#published-folders-dialog"),foldersList=$("#published-folders-list"),foldersStatus=$("#published-folders-status");
+async function refreshPublishedFolders(){
+  foldersList.replaceChildren();
+  try{
+    const list=await Library.publishedFolders();
+    if(!list.length){
+      foldersList.append(label("p","尚未添加本地发布文件夹。","list-empty"));
+      return;
+    }
+    for(const f of list){
+      const card=document.createElement("div");
+      card.className="removed-site-item";
+      const info=document.createElement("div");
+      info.append(label("strong",f.name,""),label("small",`路径：${f.path}${f.lastCid ? ` | 最新 CID：${f.lastCid}` : " | 尚未发布"}${f.ipns ? ` | IPNS：${f.ipns}` : ""}`,""));
+      const actions=document.createElement("div");
+      actions.className="pinnable-actions";
+      const pubBtn=document.createElement("button");
+      pubBtn.type="button";pubBtn.className="primary";pubBtn.textContent="发布到 IPFS";
+      pubBtn.addEventListener("click",async()=>{
+        pubBtn.disabled=true;foldersStatus.textContent=`正在发布「${f.name}」…`;
+        try{
+          const updated=await Library.publishFolder(f.id);
+          foldersStatus.textContent=`已发布「${updated.name}」，CID：${updated.lastCid}`;
+          await refreshPublishedFolders();
+        }catch(error){foldersStatus.textContent=`发布失败：${error instanceof Error ? error.message : String(error)}`;}
+        finally{pubBtn.disabled=false;}
+      });
+      const delBtn=document.createElement("button");
+      delBtn.type="button";delBtn.className="secondary";delBtn.textContent="移除";
+      delBtn.addEventListener("click",async()=>{
+        await Library.removePublishedFolder(f.id);
+        await refreshPublishedFolders();
+      });
+      actions.append(pubBtn,delBtn);
+      card.append(info,actions);
+      foldersList.append(card);
+    }
+  }catch(error){
+    foldersStatus.textContent=`读取失败：${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+$("#show-published-folders").addEventListener("click",()=>{foldersStatus.textContent="";openDialog(foldersDialog);void refreshPublishedFolders();});
+$("#add-published-folder").addEventListener("click",async()=>{
+  const name=$<HTMLInputElement>("#new-folder-name").value.trim();
+  try{
+    const added=await Library.addPublishedFolder(name,true);
+    if(added.id){
+      $<HTMLInputElement>("#new-folder-name").value="";
+      foldersStatus.textContent=`已添加「${added.name}」。`;
+      await refreshPublishedFolders();
+    }
+  }catch(error){foldersStatus.textContent=`添加失败：${error instanceof Error ? error.message : String(error)}`;}
+});
+$("#close-published-folders").addEventListener("click",()=>foldersDialog.close());
+
+// Content Aggregation (Phase 4.2)
+const aggregationDialog=$<HTMLDialogElement>("#aggregation-dialog"),aggregationForm=$<HTMLFormElement>("#aggregation-form"),aggregationSources=$<HTMLTextAreaElement>("#aggregation-sources"),aggregationResult=$("#aggregation-result");
+$("#aggregation-settings").addEventListener("click",()=>{
+  if(!site || saving)return;
+  aggregationSources.value=(site.aggregation ?? []).join("\n");
+  aggregationResult.textContent="";
+  openDialog(aggregationDialog);
+});
+$("#close-aggregation").addEventListener("click",()=>{if(!saving)aggregationDialog.close();});
+aggregationForm.addEventListener("submit",async event=>{
+  event.preventDefault();if(!site || saving)return;
+  const siteID=site.id;
+  try{
+    const updated=await Library.updateSiteAggregation(siteID,aggregationSources.value);
+    sites=sites.map(entry=>entry.id===siteID?updated:entry);if(site?.id===siteID)site=updated;
+    aggregationResult.textContent=`已保存 ${updated.aggregation?.length ?? 0} 个聚合源。`;
+  }catch(error){aggregationResult.textContent=`保存失败：${error instanceof Error ? error.message : String(error)}`;}
+});
+$("#sync-aggregation-now").addEventListener("click",async()=>{
+  if(!site || saving)return;
+  const siteID=site.id;
+  aggregationResult.textContent="正在拉取聚合源…";
+  try{
+    const count=await Library.syncSiteAggregation(siteID);
+    aggregationResult.textContent=`同步完成，新增 ${count} 篇文章。`;
+    if(count>0 && site?.id===siteID){
+      articles=await Library.articles(siteID);
+      markLocalChange(siteID);
+      updateView();
+    }
+  }catch(error){aggregationResult.textContent=`拉取失败：${error instanceof Error ? error.message : String(error)}`;}
+});
+
+// Quick Post Modal (Phase 4.3)
+const quickPostDialog=$<HTMLDialogElement>("#quick-post-dialog"),quickPostForm=$<HTMLFormElement>("#quick-post-form"),quickPostSiteSelect=$<HTMLSelectElement>("#quick-post-site"),quickPostHeadline=$<HTMLInputElement>("#quick-post-headline"),quickPostContent=$<HTMLTextAreaElement>("#quick-post-content"),quickPostFile=$<HTMLInputElement>("#quick-post-file"),quickPostStatus=$("#quick-post-status");
+$("#show-quick-post").addEventListener("click",()=>{
+  quickPostSiteSelect.replaceChildren();
+  for(const s of sites){
+    const opt=document.createElement("option");opt.value=s.id;opt.textContent=s.name;
+    if(site?.id===s.id)opt.selected=true;
+    quickPostSiteSelect.append(opt);
+  }
+  quickPostHeadline.value="";quickPostContent.value="";quickPostFile.value="";quickPostStatus.textContent=sites.length ? "" : "请先创建一个站点。";
+  $<HTMLButtonElement>("#submit-quick-post").disabled=!sites.length;
+  openDialog(quickPostDialog);
+});
+$("#close-quick-post").addEventListener("click",()=>quickPostDialog.close());
+quickPostForm.addEventListener("submit",async event=>{
+  event.preventDefault();
+  const targetSiteID=quickPostSiteSelect.value;
+  if(!targetSiteID)return;
+  const submitBtn=$<HTMLButtonElement>("#submit-quick-post");
+  submitBtn.disabled=true;quickPostStatus.textContent="正在发布…";
+  try{
+    let attName="",attB64="";
+    const f=quickPostFile.files?.[0];
+    if(f){
+      const buf=await f.arrayBuffer();
+      const bytes=new Uint8Array(buf);
+      let bin="";
+      for(let i=0;i<bytes.length;i++)bin+=String.fromCharCode(bytes[i]!);
+      attName=f.name || "quick.png";
+      attB64=window.btoa(bin);
+    }
+    const created=await Library.quickPost(targetSiteID,quickPostHeadline.value,quickPostContent.value,attName,attB64);
+    markLocalChange(targetSiteID);
+    void queuePublication(targetSiteID);
+    if(site?.id===targetSiteID){articles=await Library.articles(targetSiteID);updateView();}
+    quickPostStatus.textContent=`已发布《${created.title}》，正在同步到 IPFS。`;
+    quickPostDialog.close();
+  }catch(error){
+    quickPostStatus.textContent=`发布失败：${error instanceof Error ? error.message : String(error)}`;
+  }finally{submitBtn.disabled=false;}
 });
 starItem.addEventListener("click",async()=>{
   if(!subscription || !item) return; const address=subscription.url, key=item.key || item.id || item.link; if(!key) { showError("文章缺少可用标识"); return; } const starred=!item.starred;
