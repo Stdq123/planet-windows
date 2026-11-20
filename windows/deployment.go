@@ -32,9 +32,6 @@ func (l *Library) deploymentSite(siteID string) (store.Site, []store.Article, st
 	if err != nil {
 		return store.Site{}, nil, "", err
 	}
-	if site.Imported {
-		return store.Site{}, nil, "", errors.New("导入站点的外部发布暂不支持")
-	}
 	root, err := mygo.App.Path(mygo.PathUserData)
 	return site, articles, root, err
 }
@@ -156,9 +153,6 @@ func (l *Library) DeploySite(siteID, kind string) (string, error) {
 }
 
 func (l *Library) autoDeploy(root string, site store.Site, articles []store.Article) string {
-	if site.Imported {
-		return ""
-	}
 	enabled := []string{}
 	var warnings []string
 	for _, kind := range []string{"ssh", "cloudflare"} {

@@ -37,9 +37,6 @@ func (s *Store) UpdatePodcastSettings(siteID, language string, explicit bool, ca
 		if site.ID != siteID || site.Removed || site.DeletionPending {
 			continue
 		}
-		if site.Imported {
-			return Site{}, errors.New("导入站点暂不支持修改播客设置")
-		}
 		if site.ContentRevision == ^uint64(0) {
 			return Site{}, errors.New("站点修订版本已达到上限")
 		}
@@ -68,9 +65,6 @@ func (s *Store) SetPodcastCover(siteID, value string) (Site, error) {
 		site := &next.Sites[i]
 		if site.ID != siteID || site.Removed || site.DeletionPending {
 			continue
-		}
-		if site.Imported {
-			return Site{}, errors.New("导入站点暂不支持修改播客封面")
 		}
 		if site.PodcastCoverPNG == value {
 			return cloneSite(*site), nil

@@ -974,6 +974,82 @@ func (l *Library) SearchArticles(query string) ([]store.SearchResult, error) {
 	return s.SearchArticles(query)
 }
 
+func (l *Library) RelatedArticles(siteID, articleID, subscriptionURL, itemKey string) ([]store.SearchResult, error) {
+	s, err := l.open()
+	if err != nil {
+		return nil, err
+	}
+	return s.RelatedArticles(siteID, articleID, subscriptionURL, itemKey, 6)
+}
+
+func (l *Library) AIConfig() (services.AIConfig, error) {
+	root, err := mygo.App.Path(mygo.PathUserData)
+	if err != nil {
+		return services.AIConfig{}, err
+	}
+	return services.LoadAIConfig(root)
+}
+
+func (l *Library) ConfigureAI(baseURL, model, token string) (services.AIConfig, error) {
+	root, err := mygo.App.Path(mygo.PathUserData)
+	if err != nil {
+		return services.AIConfig{}, err
+	}
+	return services.SaveAIConfig(root, baseURL, model, token)
+}
+
+func (l *Library) ProbeAI(baseURL string) (services.AIProbeResult, error) {
+	root, err := mygo.App.Path(mygo.PathUserData)
+	if err != nil {
+		return services.AIProbeResult{}, err
+	}
+	return services.ProbeAIEndpoints(root, baseURL)
+}
+
+func (l *Library) AskAI(prompt, contextTitle, contextBody, historyJSON string) (string, error) {
+	prompt = strings.TrimSpace(prompt)
+	if prompt == "" {
+		return "", errors.New("请输入提问内容")
+	}
+	root, err := mygo.App.Path(mygo.PathUserData)
+	if err != nil {
+		return "", err
+	}
+	var history []services.AIChatMessage
+	if strings.TrimSpace(historyJSON) != "" {
+		_ = json.Unmarshal([]byte(historyJSON), &history)
+	}
+	sys := "你是 Planet 本地知识与文章助手，请使用清晰简洁的中文回答用户问题。"
+	if strings.TrimSpace(contextTitle) != "" || strings.TrimSpace(contextBody) != "" {
+		bodyRunes := []rune(contextBody)
+		if len(bodyRunes) > 8000 {
+			bodyRunes = bodyRunes[:8000]
+		}
+		sys += fmt.Sprintf("\n\n当前阅读文章：《%s》\n正文内容：\n%s", contextTitle, string(bodyRunes))
+	} else if s, e := l.open(); e == nil {
+		if hits, e := s.SearchArticles(prompt); e == nil && len(hits) > 0 {
+			var sb strings.Builder
+			sb.WriteString("\n\n本地库相关文章摘录：")
+			for i, h := range hits {
+				if i >= 4 {
+					break
+				}
+				sb.WriteString(fmt.Sprintf("\n- 《%s》（%s）：%s", h.Title, h.SourceName, h.Snippet))
+			}
+			sys += sb.String()
+		}
+	}
+	msgs := make([]services.AIChatMessage, 0, len(history)+2)
+	msgs = append(msgs, services.AIChatMessage{Role: "system", Content: sys})
+	for _, m := range history {
+		if (m.Role == "user" || m.Role == "assistant") && strings.TrimSpace(m.Content) != "" {
+			msgs = append(msgs, m)
+		}
+	}
+	msgs = append(msgs, services.AIChatMessage{Role: "user", Content: prompt})
+	return services.ChatCompletion(root, msgs)
+}
+
 // OfflineMediaUsage reports managed feed-cache usage without modifying files.
 func (l *Library) OfflineMediaUsage() (offline.Usage, error) { return l.collectOfflineMedia(false) }
 

@@ -1434,9 +1434,6 @@ func (s *Store) updateSite(siteID, name, about string, doNotIndex *bool) (Site, 
 		if site.ID != siteID || site.Removed {
 			continue
 		}
-		if site.Imported && doNotIndex != nil && site.DoNotIndex != *doNotIndex {
-			return Site{}, errors.New("导入站点暂不支持修改搜索引擎收录设置")
-		}
 		if site.Name == name && site.About == about && (doNotIndex == nil || site.DoNotIndex == *doNotIndex) {
 			return cloneSite(*site), nil
 		}

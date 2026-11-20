@@ -6,6 +6,7 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 ### Added
 
+- Added BM25 + semantic vector Reciprocal Rank Fusion (`HybridSearch`) with CJK bigram tokenization, a "Related Articles" (`相关文章`) finder in the reader, a Local AI Assistant & Settings dialog (`Ollama` / `LM Studio` / OpenAI-compatible endpoints with encrypted API token storage and article/library context), an Article TTS Speech Player (`ArticleSpeechPlayer`) with pause/resume and playback speed controls, and full site/article settings editing for imported sites.
 - Added article `heroImage` derivation from Markdown and image attachments, an article list / grid view toggle, clipboard image paste and drag-and-drop image attachments with Markdown list auto-continuation in the editor, and a built-in retro/pixel Avatar Gallery (`Nostalgia`, `Monochrom`, `Pixel Planet`, `Pixel Nomad`) with the `saveRoundAvatar` circular crop option.
 - Added article pinning (`pinned`), site custom HTML code injection (`customCodeHead`, `customCodeBodyStart`, `customCodeBodyEnd`), and per-site `publishAsIPNS` / `prewarmNewPost` publishing preferences across Site Settings, Article Settings, static/template site generation, public gateway prewarming, and `.planet` backup export.
 - Pushed the locally signed IPNS routing record (`Type 5` from Kubo `/api/v0/routing/get`, up to 2048 bytes) directly to `POST <pinnable>/record` after verified Pinnable pin requests so Pinnable can immediately re-announce the record to the DHT while the local node is offline.
