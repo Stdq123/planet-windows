@@ -273,20 +273,6 @@ let sites: Site[] = [], articles: Article[] = [], site: Site | null = null, arti
 let sitesRevision = 0;
 const articleLoadFailures = new Set<string>();
 let drafts: Draft[] = [], draft: Draft | null = null, draftsView = false;
-let articleViewMode: "list" | "grid" = "list";
-try { if (window.localStorage.getItem("planet.articleViewMode") === "grid") articleViewMode = "grid"; } catch {}
-const toggleArticleViewBtn = $<HTMLButtonElement>("#toggle-article-view");
-function syncArticleViewMode() {
-  articlesEl.classList.toggle("grid-view", articleViewMode === "grid");
-  toggleArticleViewBtn.setAttribute("aria-pressed", String(articleViewMode === "grid"));
-  toggleArticleViewBtn.textContent = articleViewMode === "grid" ? "列表" : "网格";
-}
-syncArticleViewMode();
-toggleArticleViewBtn.addEventListener("click", () => {
-  articleViewMode = articleViewMode === "grid" ? "list" : "grid";
-  try { window.localStorage.setItem("planet.articleViewMode", articleViewMode); } catch {}
-  syncArticleViewMode();
-});
 let subscriptions: Subscription[] = [], subscription: Subscription | null = null, item: Item | null = null;
 let editingSubscriptionURL = "";
 let subscriptionsRevision = 0;
