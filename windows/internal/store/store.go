@@ -171,6 +171,7 @@ type Article struct {
 	AudioDuration          *int              `json:"audioDuration,omitempty"`
 	AudioByteLength        *int64            `json:"audioByteLength,omitempty"`
 	HeroImage              string            `json:"heroImage,omitempty"`
+	HeroImageManual        bool              `json:"heroImageManual,omitempty"`
 	Pinned                 *time.Time        `json:"pinned,omitempty"`
 }
 
@@ -187,6 +188,8 @@ type Draft struct {
 	BaseModified       *time.Time        `json:"baseModified,omitempty"`
 	Attachments        []string          `json:"attachments,omitempty"`
 	RemovedAttachments []string          `json:"removedAttachments,omitempty"`
+	HeroImage          string            `json:"heroImage,omitempty"`
+	HeroImageManual    bool              `json:"heroImageManual,omitempty"`
 }
 
 type data struct {
@@ -1759,7 +1762,7 @@ func (s *Store) AddAttachmentWithMetadata(siteID, articleID, name string, durati
 		case "video":
 			article.VideoFilename = name
 		case "image":
-			if article.HeroImage == "" {
+			if article.HeroImage == "" && !article.HeroImageManual {
 				article.HeroImage = DeriveHeroImage(article.Content, article.Attachments)
 			}
 		}
@@ -1824,7 +1827,13 @@ func (s *Store) RemoveAttachment(siteID, articleID, name string) (Article, error
 			}
 		}
 		if article.HeroImage == name {
-			article.HeroImage = DeriveHeroImage(article.Content, remaining)
+			// A manually chosen cover stays explicitly cleared, matching the
+			// macOS writer; an auto-derived cover falls back to derivation.
+			if article.HeroImageManual {
+				article.HeroImage = ""
+			} else {
+				article.HeroImage = DeriveHeroImage(article.Content, remaining)
+			}
 		}
 		article.Modified = time.Now().UTC()
 		next.Articles[i] = article
@@ -1835,6 +1844,152 @@ func (s *Store) RemoveAttachment(siteID, articleID, name string) (Article, error
 		return cloneArticle(article), nil
 	}
 	return Article{}, errors.New("文章不存在")
+}
+
+// SetHeroImage records an explicit cover choice for a saved article; an empty
+// name clears the cover and keeps it from being re-derived automatically.
+func (s *Store) SetHeroImage(siteID, articleID, name string) (Article, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.hasSite(siteID) {
+		return Article{}, errors.New("站点不存在")
+	}
+	if name != "" && mediaType(name) != "image" {
+		return Article{}, errors.New("封面必须是图片附件")
+	}
+	next := s.data
+	next.Articles = append([]Article{}, s.data.Articles...)
+	for i, article := range next.Articles {
+		if article.SiteID != siteID || article.ID != articleID {
+			continue
+		}
+		if name != "" {
+			registered := false
+			for _, item := range article.Attachments {
+				if item == name {
+					registered = true
+					break
+				}
+			}
+			if !registered {
+				return Article{}, errors.New("附件未登记")
+			}
+		}
+		article.HeroImage, article.HeroImageManual = name, true
+		article.Modified = time.Now().UTC()
+		next.Articles[i] = article
+		markContentChange(&next, siteID, false)
+		if err := s.write(next); err != nil {
+			return Article{}, err
+		}
+		return cloneArticle(article), nil
+	}
+	return Article{}, errors.New("文章不存在")
+}
+
+// SetDraftHeroImage records an explicit cover choice on a draft; an empty name
+// clears it. Existing article attachments stay eligible unless the draft marks
+// them removed.
+func (s *Store) SetDraftHeroImage(siteID, draftID, name string) (Draft, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.hasSite(siteID) {
+		return Draft{}, errors.New("站点不存在")
+	}
+	next := s.data
+	next.Drafts = append([]Draft(nil), s.data.Drafts...)
+	for i, draft := range next.Drafts {
+		if draft.ID != draftID || draft.SiteID != siteID {
+			continue
+		}
+		if name != "" {
+			registered := false
+			for _, item := range draft.Attachments {
+				if item == name {
+					registered = true
+					break
+				}
+			}
+			if !registered {
+				for _, article := range s.data.Articles {
+					if article.ID == draft.ArticleID && article.SiteID == siteID {
+						removed := false
+						for _, item := range draft.RemovedAttachments {
+							if item == name {
+								removed = true
+								break
+							}
+						}
+						if !removed {
+							for _, item := range article.Attachments {
+								if item == name {
+									registered = true
+									break
+								}
+							}
+						}
+						break
+					}
+				}
+			}
+			if !registered || mediaType(name) != "image" {
+				return Draft{}, errors.New("封面必须是本文已登记的图片附件")
+			}
+		}
+		draft.HeroImage, draft.HeroImageManual = name, true
+		draft.Modified = time.Now().UTC()
+		next.Drafts[i] = draft
+		if err := s.write(next); err != nil {
+			return Draft{}, err
+		}
+		return cloneDraft(draft), nil
+	}
+	return Draft{}, errors.New("草稿不存在")
+}
+
+// TagUsage reports one previously used tag label and how many articles use it.
+type TagUsage struct {
+	Label string `json:"label"`
+	Count int    `json:"count"`
+}
+
+// SiteAvailableTags aggregates tag labels across the site's articles, skipping
+// reserved keys, mirroring the macOS writer's Previously Used Tags list.
+func (s *Store) SiteAvailableTags(siteID string) ([]TagUsage, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, site := range s.data.Sites {
+		if site.ID == siteID && !site.Removed {
+			counts := map[string]int{}
+			for _, article := range s.data.Articles {
+				if article.SiteID != siteID {
+					continue
+				}
+				for key, label := range article.Tags {
+					if isReservedTagKey(key) {
+						continue
+					}
+					counts[label]++
+				}
+			}
+			out := make([]TagUsage, 0, len(counts))
+			for label, count := range counts {
+				out = append(out, TagUsage{Label: label, Count: count})
+			}
+			// Alphabetical order matches the macOS writer's Previously Used Tags.
+			sort.Slice(out, func(i, j int) bool { return out[i].Label < out[j].Label })
+			return out, nil
+		}
+	}
+	return nil, errors.New("站点不存在")
+}
+
+func isReservedTagKey(key string) bool {
+	switch strings.ToLower(key) {
+	case "index", "tags", "archive", "archives":
+		return true
+	}
+	return false
 }
 
 func (s *Store) SaveArticle(siteID, articleID, title, content string) (Article, error) {
@@ -1855,6 +2010,8 @@ func (s *Store) saveArticleLocked(siteID, articleID, title, content, draftID str
 		return Article{}, errors.New("站点不存在")
 	}
 	var draftFiles, removedFiles []string
+	var draftHero string
+	var draftHeroManual bool
 	next := s.data
 	next.Articles = append([]Article{}, s.data.Articles...)
 	if draftID != "" {
@@ -1865,6 +2022,7 @@ func (s *Store) saveArticleLocked(siteID, articleID, title, content, draftID str
 			} else {
 				draftFiles = append([]string(nil), draft.Attachments...)
 				removedFiles = append([]string(nil), draft.RemovedAttachments...)
+				draftHero, draftHeroManual = draft.HeroImage, draft.HeroImageManual
 				queueDraftCleanup(&next, draft, draft.Attachments)
 			}
 		}
@@ -1922,7 +2080,12 @@ func (s *Store) saveArticleLocked(siteID, articleID, title, content, draftID str
 				if err != nil {
 					return Article{}, err
 				}
-				article.HeroImage = DeriveHeroImage(article.Content, article.Attachments)
+				if draftID != "" && draftHeroManual {
+					article.HeroImage, article.HeroImageManual = draftHero, true
+				} else if !article.HeroImageManual {
+					article.HeroImage = DeriveHeroImage(article.Content, article.Attachments)
+					article.HeroImageManual = false
+				}
 				next.Articles[i] = article
 				markContentChange(&next, siteID, true)
 				if err := s.write(next); err != nil {
@@ -1996,7 +2159,11 @@ func (s *Store) saveArticleLocked(siteID, articleID, title, content, draftID str
 	if err != nil {
 		return Article{}, err
 	}
-	article.HeroImage = DeriveHeroImage(article.Content, article.Attachments)
+	if draftHeroManual {
+		article.HeroImage, article.HeroImageManual = draftHero, true
+	} else {
+		article.HeroImage, article.HeroImageManual = DeriveHeroImage(article.Content, article.Attachments), false
+	}
 	next.Articles = append(next.Articles, article)
 	markContentChange(&next, siteID, true)
 	for i := range next.Sites {
@@ -2075,12 +2242,14 @@ func (s *Store) saveDraft(siteID, draftID, articleID, title, content string, tag
 	}
 	var base *time.Time
 	inheritedTags := map[string]string{}
+	inheritedHero, inheritedHeroManual := "", false
 	if articleID != "" {
 		for _, article := range s.data.Articles {
 			if article.SiteID == siteID && article.ID == articleID {
 				value := article.Modified
 				base = &value
 				inheritedTags = copyTags(article.Tags)
+				inheritedHero, inheritedHeroManual = article.HeroImage, article.HeroImageManual
 				break
 			}
 		}
@@ -2095,7 +2264,7 @@ func (s *Store) saveDraft(siteID, draftID, articleID, title, content string, tag
 	if tags != nil {
 		inheritedTags = copyTags(tags)
 	}
-	draft := Draft{ID: id, SiteID: siteID, ArticleID: articleID, Title: title, Content: content, Tags: inheritedTags, Created: now, Modified: now, BaseModified: base}
+	draft := Draft{ID: id, SiteID: siteID, ArticleID: articleID, Title: title, Content: content, Tags: inheritedTags, Created: now, Modified: now, BaseModified: base, HeroImage: inheritedHero, HeroImageManual: inheritedHeroManual}
 	next.Drafts = append(next.Drafts, draft)
 	if err := s.write(next); err != nil {
 		return Draft{}, err
@@ -2240,6 +2409,9 @@ func (s *Store) ChangeDraftAttachment(siteID, draftID, name string, add bool) (D
 			}
 			queueDraftCleanup(&next, draft, []string{name})
 			draft.Attachments = files
+			if draft.HeroImage == name {
+				draft.HeroImage, draft.HeroImageManual = "", false
+			}
 		}
 		draft.Modified = time.Now().UTC()
 		next.Drafts[i] = draft
@@ -2293,6 +2465,9 @@ func (s *Store) SetDraftExistingAttachmentRemoved(siteID, draftID, name string, 
 			return Draft{}, errors.New("该附件未标记为删除")
 		}
 		draft.RemovedAttachments = remaining
+		if removed && draft.HeroImage == name {
+			draft.HeroImage, draft.HeroImageManual = "", false
+		}
 		draft.Modified = time.Now().UTC()
 		next.Drafts[i] = draft
 		if err := s.write(next); err != nil {

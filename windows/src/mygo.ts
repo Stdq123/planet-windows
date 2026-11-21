@@ -37,6 +37,7 @@ export interface Article {
   audioDuration?: number;
   audioByteLength?: number;
   heroImage?: string;
+  heroImageManual?: boolean;
   pinned?: string;
 }
 
@@ -113,6 +114,8 @@ export interface Draft {
   baseModified?: string;
   attachments?: string[];
   removedAttachments?: string[];
+  heroImage?: string;
+  heroImageManual?: boolean;
 }
 
 export interface Entry {
@@ -350,6 +353,11 @@ export interface Subscription {
   offlineSnapshot?: string;
 }
 
+export interface TagUsage {
+  label: string;
+  count: number;
+}
+
 export interface TelegramInfo {
   configured: boolean;
   chatId: string;
@@ -412,6 +420,14 @@ export const Library = {
   applyPresetAvatar: bind<[string, string], Site>("Library.ApplyPresetAvatar", (siteID: string, key: string) => [siteID, key]),
   articles: bind<[string], Article[]>("Library.Articles", (siteID: string) => [siteID]),
   askAI: bind<[string, string, string, string], string>("Library.AskAI", (prompt: string, contextTitle: string, contextBody: string, historyJSON: string) => [prompt, contextTitle, contextBody, historyJSON]),
+  /**
+   * AttachArticleFiles opens a native picker for one kind of editor attachment
+   * ("image", "video", or "audio") and records every selected file on the saved
+   * article, mirroring the macOS writer toolbar entries.
+   */
+  attachArticleFiles: bind<[string, string, string], Article>("Library.AttachArticleFiles", (siteID: string, articleID: string, kind: string) => [siteID, articleID, kind]),
+  /** AttachDraftFiles is the draft counterpart of AttachArticleFiles. */
+  attachDraftFiles: bind<[string, string, string], Draft>("Library.AttachDraftFiles", (siteID: string, draftID: string, kind: string) => [siteID, draftID, kind]),
   /** AudioURL provides a revocable loopback stream for the selected article audio. */
   audioURL: bind<[string, string], string>("Library.AudioURL", (siteID: string, articleID: string) => [siteID, articleID]),
   builtinTemplatePreview: bind<[string], string>("Library.BuiltinTemplatePreview", (id: string) => [id]),
@@ -455,6 +471,14 @@ export const Library = {
   disableXSync: bind<[string], void>("Library.DisableXSync", (siteID: string) => [siteID]),
   downloadUpdate: bind<[string, string], string>("Library.DownloadUpdate", (version: string, sha256: string) => [version, sha256]),
   drafts: bind<[string], Draft[]>("Library.Drafts", (siteID: string) => [siteID]),
+  /**
+   * EditorAttachmentMediaURL streams an article or draft attachment (audio or
+   * video) for the editor players over the private loopback server. One server
+   * serves both players; StopEditorMedia revokes it when the editor moves on.
+   */
+  editorAttachmentMediaURL: bind<[string, string, string, string], string>("Library.EditorAttachmentMediaURL", (siteID: string, articleID: string, draftID: string, name: string) => [siteID, articleID, draftID, name]),
+  /** EditorAttachmentThumbnail returns a small inline preview for the media tray. */
+  editorAttachmentThumbnail: bind<[string, string, string, string], string>("Library.EditorAttachmentThumbnail", (siteID: string, articleID: string, draftID: string, name: string) => [siteID, articleID, draftID, name]),
   exportIPNSKey: bind<[string], string>("Library.ExportIPNSKey", (name: string) => [name]),
   /** ExportPlanet writes a .planet backup containing the site's private key. */
   exportPlanet: bind<[string], string>("Library.ExportPlanet", (siteID: string) => [siteID]),
@@ -537,16 +561,30 @@ export const Library = {
   selectSiteAvatar: bind<[string], Site>("Library.SelectSiteAvatar", (siteID: string) => [siteID]),
   selectTemplate: bind<[string], Site>("Library.SelectTemplate", (siteID: string) => [siteID]),
   serviceInfo: bind<[string, string], ServiceInfo>("Library.ServiceInfo", (siteID: string, kind: string) => [siteID, kind]),
+  /** SetArticleHeroImage records an explicit cover choice; an empty name clears it. */
+  setArticleHeroImage: bind<[string, string, string], Article>("Library.SetArticleHeroImage", (siteID: string, articleID: string, name: string) => [siteID, articleID, name]),
   setArticlePinned: bind<[string, string, boolean], Article>("Library.SetArticlePinned", (siteID: string, articleID: string, pinned: boolean) => [siteID, articleID, pinned]),
   setDraftExistingAttachmentRemoved: bind<[string, string, string, boolean], Draft>("Library.SetDraftExistingAttachmentRemoved", (siteID: string, draftID: string, name: string, removed: boolean) => [siteID, draftID, name, removed]),
+  /** SetDraftHeroImage records an explicit cover choice on a draft; empty clears it. */
+  setDraftHeroImage: bind<[string, string, string], Draft>("Library.SetDraftHeroImage", (siteID: string, draftID: string, name: string) => [siteID, draftID, name]),
   /** SetIPFSEnabled persists the user's node preference and controls the owned daemon. */
   setIPFSEnabled: bind<[boolean], void>("Library.SetIPFSEnabled", (enabled: boolean) => [enabled]),
   setSaveRoundAvatar: bind<[string, boolean], Site>("Library.SetSaveRoundAvatar", (siteID: string, round: boolean) => [siteID, round]),
   setSubscriptionRead: bind<[string, string, boolean], void>("Library.SetSubscriptionRead", (address: string, key: string, read: boolean) => [address, key, read]),
+  /**
+   * SiteAvailableTags lists the labels already used across the site's articles
+   * with per-label counts, mirroring the macOS writer's Previously Used Tags.
+   */
+  siteAvailableTags: bind<[string], TagUsage[]>("Library.SiteAvailableTags", (siteID: string) => [siteID]),
   sites: bind<[], Site[]>("Library.Sites", () => []),
   starSubscription: bind<[string, string, boolean], void>("Library.StarSubscription", (address: string, key: string, starred: boolean) => [address, key, starred]),
   /** StopAudio revokes the requested stream without stopping newer playback. */
   stopAudio: bind<[string], void>("Library.StopAudio", (address: string) => [address]),
+  /**
+   * StopEditorMedia revokes the editor media stream when playback ends or the
+   * attachment is removed.
+   */
+  stopEditorMedia: bind<[], void>("Library.StopEditorMedia", () => []),
   /** SubscriptionAudioURL streams a registered Planet audio file from a private temporary copy. */
   subscriptionAudioURL: bind<[string, string], string>("Library.SubscriptionAudioURL", (address: string, key: string) => [address, key]),
   /** SubscriptionMediaURL serves an already-fixed feed media file without network access. */

@@ -89,7 +89,7 @@ function setMetadataOpen(open: boolean) {
   metadata.hidden = !open; metadataToggle.setAttribute("aria-expanded", String(open));
   if (open) syncMetadataLayout();
 }
-metadataToggle.addEventListener("click", () => setMetadataOpen(!!metadata.hidden));
+metadataToggle.addEventListener("click", () => { const open = !!metadata.hidden; setMetadataOpen(open); if (open) void loadTagUsage(); });
 $("#close-metadata").addEventListener("click", () => { setMetadataOpen(false); metadataToggle.focus(); });
 document.addEventListener("click", event => {
   if (!metadata.hidden && !metadata.contains(event.target as Node) && !metadataToggle.contains(event.target as Node)) setMetadataOpen(false);
@@ -259,10 +259,13 @@ ipfsDialog.addEventListener("close", () => { ipfsStatusRevision++; clearTimeout(
 try { publicGateway.value = selectedGateway(window.localStorage.getItem(gatewayKey)); }
 catch { publicGateway.value = "eth.sucks"; }
 syncChoices(publicGateway.parentElement!);
-const addAttachment = $<HTMLButtonElement>("#add-attachment"), attachmentList = $("#attachment-list"), attachmentHelp = $("#attachment-help");
-const tagInput=$<HTMLInputElement>("#tag-input"), addTag=$<HTMLButtonElement>("#add-tag"), tagList=$("#tag-list");
+const attachPhoto = $<HTMLButtonElement>("#attach-photo"), attachVideo = $<HTMLButtonElement>("#attach-video"), attachAudio = $<HTMLButtonElement>("#attach-audio");
+const tagInput=$<HTMLInputElement>("#tag-input"), addTag=$<HTMLButtonElement>("#add-tag"), tagInlineList=$("#tag-inline-list"), tagInlineInput=$<HTMLInputElement>("#tag-inline-input"), tagUsageSection=$("#tag-usage"), tagUsageList=$("#tag-usage-list");
 const importedWarning = $("#imported-warning");
-const playArticleAudio = $<HTMLButtonElement>("#play-article-audio"), audioPlayer = $("#audio-player"), audioTitle = $("#audio-title"), globalAudio = $<HTMLAudioElement>("#global-audio"), globalVideo = $<HTMLVideoElement>("#global-video");
+const audioPlayer = $("#audio-player"), audioTitle = $("#audio-title"), globalAudio = $<HTMLAudioElement>("#global-audio"), globalVideo = $<HTMLVideoElement>("#global-video");
+const editorMedia = $("#editor-media"), editorVideoPlayer = $("#editor-video-player"), editorVideo = $<HTMLVideoElement>("#editor-video");
+const editorAudioPlayer = $("#editor-audio-player"), editorAudio = $<HTMLAudioElement>("#editor-audio"), editorAudioName = $("#editor-audio-name");
+const mediaTray = $("#media-tray"), mediaTrayItems = $("#media-tray-items");
 let activeMedia: HTMLMediaElement = globalAudio;
 let audioRevision = 0, playingSiteID = "", playingArticleID = "";
 let audioRequest: Promise<void> = Promise.resolve();
@@ -299,23 +302,28 @@ const xSync = initXSync({
 
 function tagSignature(): string { return JSON.stringify([...editorTags.entries()].sort(([a],[b])=>a.localeCompare(b))); }
 function tagJSON(): string { return JSON.stringify(Object.fromEntries(editorTags)); }
-function setEditorTags(tags?: Record<string,string>) { editorTags=new Map(Object.entries(tags ?? {}));savedTagSignature=tagSignature();tagInput.value=""; }
+function setEditorTags(tags?: Record<string,string>) { editorTags=new Map(Object.entries(tags ?? {}));savedTagSignature=tagSignature();tagInput.value="";tagInlineInput.value=""; }
 function normalizedTag(value:string):string {
   return value.toLowerCase().normalize("NFD").replace(/\p{M}/gu,"").replace(/[^\p{L}\p{N}-]+/gu,"-").replace(/-+/g,"-").replace(/^-|-$/g,"");
 }
-function addEditorTag() {
+function addEditorTag(field: HTMLInputElement) {
   if (!editing || saving || site?.tagsUnsupported) return;
-  const value=tagInput.value.trim(), key=normalizedTag(value);
+  const value=field.value.trim(), key=normalizedTag(value);
   if (!key || /^(?:index|tags|archive|archives|page[0-9]+|con|prn|aux|nul|(?:com|lpt)[1-9¹²³])$/i.test(key)) {showError("标签名称不能生成安全路径，请换一个名称。");return;}
   if ([...editorTags.keys()].some(old=>old.toLowerCase()===key.toLowerCase())) {showError("标签已存在。");return;}
-  editorTags.set(key,value);tagInput.value="";dirty=true;navigationRevision++;clearError();updateView();
+  editorTags.set(key,value);field.value="";dirty=true;navigationRevision++;clearError();updateView();
 }
-addTag.addEventListener("click",addEditorTag);
-tagInput.addEventListener("keydown",event=>{if(event.key==="Enter" && !event.isComposing && event.keyCode!==229){event.preventDefault();addEditorTag();}});
+addTag.addEventListener("click",()=>addEditorTag(tagInput));
+tagInput.addEventListener("keydown",event=>{if(event.key==="Enter" && !event.isComposing && event.keyCode!==229){event.preventDefault();addEditorTag(tagInput);}});
 tagInput.addEventListener("input",()=>{dirty=true;navigationRevision++;updateView();});
+tagInlineInput.addEventListener("keydown",event=>{if(event.key==="Enter" && !event.isComposing && event.keyCode!==229){event.preventDefault();addEditorTag(tagInlineInput);}});
+tagInlineInput.addEventListener("input",()=>{dirty=true;navigationRevision++;updateView();});
 function pendingTagBlocksSave(): boolean {
-  if (!tagInput.value.trim()) return false;
-  setMetadataOpen(true); showError("请先添加标签，或清空标签输入框后再保存。");tagInput.focus();return true;
+  for (const field of [tagInput, tagInlineInput]) {
+    if (!field.value.trim()) continue;
+    setMetadataOpen(true); showError("请先添加标签，或清空标签输入框后再保存。");field.focus();return true;
+  }
+  return false;
 }
 let navigationRevision = 0, favoritesView = false, readerRevision = 0;
 let smartView: "today" | "unread" | null = null;
@@ -639,15 +647,13 @@ function updateView() {
   readButton.textContent=item?.read ? "标为未读" : "标为已读";readButton.title=readButton.textContent;readButton.setAttribute("aria-label",readButton.textContent);readButton.setAttribute("aria-pressed", String(Boolean(item && !item.read)));readButton.disabled=!item || !subscription || pendingRead.has(readKey) || bulkReading.has(subscription.url);
   const markFeed=$<HTMLButtonElement>("#mark-feed-read");markFeed.hidden=!subscription;markFeed.disabled=!subscription || bulkReading.has(subscription.url) || [...pendingRead].some(key=>key.startsWith(`${subscription!.url}\u0000`)) || !subscription.feed.items.some(entry=>!entry.read);
   deleteArticle.hidden = (!article && !draft) || !!subscription; deleteArticle.textContent=draft ? "删除草稿" : "删除文章";
-  addAttachment.disabled = (!article && !draft) || !site || saving;
-	 tagInput.disabled = !editing || saving || !!site?.tagsUnsupported; addTag.disabled = tagInput.disabled;
-	 tagList.replaceChildren();
+	 tagInput.disabled = !editing || saving || !!site?.tagsUnsupported; addTag.disabled = tagInput.disabled; tagInlineInput.disabled = tagInput.disabled;
+	 tagInlineList.replaceChildren();
 	 for (const [key,value] of editorTags) {
 	   const item=label("span",value,"tag-item"), remove=document.createElement("button");
 	   remove.type="button";remove.className="remove-tag";remove.textContent="×";remove.setAttribute("aria-label",`删除标签 ${value}`);remove.disabled=tagInput.disabled;
-	   remove.addEventListener("click",()=>{if(saving || site?.tagsUnsupported)return;editorTags.delete(key);dirty=true;navigationRevision++;updateView();});item.append(remove);tagList.append(item);
+	   remove.addEventListener("click",()=>{if(saving || site?.tagsUnsupported)return;editorTags.delete(key);dirty=true;navigationRevision++;updateView();});item.append(remove);tagInlineList.append(item);
 	 }
-  playArticleAudio.hidden = !article?.audioFilename || !site; playArticleAudio.disabled = saving;
   const ownAudio=$<HTMLButtonElement>("#play-own-audio");ownAudio.hidden=!article?.audioFilename || !site;ownAudio.disabled=saving;
   const articleSettings=$<HTMLButtonElement>("#article-settings");articleSettings.disabled=!article || !site || saving;articleSettings.title="文章路径、类型与导航设置";
   $<HTMLButtonElement>("#share-own-article").disabled=!site?.ipns || !site.lastPublishedCID || !article;
@@ -655,15 +661,14 @@ function updateView() {
   let currentOwnShare="";
   if(site?.ipns && site.lastPublishedCID && article){try{currentOwnShare=sitePublicURL(selectedGateway(publicGateway.value),site.ipns,site.domain,`/${encodeURIComponent(article.slug || article.id)}/`);}catch{ /* The copy action reports unsupported gateway names. */ }}
   if(ownShareInput.value && ownShareInput.value!==currentOwnShare){ownShareInput.value="";ownShareInput.hidden=true;$("#own-share-status").textContent="";}
-  attachmentList.replaceChildren();
-  for (const name of [...(article?.attachments ?? []), ...(draft?.attachments ?? [])]) {
-    const marked = !!draft?.removedAttachments?.includes(name);
-    const item = label("span", marked ? `${name}（发布时删除）` : name, "attachment-item");
-    const remove = document.createElement("button"); remove.className = "remove-attachment"; remove.textContent = marked ? "撤销" : "×"; remove.title = marked ? `撤销删除附件 ${name}` : `删除附件 ${name}`; remove.setAttribute("aria-label", remove.title); remove.disabled = saving;
-    remove.addEventListener("click", () => void removeAttachment(name)); item.append(remove);
-    attachmentList.append(item);
-  }
-  attachmentHelp.textContent = draft ? "新增附件仅保存在本机；删除原文章附件会在发布草稿时生效，可随时撤销" : article ? "附件立即保存；保存文章或手动发布后生效，插入的链接需保存文章" : "先保存草稿或文章，再添加附件";
+  // Attachment entry points stay available while writing: the first attach
+  // lazily creates the local draft, matching the macOS writer which always
+  // operates on an existing draft.
+  const editorAttachmentsReady = !!site && editing && !saving;
+  for (const button of [attachPhoto, attachVideo, attachAudio]) button.disabled = !editorAttachmentsReady;
+  attachVideo.title = editorVideoAttachmentName() ? `替换现有视频附件（${editorVideoAttachmentName()}）` : "添加视频附件（每篇文章一个）";
+  attachAudio.title = editorAudioAttachmentName() ? `替换现有音频附件（${editorAudioAttachmentName()}）` : "添加音频附件（每篇文章一个）";
+  syncEditorMediaUI();
   importedWarning.hidden = !site?.imported;
   importedWarning.textContent = site?.templateId ? "这是导入的原版站点。通过检查的导入站点可重新生成网页并发布，保留原 IPNS 和已登记附件。" : "这是导入的原版站点。请先选择已验证的模板，才能尝试重建或发布兼容的站点。";
 	 if(site?.tagsUnsupported) importedWarning.textContent += " 原备份标签格式不受支持，已保留原始数据；当前不能编辑标签或重建该站点。";
@@ -701,8 +706,7 @@ function updateView() {
   const unpublished = !!site && ((site.contentRevision ?? 0) > (site.publishedRevision ?? 0) || !!site.publishPending || !!publication && publication.changes > publication.publishedChanges);
   saveState.textContent = saving ? busyMessage || "正在处理…" : publication?.running ? `${current}${current ? "，" : ""}正在发布已保存内容…` : publication?.status === "failed" ? `${current}${current ? "，" : ""}发布未确认` : unpublished ? `${current}${current ? "，" : ""}站点更改尚未发布` : publication?.status === "published" ? `${current}${current ? "，" : ""}${dirty ? "已发布上次保存的内容" : "已发布"}` : current;
   saveState.title = publication?.error || saveState.textContent;
-  const attachmentCount = attachmentList.childElementCount;
-  $("#metadata-count").textContent = editorTags.size || attachmentCount ? `${editorTags.size} 个标签 / ${attachmentCount} 个附件` : "";
+  $("#metadata-count").textContent = editorTags.size ? `${editorTags.size}` : "";
   const notice = $("#library-notice"), retry = $<HTMLButtonElement>("#retry-library");
   if (overview) $(".dashboard-header").after(notice, errorEl);
   else { $(".workspace-header").after(notice); workspace.append(errorEl); }
@@ -826,7 +830,7 @@ $("#share-own-article").addEventListener("click",async()=>{
     catch {shareInput.hidden=false;shareInput.focus();shareInput.select();status.textContent=`请按 Ctrl+C 复制${warning}`;}
   } catch(error){showError(error);}
 });
-$("#play-own-audio").addEventListener("click",()=>playArticleAudio.click());
+$("#play-own-audio").addEventListener("click",()=>playArticleAudioGlobal());
 function selectDraft(item: Draft) {
   if (!canLeave()) return;
   editorView="write"; setMetadataOpen(false);
@@ -2285,7 +2289,7 @@ feedForm.addEventListener("submit", async (event) => {
 });
 newArticle.addEventListener("click", startArticle);
 $("#new-article-header").addEventListener("click", startArticle);
-playArticleAudio.addEventListener("click", () => {
+function playArticleAudioGlobal() {
   if (!site || !article?.audioFilename) return;
   const siteID = site.id, articleID = article.id, label = article.title || article.audioFilename, revision = ++audioRevision;
   audioRequest = audioRequest.catch(() => {}).then(async () => {
@@ -2296,7 +2300,7 @@ playArticleAudio.addEventListener("click", () => {
       playingSiteID = siteID; playingArticleID = articleID; startPlayback(address,label,false);
     } catch (e) { if (revision === audioRevision) showError(e); }
   });
-});
+}
 function startPlayback(address:string,label:string,video:boolean) { const next=video ? globalVideo : globalAudio; if(activeMedia!==next) {activeMedia.pause();activeMedia.removeAttribute("src");} activeMedia=next;globalAudio.hidden=video;globalVideo.hidden=!video;audioTitle.textContent=label;activeMedia.src=address;audioPlayer.hidden=false;void activeMedia.play().catch(()=>{}); }
 function closeAudio() { audioRevision++; activeMedia.pause(); const previous = activeMedia.src; activeMedia.removeAttribute("src"); audioPlayer.hidden = true; playingSiteID = ""; playingArticleID = ""; void Library.stopAudio(previous).catch(showError); }
 $("#play-feed-audio").addEventListener("click", () => {
@@ -2333,45 +2337,210 @@ $("#close-audio").addEventListener("click", closeAudio);
 for(const media of [globalAudio,globalVideo]) media.addEventListener("error", () => { if (!audioPlayer.hidden && activeMedia===media) showError("无法播放媒体，文件可能不存在或格式不受 Windows 支持。"); });
 $("#audio-back").addEventListener("click", () => { activeMedia.currentTime = Math.max(0, activeMedia.currentTime - 10); });
 $("#audio-forward").addEventListener("click", () => { activeMedia.currentTime = Math.min(Number.isFinite(activeMedia.duration) ? activeMedia.duration : activeMedia.currentTime + 10, activeMedia.currentTime + 10); });
-async function removeAttachment(name: string) {
+async function removeAttachment(name: string, stripReference = false) {
   if (!site || (!article && !draft) || saving) return;
   const existingDraftAttachment = !!draft && !(draft.attachments ?? []).includes(name), marked = !!draft?.removedAttachments?.includes(name);
-  if (!marked && !window.confirm(`删除附件“${name}”？文章中的链接不会自动删除。`)) return;
+  const removing = !marked;
+  if (removing && !window.confirm(stripReference ? `删除附件“${name}”？正文中的引用会一并移除。` : `删除附件“${name}”？`)) return;
   const siteID = site.id, articleID = article?.id ?? "", draftID = draft?.id ?? "";
   navigationRevision++; saving = true; busyMessage = "正在处理附件，可能需等待发布完成…"; updateView(); clearError();
   try {
     if (draftID) {
       const updated = existingDraftAttachment ? await Library.setDraftExistingAttachmentRemoved(siteID, draftID, name, !marked) : await Library.removeDraftAttachment(siteID, draftID, name);
-      if (site?.id === siteID && draft?.id === draftID) { draft = updated; drafts = drafts.map(entry => entry.id === draftID ? updated : entry); void renderPreview(); }
+      if (site?.id === siteID && draft?.id === draftID) {
+        draft = updated; drafts = drafts.map(entry => entry.id === draftID ? updated : entry);
+        if (removing && stripReference && attachmentKindOf(name) !== "video" && attachmentKindOf(name) !== "audio") { stripAttachmentReferences(name); dirty = true; void renderPreview(); }
+        else void renderPreview();
+      }
       return;
     }
     const updated = await Library.removeAttachment(siteID, articleID, name);
     if (playingSiteID === siteID && playingArticleID === articleID && article?.audioFilename === name) closeAudio();
     markLocalChange(siteID);
-    if (site?.id === siteID && article?.id === articleID) { article = updated; articles = await Library.articles(siteID); void renderPreview(); }
-  } catch (e) { showError(e); }
-  finally { saving = false; busyMessage = ""; updateView(); }
-}
-addAttachment.addEventListener("click", async () => {
-  if (!site || (!article && !draft) || saving) return;
-  const siteID = site.id, articleID = article?.id ?? "", draftID = draft?.id ?? "", previous = new Set(draft ? draft.attachments ?? [] : article?.attachments ?? []);
-  navigationRevision++; saving = true; busyMessage = "正在处理附件，可能需等待发布完成…"; updateView(); clearError();
-  try {
-    const updated = draftID ? await Library.addDraftAttachment(siteID, draftID) : await Library.addAttachment(siteID, articleID);
-    if (!updated.id || site?.id !== siteID || (draftID ? draft?.id !== draftID : article?.id !== articleID)) return;
-    const name = updated.attachments?.find(item => !previous.has(item));
-    if (draftID) { draft = updated as Draft; drafts = drafts.map(entry => entry.id === draftID ? draft! : entry); }
-    else { article = updated as Article; markLocalChange(siteID); articles = await Library.articles(siteID); }
-    if (name) {
-      const label = name.replace(/[\\\[\]]/g, "\\$&");
-      const url = encodeURIComponent(name).replace(/[()]/g, ch => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`);
-      const image = /\.(png|jpe?g|gif|webp|svg)$/i.test(name);
-      content.value += `${content.value ? "\n\n" : ""}${image ? "!" : ""}[${label}](${url})`;
-      dirty = true; navigationRevision++; void renderPreview();
+    if (site?.id === siteID && article?.id === articleID) {
+      article = updated; articles = await Library.articles(siteID);
+      if (stripReference && attachmentKindOf(name) !== "video" && attachmentKindOf(name) !== "audio") { stripAttachmentReferences(name); dirty = true; }
+      void renderPreview();
     }
   } catch (e) { showError(e); }
   finally { saving = false; busyMessage = ""; updateView(); }
-});
+}
+// Editor attachments follow the macOS writer: one video and one audio per
+// article, image/file references inserted at the cursor, a media tray for
+// everything except the current video, and an explicit cover image.
+function attachmentKindOf(name: string): "audio" | "video" | "image" | "file" {
+  const ext = (name.includes(".") ? name.slice(name.lastIndexOf(".") + 1) : name).toLowerCase();
+  if (["mp3", "m4a", "aac", "wav", "ogg", "opus", "flac"].includes(ext)) return "audio";
+  if (["mp4", "mov", "m4v", "webm", "avi", "mpeg", "mpg"].includes(ext)) return "video";
+  if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)) return "image";
+  return "file";
+}
+function attachmentMarkdownURL(name: string): string {
+  return encodeURIComponent(name).replace(/[()]/g, ch => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+function attachmentMarkdownLabel(name: string): string {
+  return name.replace(/[\\\[\]]/g, "\\$&");
+}
+function currentAttachmentNames(): string[] {
+  return [...(draft ? draft.attachments ?? [] : []), ...(draft ? [] : article?.attachments ?? [])];
+}
+function editorVideoAttachmentName(): string {
+  const list = currentAttachmentNames();
+  if (draft) return list.find(n => attachmentKindOf(n) === "video") ?? "";
+  return article?.videoFilename && list.includes(article.videoFilename) ? article.videoFilename : article?.videoFilename ?? "";
+}
+function editorAudioAttachmentName(): string {
+  const list = currentAttachmentNames();
+  if (draft) return list.find(n => attachmentKindOf(n) === "audio") ?? "";
+  return article?.audioFilename && list.includes(article.audioFilename) ? article.audioFilename : article?.audioFilename ?? "";
+}
+function currentHeroImageName(): string {
+  return draft ? draft.heroImage ?? "" : article?.heroImage ?? "";
+}
+function insertIntoContent(snippet: string) {
+  const start = content.selectionStart ?? content.value.length;
+  const end = content.selectionEnd ?? start;
+  content.value = content.value.slice(0, start) + snippet + content.value.slice(Math.max(start, end));
+  content.selectionStart = content.selectionEnd = start + snippet.length;
+  content.focus();
+}
+function renameAttachmentReferences(oldName: string, newName: string) {
+  if (oldName === newName || !content.value.includes(oldName)) return;
+  content.value = content.value.split(oldName).join(newName);
+}
+function stripAttachmentReferences(name: string) {
+  const url = attachmentMarkdownURL(name);
+  const pattern = new RegExp(`!?\\[[^\\]]*\\]\\(<?(?:${url.replace(/[()]/g, "\\$&")}|${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})>?\\)`, "g");
+  content.value = content.value.replace(pattern, "").replace(/\n{3,}/g, "\n\n");
+}
+function syncEditorAttachmentState(updated: Draft | Article, siteID: string, draftID: string, articleID: string) {
+  if (draftID) {
+    draft = updated as Draft;
+    drafts = drafts.map(entry => entry.id === draftID ? draft! : entry);
+  } else {
+    article = updated as Article;
+    markLocalChange(siteID);
+    void Library.articles(siteID).then(loaded => { if (site?.id === siteID) articles = loaded; }).catch(() => {});
+  }
+  dirty = true; navigationRevision++; void renderPreview();
+}
+// A brand-new article has no backend object until it is saved once; the first
+// attachment creates the local draft immediately so the editor behaves like the
+// macOS writer, which always works on an existing draft.
+async function ensureEditorDraft(): Promise<string> {
+  if (draft?.id) return draft.id;
+  if (article?.id || !site) return "";
+  navigationRevision++; saving = true; busyMessage = "正在创建本地草稿…"; updateView(); clearError();
+  const siteID = site.id;
+  try {
+    const created = await Library.saveDraft(siteID, "", "", title.value, content.value);
+    if (site?.id !== siteID || !created.id) return "";
+    draft = created; drafts = [...drafts, created];
+    return created.id;
+  } catch (e) { showError(e); return ""; }
+  finally { saving = false; busyMessage = ""; updateView(); }
+}
+
+async function runEditorAttach(kind: "image" | "video" | "audio") {
+  if (!site || !editing || saving) return;
+  if (!draft?.id && !article?.id) {
+    const createdID = await ensureEditorDraft();
+    if (!createdID) return;
+  }
+  if (!site || (!article && !draft) || saving) return;
+  if (kind === "video" || kind === "audio") {
+    const existing = currentAttachmentNames().find(n => attachmentKindOf(n) === kind);
+    if (existing && !window.confirm(`这篇文章已有一个${kind === "video" ? "视频" : "音频"}附件（${existing}）。用新选择的文件替换它吗？`)) return;
+  }
+  const siteID = site.id, articleID = article?.id ?? "", draftID = draft?.id ?? "";
+  const previous = new Set(currentAttachmentNames());
+  navigationRevision++; saving = true; busyMessage = "正在添加附件…"; updateView(); clearError();
+  try {
+    const updated = draftID ? await Library.attachDraftFiles(siteID, draftID, kind) : await Library.attachArticleFiles(siteID, articleID, kind);
+    if (!updated.id || site?.id !== siteID || (draftID ? draft?.id !== draftID : article?.id !== articleID)) return;
+    const names = updated.attachments ?? [];
+    const added = names.filter(n => !previous.has(n));
+    const removed = [...previous].filter(n => !names.includes(n));
+    if (draftID) { draft = updated as Draft; drafts = drafts.map(entry => entry.id === draftID ? draft! : entry); }
+    else { article = updated as Article; markLocalChange(siteID); articles = await Library.articles(siteID); }
+    // Replacing the single video/audio keeps references valid like the macOS writer.
+    const removedMedia = removed.filter(n => attachmentKindOf(n) === "video" || attachmentKindOf(n) === "audio");
+    if (removedMedia.length === 1 && added.length === 1 && attachmentKindOf(added[0]!) === attachmentKindOf(removedMedia[0]!)) {
+      renameAttachmentReferences(removedMedia[0]!, added[0]!);
+    }
+    for (const name of added) {
+      const addedKind = attachmentKindOf(name);
+      if (addedKind === "image") insertIntoContent(`![${attachmentMarkdownLabel(name)}](${attachmentMarkdownURL(name)})`);
+      else if (addedKind === "file") insertIntoContent(`[${attachmentMarkdownLabel(name)}](${attachmentMarkdownURL(name)})`);
+    }
+    dirty = true; navigationRevision++; void renderPreview();
+  } catch (e) {
+    showError(e);
+    try {
+      if (draftID) draft = (await Library.drafts(siteID)).find(entry => entry.id === draftID) ?? draft;
+      else if (articleID) article = (await Library.articles(siteID)).find(entry => entry.id === articleID) ?? article;
+    } catch { /* keep the last known editor state */ }
+  }
+  finally { saving = false; busyMessage = ""; updateView(); }
+}
+for (const [button, kind] of [[attachPhoto, "image"], [attachVideo, "video"], [attachAudio, "audio"]] as const) {
+  button.addEventListener("click", () => void runEditorAttach(kind));
+}
+async function addEditorAttachmentFiles(files: File[]) {
+  if (!site || !editing || saving || !files.length) return;
+  if (!draft?.id && !article?.id) {
+    const createdID = await ensureEditorDraft();
+    if (!createdID) return;
+  }
+  if (!site || (!article && !draft)) return;
+  const videos = files.filter(f => attachmentKindOf(f.name) === "video" || f.type.startsWith("video/"));
+  const audios = files.filter(f => attachmentKindOf(f.name) === "audio" || f.type.startsWith("audio/"));
+  if (videos.length > 1 || audios.length > 1) {
+    showError("每次只能添加一个视频或音频附件。"); return;
+  }
+  if (videos.length === 1 || audios.length === 1) {
+    const kind = videos.length === 1 ? "video" : "audio";
+    const existing = currentAttachmentNames().find(n => attachmentKindOf(n) === kind);
+    if (existing && !window.confirm(`这篇文章已有一个${kind === "video" ? "视频" : "音频"}附件（${existing}）。用新文件替换它吗？`)) return;
+  }
+  for (const file of files) {
+    const kind = file.type.startsWith("image/") || file.type.startsWith("video/") || file.type.startsWith("audio/") ? file.type.split("/")[0]! : attachmentKindOf(file.name);
+    const siteID: string = site.id, articleID = article?.id ?? "", draftID = draft?.id ?? "";
+    const previous = new Set(currentAttachmentNames());
+    navigationRevision++; saving = true; busyMessage = kind === "image" ? "正在转存图片附件…" : "正在转存附件…"; updateView(); clearError();
+    try {
+      const buffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
+      const b64 = window.btoa(binary);
+      const rawName = file.name || `paste-${Date.now()}.${kind === "image" ? "png" : "bin"}`;
+      const updated = draftID
+        ? await Library.addDraftAttachmentBytes(siteID, draftID, rawName, b64)
+        : await Library.addAttachmentBytes(siteID, articleID, rawName, b64);
+      if (!updated.id || site?.id !== siteID || (draftID ? draft?.id !== draftID : article?.id !== articleID)) return;
+      const names = updated.attachments ?? [];
+      const added = names.filter(n => !previous.has(n));
+      const removed = [...previous].filter(n => !names.includes(n));
+      if (draftID) { draft = updated as Draft; drafts = drafts.map(entry => entry.id === draftID ? draft! : entry); }
+      else { article = updated as Article; markLocalChange(siteID); articles = await Library.articles(siteID); }
+      const removedMedia = removed.filter(n => attachmentKindOf(n) === "video" || attachmentKindOf(n) === "audio");
+      if (removedMedia.length === 1 && added.length === 1 && attachmentKindOf(added[0]!) === attachmentKindOf(removedMedia[0]!)) {
+        renameAttachmentReferences(removedMedia[0]!, added[0]!);
+      }
+      if (added.length === 1) {
+        const name = added[0]!, addedKind = attachmentKindOf(name);
+        if (addedKind === "image") insertIntoContent(`![${attachmentMarkdownLabel(name)}](${attachmentMarkdownURL(name)})`);
+        else if (addedKind === "file") insertIntoContent(`[${attachmentMarkdownLabel(name)}](${attachmentMarkdownURL(name)})`);
+      }
+      dirty = true; navigationRevision++; void renderPreview();
+    } catch (e) {
+      showError(e);
+    } finally {
+      saving = false; busyMessage = ""; updateView();
+    }
+  }
+}
 publicGateway.addEventListener("change", () => {
   publicGateway.value = selectedGateway(publicGateway.value);
   try { window.localStorage.setItem(gatewayKey, publicGateway.value); }
@@ -2436,48 +2605,11 @@ content.addEventListener("keydown", event => {
   }
 });
 
-async function addEditorAttachmentFile(file: File) {
-  if (!site || (!article && !draft) || saving) return;
-  const siteID = site.id, articleID = article?.id ?? "", draftID = draft?.id ?? "";
-  const previous = new Set(draft ? draft.attachments ?? [] : article?.attachments ?? []);
-  const buffer = await file.arrayBuffer();
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!);
-  const b64 = window.btoa(binary);
-  const rawName = file.name || `paste-${Date.now()}.png`;
-  navigationRevision++; saving = true; busyMessage = "正在转存图片附件…"; updateView(); clearError();
-  try {
-    const updated = draftID
-      ? await Library.addDraftAttachmentBytes(siteID, draftID, rawName, b64)
-      : await Library.addAttachmentBytes(siteID, articleID, rawName, b64);
-    if (!updated.id || site?.id !== siteID || (draftID ? draft?.id !== draftID : article?.id !== articleID)) return;
-    const name = updated.attachments?.find(item => !previous.has(item)) ?? rawName;
-    if (draftID) {
-      draft = updated as Draft;
-      drafts = drafts.map(entry => entry.id === draftID ? draft! : entry);
-    } else {
-      article = updated as Article;
-      markLocalChange(siteID);
-      articles = await Library.articles(siteID);
-    }
-    const labelText = name.replace(/[\\\[\]]/g, "\\$&");
-    const url = encodeURIComponent(name).replace(/[()]/g, ch => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`);
-    const isImg = /\.(png|jpe?g|gif|webp|svg)$/i.test(name);
-    content.value += `${content.value ? "\n\n" : ""}${isImg ? "!" : ""}[${labelText}](${url})`;
-    dirty = true; navigationRevision++; void renderPreview();
-  } catch (e) {
-    showError(e);
-  } finally {
-    saving = false; busyMessage = ""; updateView();
-  }
-}
-
 content.addEventListener("paste", event => {
-  const files = Array.from(event.clipboardData?.files ?? []).filter(f => f.type.startsWith("image/"));
+  const files = Array.from(event.clipboardData?.files ?? []);
   if (!files.length || !site || (!article && !draft) || saving) return;
   event.preventDefault();
-  void addEditorAttachmentFile(files[0]!);
+  void addEditorAttachmentFiles(files);
 });
 content.addEventListener("dragover", event => {
   if (event.dataTransfer?.types?.includes("Files")) event.preventDefault();
@@ -2486,7 +2618,178 @@ content.addEventListener("drop", event => {
   const files = Array.from(event.dataTransfer?.files ?? []);
   if (!files.length || !site || (!article && !draft) || saving) return;
   event.preventDefault();
-  void addEditorAttachmentFile(files[0]!);
+  void addEditorAttachmentFiles(files);
+});
+mediaTrayItems.addEventListener("dragover", event => {
+  if (event.dataTransfer?.types?.includes("Files")) event.preventDefault();
+});
+mediaTrayItems.addEventListener("drop", event => {
+  const files = Array.from(event.dataTransfer?.files ?? []);
+  if (!files.length || !site || (!article && !draft) || saving) return;
+  event.preventDefault();
+  void addEditorAttachmentFiles(files);
+});
+
+const thumbnailCache = new Map<string, string>();
+let editorMediaKey = "";
+let trayKey = "";
+
+function editorMediaIdentity(): string {
+  return `${site?.id ?? ""}|${draft?.id ?? article?.id ?? ""}|${editorVideoAttachmentName()}|${editorAudioAttachmentName()}`;
+}
+
+async function syncEditorPlayers() {
+  const video = editorVideoAttachmentName(), audio = editorAudioAttachmentName();
+  const key = editorMediaIdentity();
+  if (key === editorMediaKey) return;
+  editorMediaKey = key;
+  const active = video || audio;
+  editorMedia.hidden = !active;
+  editorVideoPlayer.hidden = !video;
+  editorAudioPlayer.hidden = !audio;
+  editorAudioName.textContent = audio;
+  if (!video) { editorVideo.pause(); editorVideo.removeAttribute("src"); }
+  if (!audio) { editorAudio.pause(); editorAudio.removeAttribute("src"); }
+  if (!active) { void Library.stopEditorMedia().catch(() => {}); return; }
+  if (site) {
+    const siteID = site.id, articleID = article?.id ?? "", draftID = draft?.id ?? "";
+    try {
+      if (video) editorVideo.src = await Library.editorAttachmentMediaURL(siteID, articleID, draftID, video);
+      if (audio) editorAudio.src = await Library.editorAttachmentMediaURL(siteID, articleID, draftID, audio);
+    } catch { editorMedia.hidden = true; }
+  }
+}
+
+function trayAttachmentNames(): string[] {
+  const video = editorVideoAttachmentName();
+  const names = draft ? [...(article?.attachments ?? []), ...(draft.attachments ?? [])] : [...(article?.attachments ?? [])];
+  return names.filter(n => n !== video);
+}
+
+function trayItemMarked(name: string): boolean {
+  return !!draft?.removedAttachments?.includes(name);
+}
+
+function syncMediaTray() {
+  const names = trayAttachmentNames();
+  const hero = currentHeroImageName();
+  const key = `${site?.id ?? ""}|${draft?.id ?? article?.id ?? ""}|${names.join(",")}|${hero}|${draft?.removedAttachments?.join(",") ?? ""}`;
+  // The tray lives inside the editor, so it stays invisible outside editing;
+  // its items still render so attachment actions exist whenever state allows.
+  mediaTray.hidden = !site || (!article && !draft) || !names.length;
+  if (mediaTray.hidden) {
+    if (trayKey !== "") { trayKey = ""; mediaTrayItems.replaceChildren(); }
+    return;
+  }
+  if (key === trayKey) return;
+  trayKey = key;
+  mediaTrayItems.replaceChildren();
+  for (const name of names) {
+    const kind = attachmentKindOf(name);
+    const item = document.createElement("div");
+    item.className = "tray-item";
+    if (trayItemMarked(name)) item.classList.add("tray-removed");
+    item.title = name;
+    item.setAttribute("role", "listitem");
+    item.setAttribute("aria-label", `附件 ${name}`);
+    const cacheKey = `${site?.id ?? ""}|${draft?.id ?? article?.id ?? ""}|${name}`;
+    if (kind === "image") {
+      const img = document.createElement("img");
+      img.alt = "";
+      img.draggable = false;
+      const cached = thumbnailCache.get(cacheKey);
+      if (cached) img.src = cached;
+      else void Library.editorAttachmentThumbnail(site!.id, article?.id ?? "", draft?.id ?? "", name)
+        .then(url => { thumbnailCache.set(cacheKey, url); if (img.isConnected) img.src = url; })
+        .catch(() => { if (img.isConnected) item.append(label("span", "图", "tray-fallback")); });
+      item.append(img);
+      if (hero === name) item.append(label("span", "封面", "tray-hero-badge"));
+    } else {
+      item.append(label("span", kind === "audio" ? "♪" : "文件", "tray-fallback"));
+    }
+    item.addEventListener("contextmenu", event => { openTrayMenu(event, name); });
+    mediaTrayItems.append(item);
+  }
+}
+
+function closeTrayMenu() {
+  document.querySelector(".tray-menu")?.remove();
+  document.removeEventListener("click", closeTrayMenu);
+}
+
+function openTrayMenu(event: MouseEvent, name: string) {
+  event.preventDefault();
+  event.stopPropagation();
+  closeTrayMenu();
+  const hero = currentHeroImageName();
+  const marked = trayItemMarked(name);
+  const menu = document.createElement("div");
+  menu.className = "tray-menu";
+  const options: Array<{ label: string; run: () => void }> = [];
+  if (attachmentKindOf(name) === "image" && !marked) {
+    options.push({ label: hero === name ? "取消封面" : "设为封面", run: () => void setHeroImage(hero === name ? "" : name) });
+  }
+  options.push(marked
+    ? { label: "撤销删除", run: () => void removeAttachment(name) }
+    : { label: "移除附件", run: () => void removeAttachment(name, true) });
+  for (const option of options) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = option.label;
+    button.addEventListener("click", () => { closeTrayMenu(); option.run(); });
+    menu.append(button);
+  }
+  document.body.append(menu);
+  const bounds = menu.getBoundingClientRect();
+  menu.style.left = `${Math.max(4, Math.min(event.clientX, window.innerWidth - bounds.width - 4))}px`;
+  menu.style.top = `${Math.max(4, Math.min(event.clientY, window.innerHeight - bounds.height - 4))}px`;
+  document.addEventListener("click", closeTrayMenu);
+}
+
+async function setHeroImage(name: string) {
+  if (!site || (!article && !draft) || saving) return;
+  const siteID = site.id, articleID = article?.id ?? "", draftID = draft?.id ?? "";
+  navigationRevision++; saving = true; busyMessage = "正在更新封面…"; updateView(); clearError();
+  try {
+    const updated = draftID ? await Library.setDraftHeroImage(siteID, draftID, name) : await Library.setArticleHeroImage(siteID, articleID, name);
+    if (!updated.id || site?.id !== siteID || (draftID ? draft?.id !== draftID : article?.id !== articleID)) return;
+    syncEditorAttachmentState(updated, siteID, draftID, articleID);
+  } catch (e) { showError(e); }
+  finally { saving = false; busyMessage = ""; updateView(); }
+}
+
+function syncEditorMediaUI() {
+  void syncEditorPlayers();
+  syncMediaTray();
+}
+
+async function loadTagUsage() {
+  if (!site || site.tagsUnsupported) { tagUsageSection.hidden = true; return; }
+  try {
+    const usage = await Library.siteAvailableTags(site.id);
+    tagUsageSection.hidden = !usage.length;
+    tagUsageList.replaceChildren();
+    for (const entry of usage) {
+      const chip = label("button", entry.label, "tag-usage-item") as HTMLButtonElement;
+      chip.type = "button";
+      chip.title = `${site.name} 中有 ${entry.count} 篇文章使用该标签`;
+      chip.append(label("span", String(entry.count), "tag-usage-count"));
+      chip.addEventListener("click", () => {
+        if (tagInput.disabled || saving) return;
+        const key = normalizedTag(entry.label);
+        if (!key) return;
+        if ([...editorTags.keys()].some(old => old.toLowerCase() === key.toLowerCase())) { showError("标签已存在。"); return; }
+        editorTags.set(key, entry.label);
+        dirty = true; navigationRevision++; clearError(); updateView();
+      });
+      tagUsageList.append(chip);
+    }
+  } catch { tagUsageSection.hidden = true; }
+}
+
+$("#remove-editor-audio").addEventListener("click", () => {
+  const audio = editorAudioAttachmentName();
+  if (audio) void removeAttachment(audio, true);
 });
 window.addEventListener("keydown", event => {
   if (event.isComposing || !(event.ctrlKey || event.metaKey)) return;

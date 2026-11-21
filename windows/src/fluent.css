@@ -97,8 +97,7 @@
 .document-meta { color:var(--muted); font-size:var(--text-sm); line-height:18px; font-weight:400; }
 .tag-bar { padding:0 28px 10px; color:var(--muted); font-size:var(--text-sm); }
 .tag-bar input { font-size:var(--text-base); border-radius:var(--radius-sm); }
-.attachment-bar,#attachment-help,.tag-help { color:var(--muted); font-size:var(--text-sm); }
-.attachment-bar { padding:0 28px 16px; }
+.tag-help { color:var(--muted); font-size:var(--text-sm); }
 .writing-grid { flex:1 0 320px; min-height:320px; margin:0 28px 24px; gap:var(--space-4); border:0; }
 .writing-pane,.preview-pane { min-height:300px; border:1px solid var(--pw-line); border-radius:var(--radius-md); overflow:hidden; background:#fff; }
 .writing-pane { border-right:1px solid var(--pw-line); }
@@ -123,7 +122,7 @@ button:focus-visible,summary:focus-visible,a:focus-visible,input:focus-visible,t
   .workspace-heading { flex:none; }
   .header-actions { justify-content:flex-start; }
   .editor .document-head { padding:24px 20px 16px; }
-  .tag-bar,.attachment-bar { padding-left:20px; padding-right:20px; }
+  .tag-bar { padding-left:20px; padding-right:20px; }
   .writing-grid { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(220px,1fr) minmax(220px,1fr); flex:0 0 auto; min-height:456px; margin:0 20px 20px; overflow:visible; }
   .writing-pane,.preview-pane { min-height:220px; }
   .reader .document-head { padding:28px 24px 16px; }

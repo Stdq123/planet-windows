@@ -144,19 +144,28 @@
       <div id="empty" class="empty"><div class="empty-orbit"><img src="./resources/workspace/planet.svg" alt="" /></div><h2>让想法有一个地方安放。</h2><p>创建站点，开始撰写你的第一篇文章。</p><button id="empty-action" class="primary">创建站点</button></div>
       <div id="editor" class="editor" hidden>
         <div id="imported-warning" class="imported-warning" hidden></div>
+        <div id="editor-media" class="editor-media" hidden>
+          <div id="editor-video-player" class="editor-video-player" hidden><video id="editor-video" controls></video></div>
+          <div id="editor-audio-player" class="editor-audio-player" hidden><span class="system-icon" aria-hidden="true">&#xE8D6;</span><audio id="editor-audio" controls></audio><strong id="editor-audio-name"></strong><button id="remove-editor-audio" type="button" class="icon-button" aria-label="移除音频附件" title="移除音频附件">×</button></div>
+        </div>
         <div class="document-head"><label class="editor-title-label sr-only" for="title">文章标题</label><input id="title" class="title-input" placeholder="文章标题" maxlength="250" /></div>
         <div class="editor-controls">
           <div class="editor-options">
-            <button id="toggle-metadata" type="button" class="secondary quiet" aria-controls="editor-metadata" aria-expanded="false">标签与附件<span id="metadata-count"></span><span class="system-icon" aria-hidden="true">&#xE70D;</span></button>
+            <button id="toggle-metadata" type="button" class="secondary quiet" aria-controls="editor-metadata" aria-expanded="false">标签<span id="metadata-count"></span><span class="system-icon" aria-hidden="true">&#xE70D;</span></button>
+            <span id="tag-inline-list" class="tag-inline-list"></span><input id="tag-inline-input" class="tag-inline-input" maxlength="120" placeholder="+ 标签" aria-label="输入标签后回车添加" />
+            <button id="attach-photo" type="button" class="secondary quiet" title="添加照片附件，可一次选择多张">附件照片</button>
+            <button id="attach-video" type="button" class="secondary quiet" title="添加视频附件（每篇文章一个，替换现有视频）">附件视频</button>
+            <button id="attach-audio" type="button" class="secondary quiet" title="添加音频附件（每篇文章一个，替换现有音频）">附件音频</button>
             <section id="editor-metadata" class="editor-metadata" aria-labelledby="metadata-heading" hidden>
-              <div class="metadata-heading"><h2 id="metadata-heading">文章信息</h2><button id="close-metadata" type="button" class="icon-button" aria-label="关闭文章信息" title="关闭"><span class="system-icon" aria-hidden="true">&#xE711;</span></button></div>
-              <div class="tag-bar"><label for="tag-input">标签</label><span id="tag-list"></span><div class="tag-input-row"><input id="tag-input" maxlength="120" placeholder="输入标签" /><button id="add-tag" type="button" class="secondary">添加</button></div><span class="tag-help">随文章或草稿保存</span></div>
-              <div class="attachment-bar"><div class="attachment-actions"><span>附件</span><button id="add-attachment" class="secondary" disabled>添加附件</button><button id="play-article-audio" class="secondary" hidden>播放音频</button></div><span id="attachment-list"></span><span id="attachment-help">先保存文章，再添加附件</span></div>
+              <div class="metadata-heading"><h2 id="metadata-heading">标签</h2><button id="close-metadata" type="button" class="icon-button" aria-label="关闭标签" title="关闭"><span class="system-icon" aria-hidden="true">&#xE711;</span></button></div>
+              <div class="tag-bar"><div class="tag-input-row"><input id="tag-input" maxlength="120" placeholder="输入标签，回车或点击添加" /><button id="add-tag" type="button" class="secondary">添加</button></div><span class="tag-help">随文章或草稿保存；曾用标签点击即可添加</span></div>
+              <div class="tag-usage" id="tag-usage" hidden><div class="tag-usage-heading">曾用标签</div><div id="tag-usage-list" class="tag-usage-list"></div></div>
             </section>
           </div>
           <div class="view-switch" role="group" aria-label="写作视图"><button id="view-write" type="button" aria-pressed="true">编辑</button><button id="view-preview" type="button" aria-pressed="false">预览</button><button id="view-split" type="button" aria-pressed="false">分栏</button></div>
         </div>
         <div class="writing-grid"><section id="writing-pane" class="writing-pane"><div class="pane-label">编辑 <span>MARKDOWN</span></div><label class="sr-only" for="content">文章内容</label><textarea id="content" placeholder="从这里开始写作…" spellcheck="false"></textarea></section><section id="preview-pane" class="preview-pane" hidden><div class="pane-label">预览 <span>LIVE PREVIEW</span></div><iframe id="preview" sandbox="" title="文章预览"></iframe></section></div>
+        <div id="media-tray" class="media-tray" hidden><div id="media-tray-items" class="media-tray-items" role="list" aria-label="附件媒体"></div></div>
         <div class="editor-footer">草稿仅保存在本机；保存并发布会公开整个站点及其附件。</div>
       </div>
       <div id="own-reader" class="reader" hidden><div class="document-head"><div class="reader-category"><span class="reader-source-icon" aria-hidden="true">P</span><span id="own-reader-source"></span></div><h2 id="own-reader-title"></h2><div class="reader-meta"><span class="reader-author-avatar" aria-hidden="true">P</span><div class="reader-byline"><strong id="own-reader-author"></strong><div id="own-reader-date" class="document-meta"></div></div><div class="own-reader-actions"><button id="play-own-audio" class="secondary" type="button" aria-label="播放音频" title="播放音频" hidden>播放音频</button><button id="speak-own-article" class="secondary" type="button" aria-label="朗读文章" title="朗读文章">朗读</button><button id="chat-own-article" class="secondary" type="button" aria-label="AI 问答" title="针对本文 AI 问答">AI 问答</button><button id="related-own-article" class="secondary" type="button" aria-label="相关文章" title="查找相关文章">相关文章</button><button id="share-own-article" class="secondary" type="button" aria-label="复制链接" title="复制链接">复制链接</button><button id="article-settings" class="secondary" type="button" aria-label="文章设置" title="文章设置">文章设置</button><button id="edit-article" class="secondary" type="button" aria-label="编辑文章" title="编辑文章">编辑文章</button></div></div><input id="own-share-url" readonly hidden aria-label="文章分享链接"/><span id="own-share-status" role="status"></span></div><iframe id="own-reader-preview" sandbox="" title="本地文章"></iframe></div>

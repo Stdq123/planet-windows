@@ -687,8 +687,10 @@ func TestAddAndCopyAttachment(t *testing.T) {
 	if err != nil || string(b) != "image content" {
 		t.Fatalf("asset=%q err=%v", b, err)
 	}
-	if _, err = Add(root, library, site.ID, article.ID, source); err == nil {
-		t.Fatal("duplicate attachment accepted")
+	// Re-adding the same name replaces the previous copy, matching the macOS writer.
+	replaced, err := Add(root, library, site.ID, article.ID, source)
+	if err != nil || len(replaced.Attachments) != 1 || replaced.Attachments[0] != "photo.png" {
+		t.Fatalf("same-name replacement failed: %+v err=%v", replaced, err)
 	}
 	reserved := filepath.Join(t.TempDir(), "index.html")
 	os.WriteFile(reserved, []byte("bad"), 0600)
@@ -957,5 +959,43 @@ func TestEnrichMediaRestoresSizeForOlderArticles(t *testing.T) {
 	}
 	if enriched[0].AudioByteLength == nil || *enriched[0].AudioByteLength != 6 {
 		t.Fatalf("enriched=%+v", enriched[0])
+	}
+}
+
+func TestAddingSecondVideoReplacesTheFirst(t *testing.T) {
+	root := t.TempDir()
+	library, err := store.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	site, err := library.CreateSite("Site", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	article, err := library.SaveArticle(site.ID, "", "Post", "Body")
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := filepath.Join(t.TempDir(), "first.mp4")
+	if err := os.WriteFile(first, []byte("one"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	article, err = Add(root, library, site.ID, article.ID, first)
+	if err != nil || article.VideoFilename != "first.mp4" {
+		t.Fatalf("article=%+v err=%v", article, err)
+	}
+	second := filepath.Join(t.TempDir(), "second.mp4")
+	if err := os.WriteFile(second, []byte("two"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	article, err = Add(root, library, site.ID, article.ID, second)
+	if err != nil || article.VideoFilename != "second.mp4" {
+		t.Fatalf("article=%+v err=%v", article, err)
+	}
+	if len(article.Attachments) != 1 || article.Attachments[0] != "second.mp4" {
+		t.Fatalf("the previous video should be replaced: %+v", article)
+	}
+	if _, err = OpenRegistered(root, site, article, "first.mp4"); err == nil {
+		t.Fatal("the replaced video file should be removed")
 	}
 }
