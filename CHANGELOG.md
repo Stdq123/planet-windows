@@ -4,6 +4,8 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 ## [Unreleased]
 
+## [0.0.1-alpha.6] - 2026-11-21
+
 ### Removed
 
 - Removed the article grid/list view toggle and the grid rendering; the posts panel keeps the single-column article list for both my sites and subscriptions (the grid could not show a real multi-column layout at the panel width).

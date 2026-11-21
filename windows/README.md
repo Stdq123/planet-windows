@@ -6,11 +6,11 @@
 >
 > Planet Windows 基于上述上游项目，是独立开发的 Windows 移植版本。
 
-[下载 v0.0.1-alpha.4](https://github.com/Stdq123/planet-windows/releases/tag/v0.0.1-alpha.4) · [简体中文主页](../README_zh.md) · [English README](../README.md) · [贡献指南](../CONTRIBUTING.md)
+[下载 v0.0.1-alpha.6](https://github.com/Stdq123/planet-windows/releases/tag/v0.0.1-alpha.6) · [简体中文主页](../README_zh.md) · [English README](../README.md) · [贡献指南](../CONTRIBUTING.md)
 
 [![Listed on Awesome MyGo](https://awesomemygo.dev/badge.svg)](https://awesomemygo.dev/apps/planet-windows)
 
-> **当前为未签名 alpha。** 原版功能尚未全部实现；Windows 10/11 界面、输入法、恢复流程和真实 Mac 备份兼容性仍未完成验收。完整范围见[已知限制](#尚未完成与待验证)和[本次验收记录](../docs/acceptance-0.0.1-alpha.4.md)。
+> **当前为未签名 alpha。** 原版功能尚未全部实现；Windows 10/11 界面、输入法、恢复流程和真实 Mac 备份兼容性仍未完成验收。完整范围见[已知限制](#尚未完成与待验证)和[本次验收记录](../docs/acceptance-0.0.1-alpha.6.md)。
 
 本文介绍日常操作，开发环境与命令见[构建与测试](#构建与测试)。
 
@@ -32,7 +32,7 @@
 ### 下载与安装
 
 1. 准备 Windows x64 和 WebView2 Runtime。
-2. [下载 Windows x64 安装包](https://github.com/Stdq123/planet-windows/releases/download/v0.0.1-alpha.4/planet-windows-safe-setup-0.0.1-alpha.4-amd64.exe)，安装到空目录后，从开始菜单打开 **Planet Windows**。[发行页面](https://github.com/Stdq123/planet-windows/releases/tag/v0.0.1-alpha.4)同时提供对应源码、SHA-256 校验文件和本次最终安装包的验收证据。
+2. [下载 Windows x64 安装包](https://github.com/Stdq123/planet-windows/releases/download/v0.0.1-alpha.6/planet-windows-safe-setup-0.0.1-alpha.6-amd64.exe)，安装到空目录后，从开始菜单打开 **Planet Windows**。[发行页面](https://github.com/Stdq123/planet-windows/releases/tag/v0.0.1-alpha.6)同时提供对应源码、SHA-256 校验文件和本次最终安装包的验收证据。
 3. 在写作台创建站点开始写作，或点击侧栏“订阅”旁的 **+** 添加订阅。
 
 ### 写作台
@@ -396,7 +396,7 @@ bun run build
 
 ### 当前验收限制
 
-本次安装验收限定为[七个原生静默安装场景](../docs/acceptance-0.0.1-alpha.4.md#发布前必须重新通过的七个原生场景)，最终运行结果及安装包摘要随 alpha.4 Release 附件保存，不沿用历史版本的通过证据。Windows 10/11 图形界面、真实跨版本升级和恢复仍未验证。安装和卸载的文件检查与操作之间仍有并发变更窗口；安装失败时可能留下部分文件，需要在确认文件归属后手动处理。本次按未签名预发布策略提供程序与安装包。
+本次安装验收限定为[七个原生静默安装场景](../docs/acceptance-0.0.1-alpha.6.md#发布前必须重新通过的七个原生场景)，最终运行结果及安装包摘要随 alpha.6 Release 附件保存，不沿用历史版本的通过证据。Windows 10/11 图形界面、真实跨版本升级和恢复仍未验证。安装和卸载的文件检查与操作之间仍有并发变更窗口；安装失败时可能留下部分文件，需要在确认文件归属后手动处理。本次按未签名预发布策略提供程序与安装包。
 
 ## 尚未完成与待验证
 
@@ -430,4 +430,4 @@ ENS 的非 IPFS/IPNS 内容协议尚不支持。Unicode 名称查询已用真实
 
 ### 安装与发行
 
-本次原生静默新装、同包重装、异常操作拒绝和卸载必须关联 alpha.4 最终安装包的新证据，实际运行环境与结果见 Release 附件。Windows 10/11 完整界面、输入法、跨版本资料和断电恢复验收仍未完成。本次 alpha 未签名，没有预置生产更新源，采用手动下载。已知限制与证据要求见[alpha.4 验收范围](../docs/acceptance-0.0.1-alpha.4.md)和[发行检查记录](docs/release-audit.md)；[alpha.1 记录](../docs/acceptance-0.0.1-alpha.1.md)等早期记录仅保留为历史证据。
+本次原生静默新装、同包重装、异常操作拒绝和卸载必须关联 alpha.6 最终安装包的新证据，实际运行环境与结果见 Release 附件。Windows 10/11 完整界面、输入法、跨版本资料和断电恢复验收仍未完成。本次 alpha 未签名，没有预置生产更新源，采用手动下载。已知限制与证据要求见[alpha.6 验收范围](../docs/acceptance-0.0.1-alpha.6.md)和[发行检查记录](docs/release-audit.md)；[alpha.1 记录](../docs/acceptance-0.0.1-alpha.1.md)等早期记录仅保留为历史证据。
