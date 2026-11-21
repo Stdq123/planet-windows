@@ -4,6 +4,8 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 ## [Unreleased]
 
+## [0.0.1-alpha.5] - 2026-11-21
+
 ### Added
 
 - Aligned the article editor's tags and attachments with the macOS writer: dedicated toolbar entries for photos (multi-select), video, and audio with the one-video/one-audio-per-article replacement rule, inline video and audio players above the editor, a media tray with image thumbnails and drop support, right-click cover management (Set/Unset as Hero Image) with manual covers surviving saves and draft publication, attachment removal that also strips the matching Markdown references, media pasted or dropped onto the editor inserted at the cursor, current tags shown inline in the editor controls with an inline add field, a "Previously Used Tags" list with per-label counts in the tags popover, and attachment entry points that lazily create the local draft so brand-new articles accept attachments immediately.
