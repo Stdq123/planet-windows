@@ -4,6 +4,10 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 ## [Unreleased]
 
+### Fixed
+
+- Made the article list toggle actually show a multi-column card grid in the 280px posts panel by lowering the minimum grid card width to 112px and wrapping card titles to two lines; the grid previously collapsed into a single bordered column indistinguishable from the list.
+
 ## [0.0.1-alpha.5] - 2026-11-21
 
 ### Added

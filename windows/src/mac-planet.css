@@ -1431,7 +1431,7 @@ dialog .dialog-actions,
 /* Article Grid View & Hero Badges */
 #articles.grid-view {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
   gap: 8px;
   align-content: start;
   padding: 8px;
@@ -1441,11 +1441,19 @@ dialog .dialog-actions,
   flex-direction: column;
   align-items: flex-start;
   justify-content: space-between;
+  gap: 4px;
   min-height: 112px;
   padding: 10px;
   border: 0.5px solid var(--mac-line);
   border-radius: 8px;
   background: var(--mac-subtle);
+}
+#articles.grid-view .article-title {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.4;
 }
 #articles.grid-view .article-item.active {
   background: var(--mac-list-selected);
