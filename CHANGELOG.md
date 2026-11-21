@@ -26,6 +26,7 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 ### Fixed
 
+- Restored the shared dialog header/body/footer chrome for the AI assistant, local API console, and Quick Post settings dialogs so their titles, content padding, and action bars match the other settings dialogs, and made the App Log category and Quick Post site selectors span the dialog width like sibling form controls.
 - Allowed IPFS node status and repository size queries to read Kubo's concurrent loopback RPC without failing with "节点正忙，请稍后刷新" during background IPNS renewal, site publication, or subscription refresh.
 - Triggered recursive `routing/provide` announcements after site publication, startup, and IPNS renewal, automatically re-announcing published CIDs once Kubo acquires public or `/p2p-circuit` relay reachability after cold start.
 
