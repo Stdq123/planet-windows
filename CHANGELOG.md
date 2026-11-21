@@ -4,9 +4,9 @@ User-facing changes are recorded here. Release entries use `MAJOR.MINOR.PATCH` w
 
 ## [Unreleased]
 
-### Fixed
+### Removed
 
-- Made the article list toggle actually show a multi-column card grid in the 280px posts panel by lowering the minimum grid card width to 112px and wrapping card titles to two lines; the grid previously collapsed into a single bordered column indistinguishable from the list.
+- Removed the article grid/list view toggle and the grid rendering; the posts panel keeps the single-column article list for both my sites and subscriptions (the grid could not show a real multi-column layout at the panel width).
 
 ## [0.0.1-alpha.5] - 2026-11-21
 

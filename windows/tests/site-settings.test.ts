@@ -151,9 +151,6 @@ test("avatar gallery applies preset avatar and toggles saveRoundAvatar, and arti
     default:throw new Error(method);
   }}};
   await import("../src/main.ts?avatar-gallery-and-grid"); enterFirstSite(window);await waitFor(()=>window.document.querySelector("#site-title")?.textContent==="My Planet");
-  const toggleBtn=window.document.querySelector<HTMLButtonElement>("#toggle-article-view")!;
-  toggleBtn.click();
-  expect(window.document.querySelector("#articles")!.classList.contains("grid-view")).toBe(true);
   expect(window.document.querySelector(".article-hero-badge")?.textContent).toContain("hero.png");
 
   window.document.querySelector<HTMLButtonElement>("#edit-site")!.click();
