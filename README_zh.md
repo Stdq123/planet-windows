@@ -90,12 +90,12 @@
 
 | 版本 | 适用平台 | 运行环境 | 校验与说明 |
 | --- | --- | --- | --- |
-| **[Planet Windows v0.0.1-alpha.4](https://github.com/Stdq123/planet-windows/releases/download/v0.0.1-alpha.4/planet-windows-safe-setup-0.0.1-alpha.4-amd64.exe)** | Windows x64 | Windows 10/11 + WebView2 Runtime | [Release 页面](https://github.com/Stdq123/planet-windows/releases/tag/v0.0.1-alpha.4)（含 SHA-256、源码归档与验收附件） |
+| **[Planet Windows v0.0.1-alpha.6](https://github.com/Stdq123/planet-windows/releases/download/v0.0.1-alpha.6/planet-windows-safe-setup-0.0.1-alpha.6-amd64.exe)** | Windows x64 | Windows 10/11 + WebView2 Runtime | [Release 页面](https://github.com/Stdq123/planet-windows/releases/tag/v0.0.1-alpha.6)（含 SHA-256、源码归档与验收附件） |
 
 安装到空目录后，从开始菜单打开 **Planet Windows** 即可使用。
 
 > [!NOTE]
-> **早期未签名 Alpha 版本。** 运行安装包时 Windows SmartScreen 可能会给出提示，安装前建议核对 Release 页面提供的 SHA-256 校验值。Windows 10/11 完整桌面界面、输入法、跨版本升级及真实 Mac `.planet` 备份双向兼容仍在持续验证中，详见[已知限制](windows/README.md#尚未完成与待验证)与 [alpha.4 验收范围](docs/acceptance-0.0.1-alpha.4.md)。
+> **早期未签名 Alpha 版本。** 运行安装包时 Windows SmartScreen 可能会给出提示，安装前建议核对 Release 页面提供的 SHA-256 校验值。Windows 10/11 完整桌面界面、输入法、跨版本升级及真实 Mac `.planet` 备份双向兼容仍在持续验证中，详见[已知限制](windows/README.md#尚未完成与待验证)与 [alpha.6 验收范围](docs/acceptance-0.0.1-alpha.6.md)。
 
 > [!WARNING]
 > 导出的 `.planet` 备份包含**未加密的 IPNS 私钥**，请妥善保管，切勿上传到公开仓库或网盘。
