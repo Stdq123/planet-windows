@@ -58,6 +58,8 @@ type Library struct {
 	audioTemp           string
 	audioSnapshot       string
 	audioFile           string
+	editorMediaMu       sync.Mutex
+	editorMedia         *audiostream.Server
 	updateMu            sync.Mutex
 	checkedUpdate       *updates.Release
 	updateIdentity      string
@@ -603,6 +605,239 @@ func (l *Library) RemoveDraftAttachment(siteID, draftID, name string) (store.Dra
 		return store.Draft{}, err
 	}
 	return attachments.RemoveDraft(root, s, siteID, draftID, name)
+}
+
+// AttachArticleFiles opens a native picker for one kind of editor attachment
+// ("image", "video", or "audio") and records every selected file on the saved
+// article, mirroring the macOS writer toolbar entries.
+func (l *Library) AttachArticleFiles(ctx context.Context, siteID, articleID, kind string) (store.Article, error) {
+	paths, err := chooseEditorAttachments(ctx, kind, false)
+	if err != nil || len(paths) == 0 {
+		return store.Article{}, err
+	}
+	l.publicMu.Lock()
+	defer l.publicMu.Unlock()
+	s, err := l.open()
+	if err != nil {
+		return store.Article{}, err
+	}
+	root, err := mygo.App.Path(mygo.PathUserData)
+	if err != nil {
+		return store.Article{}, err
+	}
+	article := store.Article{}
+	for i, path := range paths {
+		article, err = attachments.Add(root, s, siteID, articleID, path)
+		if err != nil {
+			if i == 0 {
+				return store.Article{}, err
+			}
+			break
+		}
+	}
+	return article, err
+}
+
+// AttachDraftFiles is the draft counterpart of AttachArticleFiles.
+func (l *Library) AttachDraftFiles(ctx context.Context, siteID, draftID, kind string) (store.Draft, error) {
+	paths, err := chooseEditorAttachments(ctx, kind, false)
+	if err != nil || len(paths) == 0 {
+		return store.Draft{}, err
+	}
+	l.publicMu.Lock()
+	defer l.publicMu.Unlock()
+	s, err := l.open()
+	if err != nil {
+		return store.Draft{}, err
+	}
+	root, err := mygo.App.Path(mygo.PathUserData)
+	if err != nil {
+		return store.Draft{}, err
+	}
+	draft := store.Draft{}
+	for i, path := range paths {
+		draft, err = attachments.AddDraft(root, s, siteID, draftID, path)
+		if err != nil {
+			if i == 0 {
+				return store.Draft{}, err
+			}
+			break
+		}
+	}
+	return draft, err
+}
+
+func chooseEditorAttachments(ctx context.Context, kind string, multiple bool) ([]string, error) {
+	var options mygo.OpenDialogOptions
+	switch kind {
+	case "image":
+		options = mygo.OpenDialogOptions{
+			Title: "选择附件照片（PNG、JPEG、GIF 或 WebP）",
+			Filters: []mygo.FileFilter{
+				{Name: "图片", Extensions: []string{"png", "jpg", "jpeg", "gif", "webp"}},
+			},
+			Multiple: multiple,
+		}
+	case "video":
+		options = mygo.OpenDialogOptions{
+			Title: "选择附件视频（MP4、MOV、M4V 或 WebM）",
+			Filters: []mygo.FileFilter{
+				{Name: "视频", Extensions: []string{"mp4", "mov", "m4v", "webm"}},
+				{Name: "全部文件", Extensions: []string{"*"}},
+			},
+		}
+	case "audio":
+		options = mygo.OpenDialogOptions{
+			Title: "选择附件音频（MP3、M4A、AAC 或 WAV）",
+			Filters: []mygo.FileFilter{
+				{Name: "音频", Extensions: []string{"mp3", "m4a", "aac", "wav"}},
+				{Name: "全部文件", Extensions: []string{"*"}},
+			},
+		}
+	default:
+		return nil, errors.New("附件类型无效")
+	}
+	options.Parent = mygo.CallerWindow(ctx)
+	return mygo.Dialog.Open(options)
+}
+
+// SetArticleHeroImage records an explicit cover choice; an empty name clears it.
+func (l *Library) SetArticleHeroImage(siteID, articleID, name string) (store.Article, error) {
+	l.publicMu.Lock()
+	defer l.publicMu.Unlock()
+	s, err := l.open()
+	if err != nil {
+		return store.Article{}, err
+	}
+	return s.SetHeroImage(siteID, articleID, name)
+}
+
+// SetDraftHeroImage records an explicit cover choice on a draft; empty clears it.
+func (l *Library) SetDraftHeroImage(siteID, draftID, name string) (store.Draft, error) {
+	l.publicMu.Lock()
+	defer l.publicMu.Unlock()
+	s, err := l.open()
+	if err != nil {
+		return store.Draft{}, err
+	}
+	return s.SetDraftHeroImage(siteID, draftID, name)
+}
+
+// SiteAvailableTags lists the labels already used across the site's articles
+// with per-label counts, mirroring the macOS writer's Previously Used Tags.
+func (l *Library) SiteAvailableTags(siteID string) ([]store.TagUsage, error) {
+	s, err := l.open()
+	if err != nil {
+		return nil, err
+	}
+	return s.SiteAvailableTags(siteID)
+}
+
+// EditorAttachmentMediaURL streams an article or draft attachment (audio or
+// video) for the editor players over the private loopback server. One server
+// serves both players; StopEditorMedia revokes it when the editor moves on.
+func (l *Library) EditorAttachmentMediaURL(siteID, articleID, draftID, name string) (string, error) {
+	s, err := l.open()
+	if err != nil {
+		return "", err
+	}
+	root, err := mygo.App.Path(mygo.PathUserData)
+	if err != nil {
+		return "", err
+	}
+	lookup := func(requested string) (*os.File, error) {
+		if draftID != "" {
+			drafts, err := s.ListDrafts(siteID)
+			if err != nil {
+				return nil, err
+			}
+			for _, draft := range drafts {
+				if draft.ID == draftID {
+					return attachments.OpenDraftAttachment(root, draft, requested)
+				}
+			}
+			return nil, os.ErrNotExist
+		}
+		site, articles, _, err := s.PublicationSnapshot(siteID)
+		if err != nil {
+			return nil, err
+		}
+		for _, article := range articles {
+			if article.ID == articleID {
+				return attachments.OpenRegistered(root, site, article, requested)
+			}
+		}
+		return nil, os.ErrNotExist
+	}
+	l.editorMediaMu.Lock()
+	defer l.editorMediaMu.Unlock()
+	if l.editorMedia == nil {
+		server, err := audiostream.New(func(_, _, requested string) (*os.File, error) {
+			return lookup(requested)
+		})
+		if err != nil {
+			return "", err
+		}
+		l.editorMedia = server
+	}
+	address, err := l.editorMedia.URLWithType(siteID, articleID, name, "")
+	if err != nil {
+		return "", err
+	}
+	return address, nil
+}
+
+// StopEditorMedia revokes the editor media stream when playback ends or the
+// attachment is removed.
+func (l *Library) StopEditorMedia() {
+	l.editorMediaMu.Lock()
+	defer l.editorMediaMu.Unlock()
+	if l.editorMedia != nil {
+		_ = l.editorMedia.Close()
+		l.editorMedia = nil
+	}
+}
+
+// EditorAttachmentThumbnail returns a small inline preview for the media tray.
+func (l *Library) EditorAttachmentThumbnail(siteID, articleID, draftID, name string) (string, error) {
+	s, err := l.open()
+	if err != nil {
+		return "", err
+	}
+	root, err := mygo.App.Path(mygo.PathUserData)
+	if err != nil {
+		return "", err
+	}
+	if draftID != "" {
+		drafts, err := s.ListDrafts(siteID)
+		if err != nil {
+			return "", err
+		}
+		for _, draft := range drafts {
+			if draft.ID == draftID {
+				data, mime, err := attachments.ReadDraftPreviewImage(root, draft, name)
+				if err != nil {
+					return "", err
+				}
+				return attachments.ThumbnailDataURL(data, mime)
+			}
+		}
+		return "", os.ErrNotExist
+	}
+	site, articles, _, err := s.PublicationSnapshot(siteID)
+	if err != nil {
+		return "", err
+	}
+	for _, article := range articles {
+		if article.ID == articleID {
+			data, mime, err := attachments.ReadPreviewImage(root, site, article, name)
+			if err != nil {
+				return "", err
+			}
+			return attachments.ThumbnailDataURL(data, mime)
+		}
+	}
+	return "", os.ErrNotExist
 }
 
 func (l *Library) SetDraftExistingAttachmentRemoved(siteID, draftID, name string, removed bool) (store.Draft, error) {
@@ -3027,6 +3262,7 @@ func main() {
 		maintenance.Wait()
 		library.closeNode()
 		library.closeAudio()
+		library.StopEditorMedia()
 	}()
 	mygo.App.WhenReady(func() {
 		if root, err := mygo.App.Path(mygo.PathUserData); err == nil {

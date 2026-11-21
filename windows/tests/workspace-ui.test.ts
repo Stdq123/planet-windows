@@ -23,6 +23,9 @@ async function fixture(override: (method:string, args:any[])=>unknown = ()=>unde
       case "Library.Drafts": return [draft];
       case "Library.SaveDraft": return {...draft,title:args[3],content:args[4]};
       case "Library.Preview": case "Library.PreviewDraft": return "<p>Preview</p>";
+      case "Library.StopEditorMedia": return;
+      case "Library.EditorAttachmentMediaURL": return "http://127.0.0.1:0/editor-media";
+      case "Library.EditorAttachmentThumbnail": return "data:image/png;base64,";
       default: throw new Error(`Unexpected backend call: ${method}`);
     }
   }};
@@ -131,7 +134,7 @@ test("metadata dismissal preserves draft text, attachments and pending tag input
   $<HTMLButtonElement>("#close-metadata").click();
   expect($("#editor-metadata").hidden).toBe(true);expect(window.document.activeElement).toBe(toggle);
   expect(tag.value).toBe("尚未添加");expect(content.value).toBe(saved.content);
-  expect($("#attachment-list").children.length).toBe(3);expect($("#metadata-count").textContent).toBe("1 个标签 / 3 个附件");
+  expect($("#media-tray-items").children.length).toBe(3);expect($("#metadata-count").textContent).toBe("1");
   toggle.click();content.focus();content.click();
   expect($("#editor-metadata").hidden).toBe(true);expect(window.document.activeElement).toBe(content);
   expect(tag.value).toBe("尚未添加");expect(content.value).toBe(saved.content);

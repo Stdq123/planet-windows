@@ -2,11 +2,18 @@
 package attachments
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"image"
+	"image/color"
+	"image/gif"
+	"image/jpeg"
+	"image/png"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -74,30 +81,75 @@ func managedDir(root, kind, siteID, articleID string, create bool) (string, erro
 }
 
 // AddDraft keeps newly selected files outside all public and backup trees.
+// Audio and video follow the macOS writer's single-attachment rule: adding one
+// replaces the previous draft file of the same kind and, for a draft editing a
+// saved article, marks the article's previous file of that kind as removed.
 func AddDraft(root string, library *store.Store, siteID, draftID, source string) (store.Draft, error) {
 	name := filepath.Base(source)
 	if !validName(name) || strings.HasPrefix(strings.ToLower(name), ".draft-stage-") {
 		return store.Draft{}, errors.New("附件文件名无效或与生成文件冲突")
 	}
 	CleanupDraftFiles(root, library)
-	for _, entry := range library.PendingDraftCleanup() {
-		if entry.SiteID == siteID && entry.DraftID == draftID && strings.EqualFold(entry.Name, name) {
-			return store.Draft{}, errors.New("原草稿附件等待清理，请稍后重试")
-		}
-	}
 	drafts, err := library.ListDrafts(siteID)
 	if err != nil {
 		return store.Draft{}, err
 	}
-	found := false
-	for _, draft := range drafts {
-		if draft.ID == draftID {
-			found = true
+	var matched *store.Draft
+	for i := range drafts {
+		if drafts[i].ID == draftID {
+			matched = &drafts[i]
 			break
 		}
 	}
-	if !found {
+	if matched == nil {
 		return store.Draft{}, errors.New("草稿不存在")
+	}
+	kind := attachmentKind(name)
+	replaced := ""
+	for _, old := range matched.Attachments {
+		if strings.EqualFold(old, name) || ((kind == "audio" || kind == "video") && attachmentKind(old) == kind) {
+			replaced = old
+			break
+		}
+	}
+	if replaced == "" && (kind == "audio" || kind == "video") && matched.ArticleID != "" {
+		posts, err := library.ListArticles(siteID)
+		if err != nil {
+			return store.Draft{}, err
+		}
+		for _, post := range posts {
+			if post.ID != matched.ArticleID {
+				continue
+			}
+			existing := post.AudioFilename
+			if kind == "video" {
+				existing = post.VideoFilename
+			}
+			removedAlready := false
+			for _, removed := range matched.RemovedAttachments {
+				if removed == existing {
+					removedAlready = true
+					break
+				}
+			}
+			if existing != "" && !removedAlready {
+				if _, err := library.SetDraftExistingAttachmentRemoved(siteID, draftID, existing, true); err != nil {
+					return store.Draft{}, err
+				}
+			}
+			break
+		}
+	}
+	if replaced != "" {
+		if _, err := RemoveDraft(root, library, siteID, draftID, replaced); err != nil {
+			return store.Draft{}, err
+		}
+		CleanupDraftFiles(root, library)
+	}
+	for _, entry := range library.PendingDraftCleanup() {
+		if entry.SiteID == siteID && entry.DraftID == draftID && strings.EqualFold(entry.Name, name) {
+			return store.Draft{}, errors.New("原草稿附件等待清理，请稍后重试")
+		}
 	}
 	dir, err := managedDir(root, "draft-attachments", siteID, draftID, true)
 	if err != nil {
@@ -459,38 +511,48 @@ func sameRegular(a, b string) (bool, error) {
 }
 
 func ReadDraftPreviewImage(root string, draft store.Draft, name string) ([]byte, string, error) {
-	if !validName(name) {
-		return nil, "", errors.New("附件名称无效")
-	}
-	found := false
-	for _, item := range draft.Attachments {
-		if item == name {
-			found = true
-			break
-		}
-	}
-	if !found {
-		return nil, "", errors.New("草稿附件未登记")
-	}
-	dir, err := managedDir(root, "draft-attachments", draft.SiteID, draft.ID, false)
-	if err != nil {
-		return nil, "", err
-	}
-	path := filepath.Join(dir, name)
-	info, err := os.Lstat(path)
-	if err != nil || !info.Mode().IsRegular() {
-		return nil, "", errors.New("草稿附件文件无效")
-	}
-	f, err := os.Open(path)
+	f, err := OpenDraftAttachment(root, draft, name)
 	if err != nil {
 		return nil, "", err
 	}
 	defer f.Close()
+	return readPreviewImage(f)
+}
+
+// OpenDraftAttachment opens a staged draft attachment without following links.
+func OpenDraftAttachment(root string, draft store.Draft, name string) (*os.File, error) {
+	if !validName(name) {
+		return nil, errors.New("附件名称无效")
+	}
+	registered := false
+	for _, item := range draft.Attachments {
+		if item == name {
+			registered = true
+			break
+		}
+	}
+	if !registered {
+		return nil, errors.New("草稿附件未登记")
+	}
+	dir, err := managedDir(root, "draft-attachments", draft.SiteID, draft.ID, false)
+	if err != nil {
+		return nil, err
+	}
+	path := filepath.Join(dir, name)
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() {
+		return nil, errors.New("草稿附件文件无效")
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
 	actual, err := f.Stat()
 	if err != nil || !actual.Mode().IsRegular() || !os.SameFile(info, actual) {
-		return nil, "", errors.New("草稿附件在读取期间发生变化")
+		f.Close()
+		return nil, errors.New("草稿附件在读取期间发生变化")
 	}
-	return readPreviewImage(f)
+	return f, nil
 }
 func copyRegular(src, dst string) error {
 	info, err := os.Lstat(src)
@@ -520,36 +582,70 @@ func copyRegular(src, dst string) error {
 	return err
 }
 
+// attachmentKind classifies a file name the way templates treat attachments.
+func attachmentKind(name string) string {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".mp3", ".m4a", ".aac", ".wav", ".ogg", ".opus", ".flac":
+		return "audio"
+	case ".mp4", ".mov", ".m4v", ".webm", ".avi", ".mpeg", ".mpg":
+		return "video"
+	case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg":
+		return "image"
+	}
+	return "file"
+}
+
 // Add copies a file and records it on a saved, Windows-authored article.
+// Audio and video follow the macOS writer's single-attachment rule: adding one
+// replaces the previous file of the same kind, and a re-selected name replaces
+// the previous copy.
 func Add(root string, library *store.Store, siteID, articleID, source string) (store.Article, error) {
 	name := filepath.Base(source)
 	if !validName(name) {
 		return store.Article{}, errors.New("附件文件名无效或与生成文件冲突")
 	}
 	CleanupArticleFiles(root, library)
-	for _, entry := range library.PendingArticleCleanup() {
-		if entry.SiteID == siteID && entry.ArticleID == articleID && strings.EqualFold(entry.Name, name) {
-			return store.Article{}, errors.New("原附件等待清理，请稍后重试")
-		}
-	}
 	posts, err := library.ListArticles(siteID)
 	if err != nil {
 		return store.Article{}, err
 	}
 	found := false
+	kind := attachmentKind(name)
 	for _, post := range posts {
-		if post.ID == articleID {
-			found = true
-			for _, old := range post.Attachments {
-				if strings.EqualFold(old, name) {
-					return store.Article{}, errors.New("附件名称已存在")
-				}
-			}
-			break
+		if post.ID != articleID {
+			continue
 		}
+		found = true
+		replaced := ""
+		for _, old := range post.Attachments {
+			if strings.EqualFold(old, name) {
+				replaced = old
+				break
+			}
+		}
+		if replaced == "" && (kind == "audio" || kind == "video") {
+			if kind == "audio" && post.AudioFilename != "" {
+				replaced = post.AudioFilename
+			}
+			if kind == "video" && post.VideoFilename != "" {
+				replaced = post.VideoFilename
+			}
+		}
+		if replaced != "" {
+			if _, err := Remove(root, library, siteID, articleID, replaced); err != nil {
+				return store.Article{}, err
+			}
+			CleanupArticleFiles(root, library)
+		}
+		break
 	}
 	if !found {
 		return store.Article{}, errors.New("文章不存在")
+	}
+	for _, entry := range library.PendingArticleCleanup() {
+		if entry.SiteID == siteID && entry.ArticleID == articleID && strings.EqualFold(entry.Name, name) {
+			return store.Article{}, errors.New("原附件等待清理，请稍后重试")
+		}
 	}
 	dir, err := ownedDir(root, siteID, articleID, true)
 	if err != nil {
@@ -964,4 +1060,96 @@ func AddDraftBytes(root string, library *store.Store, siteID, draftID, name, dat
 	}
 	defer cleanup()
 	return AddDraft(root, library, siteID, draftID, stagedPath)
+}
+
+// ThumbnailDataURL renders a small inline preview for the editor media tray.
+// Decodable raster images are downscaled to a 160px PNG; WebP passes through
+// untouched because the browser can scale it visually.
+func ThumbnailDataURL(data []byte, mime string) (string, error) {
+	if mime == "image/webp" {
+		return "data:image/webp;base64," + base64.StdEncoding.EncodeToString(data), nil
+	}
+	var source image.Image
+	switch mime {
+	case "image/png":
+		decoded, err := png.Decode(bytes.NewReader(data))
+		if err != nil {
+			return "", errors.New("图片无法解码")
+		}
+		source = decoded
+	case "image/jpeg":
+		decoded, err := jpeg.Decode(bytes.NewReader(data))
+		if err != nil {
+			return "", errors.New("图片无法解码")
+		}
+		source = decoded
+	case "image/gif":
+		decoded, err := gif.Decode(bytes.NewReader(data))
+		if err != nil {
+			return "", errors.New("图片无法解码")
+		}
+		source = decoded
+	default:
+		return "", errors.New("不支持生成此图片预览")
+	}
+	bounds := source.Bounds()
+	width, height := bounds.Dx(), bounds.Dy()
+	if width <= 0 || height <= 0 {
+		return "", errors.New("图片尺寸无效")
+	}
+	const limit = 160
+	scale := 1.0
+	if width > limit || height > limit {
+		scale = math.Min(float64(limit)/float64(width), float64(limit)/float64(height))
+	}
+	targetW := int(float64(width)*scale + 0.5)
+	targetH := int(float64(height)*scale + 0.5)
+	if targetW < 1 {
+		targetW = 1
+	}
+	if targetH < 1 {
+		targetH = 1
+	}
+	dst := image.NewRGBA(image.Rect(0, 0, targetW, targetH))
+	for y := 0; y < targetH; y++ {
+		startY := y * height / targetH
+		endY := (y + 1) * height / targetH
+		if endY <= startY {
+			endY = startY + 1
+		}
+		for x := 0; x < targetW; x++ {
+			startX := x * width / targetW
+			endX := (x + 1) * width / targetW
+			if endX <= startX {
+				endX = startX + 1
+			}
+			var sumR, sumG, sumB, sumA, count float64
+			for sy := startY; sy < endY; sy++ {
+				for sx := startX; sx < endX; sx++ {
+					r, g, b, a := source.At(bounds.Min.X+sx, bounds.Min.Y+sy).RGBA()
+					alpha := float64(a) / 0xffff
+					sumR += float64(r) * alpha
+					sumG += float64(g) * alpha
+					sumB += float64(b) * alpha
+					sumA += alpha
+					count++
+				}
+			}
+			if sumA <= 0 {
+				dst.Set(x, y, color.NRGBA{0, 0, 0, 0})
+				continue
+			}
+			dst.Set(x, y, color.NRGBA{
+				R: uint8(sumR / sumA / 0x100),
+				G: uint8(sumG / sumA / 0x100),
+				B: uint8(sumB / sumA / 0x100),
+				A: uint8(sumA / count / 0x10000 * 0xffff),
+			})
+		}
+	}
+	var out bytes.Buffer
+	if err := png.Encode(&out, dst); err != nil {
+		return "", err
+	}
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(out.Bytes()), nil
 }

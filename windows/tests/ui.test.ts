@@ -503,23 +503,27 @@ test("saved drafts accept private attachments without publishing", async () => {
   const window = new Window({url:"http://localhost/"}); window.document.write(await Bun.file("index.html").text()); Object.assign(globalThis,{window,document:window.document});
   const site={id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z"};
   let draft:any={id:"d",siteId:"s",title:"Draft",content:"",created:site.created,modified:site.created}, publications=0;
-  (globalThis as any).mygo={call:async(method:string)=>{switch(method){
+  (globalThis as any).mygo={call:async(method:string,...args:any[])=>{switch(method){
     case "Library.Sites":return [site];case "Library.Subscriptions":case "Library.Articles":return [];
     case "Library.Drafts":return [draft];case "Library.Preview":case "Library.PreviewDraft":return "";
-    case "Library.AddDraftAttachment":draft={...draft,attachments:["private image.png"]};return draft;
+    case "Library.AttachDraftFiles":draft={...draft,attachments:["private image.png"]};return draft;
     case "Library.RemoveDraftAttachment":draft={...draft,attachments:[]};return draft;
+    case "Library.StopEditorMedia":return;case "Library.EditorAttachmentThumbnail":return "data:image/png;base64,";
     case "Library.PublishSite":publications++;return {};
-    default:throw new Error(method);
+    default:throw new Error(`${method} ${args}`);
   }}};
   window.confirm=()=>true;
   await import("../src/main.ts?draft-attachments"); enterFirstSite(window);await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#show-drafts")!.disabled);
   window.document.querySelector<HTMLButtonElement>("#show-drafts")!.click();await waitFor(()=>window.document.querySelector("#articles")?.textContent?.includes("Draft")===true);
   window.document.querySelector<HTMLButtonElement>("#articles button")!.click();
-  const add=window.document.querySelector<HTMLButtonElement>("#add-attachment")!;expect(add.disabled).toBe(false);add.click();
-  await waitFor(()=>window.document.querySelector("#attachment-list")?.textContent?.includes("private image.png")===true);
+  const add=window.document.querySelector<HTMLButtonElement>("#attach-photo")!;expect(add.disabled).toBe(false);add.click();
+  await waitFor(()=>!!window.document.querySelector('#media-tray-items [aria-label="附件 private image.png"]'));
   expect(window.document.querySelector<HTMLTextAreaElement>("#content")!.value).toContain("private%20image.png");
-  expect(publications).toBe(0);window.document.querySelector<HTMLButtonElement>("#attachment-list .remove-attachment")!.click();
-  await waitFor(()=>!window.document.querySelector("#attachment-list")?.textContent?.includes("private image.png"));expect(publications).toBe(0);
+  expect(publications).toBe(0);
+  window.document.querySelector<HTMLElement>("#media-tray-items .tray-item")!.dispatchEvent(new window.MouseEvent("contextmenu",{bubbles:true,cancelable:true}));
+  await waitFor(()=>!!window.document.querySelector(".tray-menu"));
+  Array.from(window.document.querySelectorAll<HTMLButtonElement>(".tray-menu button")).find(b=>b.textContent==="移除附件")!.click();
+  await waitFor(()=>!window.document.querySelector('#media-tray-items [aria-label="附件 private image.png"]'));expect(publications).toBe(0);
 });
 
 test("draft can stage and undo removal of an existing article attachment", async () => {
@@ -531,14 +535,22 @@ test("draft can stage and undo removal of an existing article attachment", async
     case "Library.Sites":return [site];case "Library.Subscriptions":return [];case "Library.Articles":return [post];case "Library.Drafts":return [draft];
     case "Library.Preview":case "Library.PreviewArticle":case "Library.PreviewDraft":return "";
     case "Library.SetDraftExistingAttachmentRemoved":draft={...draft,removedAttachments:args[3]?[args[2]]:[]};return draft;
-    case "Library.PublishSite":publications++;return {};default:throw new Error(method);
+    case "Library.StopEditorMedia":return;case "Library.EditorAttachmentThumbnail":return "data:image/png;base64,";
+    case "Library.PublishSite":publications++;return {};default:throw new Error(`${method} ${args}`);
   }}};window.confirm=()=>true;
   await import("../src/main.ts?draft-existing-attachment"); enterFirstSite(window);await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#show-drafts")!.disabled);
   window.document.querySelector<HTMLButtonElement>("#show-drafts")!.click();await waitFor(()=>window.document.querySelector("#articles")?.textContent?.includes("Draft")===true);
   window.document.querySelector<HTMLButtonElement>("#articles button")!.click();
-  const button=()=>window.document.querySelector<HTMLButtonElement>("#attachment-list .remove-attachment")!;
-  expect(button().disabled).toBe(false);button().click();await waitFor(()=>button().textContent==="撤销");
-  expect(publications).toBe(0);button().click();await waitFor(()=>button().textContent==="×");expect(publications).toBe(0);
+  await waitFor(()=>!!window.document.querySelector("#media-tray-items .tray-item"));
+  const item=()=>window.document.querySelector<HTMLElement>("#media-tray-items .tray-item")!;
+  item().dispatchEvent(new window.MouseEvent("contextmenu",{bubbles:true,cancelable:true}));
+  await waitFor(()=>!!window.document.querySelector(".tray-menu"));
+  Array.from(window.document.querySelectorAll<HTMLButtonElement>(".tray-menu button")).find(b=>b.textContent==="移除附件")!.click();
+  await waitFor(()=>item().classList.contains("tray-removed"));expect(publications).toBe(0);
+  item().dispatchEvent(new window.MouseEvent("contextmenu",{bubbles:true,cancelable:true}));
+  await waitFor(()=>!!window.document.querySelector(".tray-menu"));
+  Array.from(window.document.querySelectorAll<HTMLButtonElement>(".tray-menu button")).find(b=>b.textContent==="撤销删除")!.click();
+  await waitFor(()=>!item().classList.contains("tray-removed"));expect(publications).toBe(0);
 });
 
 test("unfollowing a subscription removes it after confirmation", async () => {
@@ -914,8 +926,10 @@ test("saving and deleting an article restores site actions", async () => {
         const saved = { ...articles[0], id: "article-1", siteId: args[0]!, title: args[2]!, content: args[3]!, created: "2026-01-01T00:00:00Z", modified: "2026-01-01T00:00:00Z" };
         articles = [saved]; site.contentRevision++; site.publishPending=true; return saved;
       }
-      case "Library.AddAttachment": { const updated = { ...articles[0]!, attachments: ["photo.png"] }; articles = [updated]; site.contentRevision++; return updated; }
+      case "Library.AttachArticleFiles": { const updated = { ...articles[0]!, attachments: ["photo.png"] }; articles = [updated]; site.contentRevision++; return updated; }
       case "Library.RemoveAttachment": { const updated = { ...articles[0]!, attachments: [] }; articles = [updated]; site.contentRevision++; return updated; }
+      case "Library.StopEditorMedia": return;
+      case "Library.EditorAttachmentThumbnail": return "data:image/png;base64,";
       case "Library.DeleteArticle": articles = []; site.contentRevision++; return;
       case "Library.PublishSite": {
         const revision=site.contentRevision;
@@ -968,9 +982,8 @@ test("saving and deleting an article restores site actions", async () => {
   expect(button("publish-site").disabled).toBe(false);
   expect(button("export-site").disabled).toBe(false);
   expect(button("new-article").disabled).toBe(false);
-  button("add-attachment").click();
-  await waitFor(() => window.document.querySelector("#attachment-list")?.textContent?.includes("photo.png") === true);
-  expect(window.document.querySelector("#attachment-help")!.textContent).toContain("立即保存");
+  button("attach-photo").click();
+  await waitFor(() => !!window.document.querySelector('#media-tray-items [aria-label="附件 photo.png"]'));
   expect(window.document.querySelector<HTMLTextAreaElement>("#content")!.value).toContain("![photo.png](photo.png)");
   button("save").click();
   await waitFor(() => !button("publish-site").disabled && window.document.querySelector("#save-state")?.textContent?.includes("已发布") === true);
@@ -987,8 +1000,10 @@ test("saving and deleting an article restores site actions", async () => {
   const address = window.document.querySelector<HTMLInputElement>("#published-url")!;
   expect(address.selectionStart).toBe(0);
   expect(address.selectionEnd).toBe(address.value.length);
-  window.document.querySelector<HTMLButtonElement>(".remove-attachment")!.click();
-  await waitFor(() => !window.document.querySelector("#attachment-list")?.textContent?.includes("photo.png"));
+  window.document.querySelector<HTMLElement>("#media-tray-items .tray-item")!.dispatchEvent(new window.MouseEvent("contextmenu",{bubbles:true,cancelable:true}));
+  await waitFor(() => !!window.document.querySelector(".tray-menu"));
+  Array.from(window.document.querySelectorAll<HTMLButtonElement>(".tray-menu button")).find(b => b.textContent === "移除附件")!.click();
+  await waitFor(() => !window.document.querySelector('#media-tray-items [aria-label="附件 photo.png"]'));
   expect(confirmation).toContain("photo.png");
   expect(window.document.querySelector("#save-state")?.textContent).toContain("尚未发布");
   button("delete-article").click();
@@ -1037,7 +1052,7 @@ test("saving cancels an older pending site switch and still publishes", async ()
       case "Library.Articles":if(args[0]==="second"){await new Promise<void>(resolve=>{releaseSwitch=resolve});return []};return [post];
       case "Library.Preview":case "Library.PreviewArticle":return "";
       case "Library.SaveArticle":post.title=args[2]!;post.content=args[3]!;return {...post};
-      case "Library.AddAttachment":await new Promise<void>(resolve=>{releaseAttachment=resolve});return {...post,attachments:["file.txt"]};
+      case "Library.AttachArticleFiles":await new Promise<void>(resolve=>{releaseAttachment=resolve});return {...post,attachments:["file.txt"]};
       case "Library.PublishSite":published=args[0]!;return {ipns:"k51first",cid:"bafyfirst",revision:1,pending:false};
       default:throw new Error(`Unexpected call: ${method}`);
     }
@@ -1058,7 +1073,7 @@ test("saving cancels an older pending site switch and still publishes", async ()
   releaseSwitch=undefined;
   Array.from(window.document.querySelectorAll<HTMLButtonElement>(".site-item")).find(item=>item.textContent?.includes("Second"))!.click();
   await waitFor(()=>!!releaseSwitch);
-  window.document.querySelector<HTMLButtonElement>("#add-attachment")!.click();await waitFor(()=>!!releaseAttachment);
+  window.document.querySelector<HTMLButtonElement>("#attach-photo")!.click();await waitFor(()=>!!releaseAttachment);
   releaseSwitch!();await new Promise(resolve=>setTimeout(resolve,10));
   releaseAttachment!();await waitFor(()=>content.value.includes("[file.txt](file.txt)"));
   expect(window.document.querySelector("#site-title")?.textContent).toBe("First");
@@ -1079,13 +1094,16 @@ test("changes during publication trigger a follow-up snapshot", async () => {
   (globalThis as any).mygo={call:async(method:string)=>{switch(method){
     case "Library.Sites":return [site];case "Library.Subscriptions":return [];case "Library.Articles":return [{...post}];case "Library.Preview":case "Library.PreviewArticle":return "";
     case "Library.RemoveAttachment":await new Promise<void>(resolve=>{releaseAttachment=resolve});post.attachments=[];site.contentRevision++;return {...post};
+    case "Library.StopEditorMedia":return;case "Library.EditorAttachmentThumbnail":return "data:image/png;base64,";
     case "Library.PublishSite":{count++;const revision=site.contentRevision;if(count===1)await new Promise<void>(resolve=>{release=resolve});const pending=revision!==site.contentRevision;site.publishedRevision=revision;site.publishPending=pending;return {ipns:"k51",cid:"bafy",revision,pending};}
     default:throw new Error(`Unexpected ${method}`);
   }}};
   window.confirm=()=>true;window.alert=()=>{};await import("../src/main.ts?mutation-race"); enterFirstSite(window);
   await waitFor(()=>!!window.document.querySelector(".article-item"));window.document.querySelector<HTMLButtonElement>(".article-item")!.click();
   window.document.querySelector<HTMLButtonElement>("#publish-site")!.click();await waitFor(()=>!!release);
-  window.document.querySelector<HTMLButtonElement>(".remove-attachment")!.click();await waitFor(()=>!!releaseAttachment);
+  window.document.querySelector<HTMLElement>("#media-tray-items .tray-item")!.dispatchEvent(new window.MouseEvent("contextmenu",{bubbles:true,cancelable:true}));
+  await waitFor(()=>!!window.document.querySelector(".tray-menu"));
+  Array.from(window.document.querySelectorAll<HTMLButtonElement>(".tray-menu button")).find(b=>b.textContent==="移除附件")!.click();await waitFor(()=>!!releaseAttachment);
   expect(window.document.querySelector("#save-state")?.textContent).toContain("等待");
   releaseAttachment!();await waitFor(()=>site.contentRevision===2);
   release!();await waitFor(()=>count===2 && !window.document.querySelector<HTMLButtonElement>("#publish-site")!.disabled);
@@ -1096,16 +1114,19 @@ test("imported articles expose attachment editing", async () => {
   const window = new Window({url:"http://localhost/"}); window.document.write(await Bun.file("index.html").text()); Object.assign(globalThis,{window,document:window.document});
   const site={id:"imported",name:"Imported",about:"",created:"2026-01-01T00:00:00Z",imported:true};
   let post={id:"post",siteId:site.id,title:"Post",content:"Text",created:"2026-01-01T00:00:00Z",modified:"2026-01-01T00:00:00Z",attachments:["old.txt"]};
-  (globalThis as any).mygo={call:async(method:string)=>{switch(method){
+  (globalThis as any).mygo={call:async(method:string,...args:any[])=>{switch(method){
     case "Library.Sites":return [site]; case "Library.Subscriptions":return []; case "Library.Articles":return [post]; case "Library.Preview":case "Library.PreviewArticle":return "";
-    case "Library.AddAttachment":post={...post,attachments:[...post.attachments,"new.txt"]};return post;
+    case "Library.AttachArticleFiles":post={...post,attachments:[...post.attachments,"new.txt"]};return post;
     case "Library.RemoveAttachment":post={...post,attachments:post.attachments.filter(name=>name!=="old.txt")};return post;
-    default:throw new Error(`Unexpected ${method}`);
+    case "Library.StopEditorMedia":return;case "Library.EditorAttachmentThumbnail":return "data:image/png;base64,";
+    default:throw new Error(`Unexpected ${method} ${args}`);
   }}};
   window.confirm=()=>true; await import("../src/main.ts?imported-attachments"); enterFirstSite(window); await waitFor(()=>!!window.document.querySelector(".article-item")); window.document.querySelector<HTMLButtonElement>(".article-item")!.click();window.document.querySelector<HTMLButtonElement>("#edit-article")!.click();
-  expect(window.document.querySelector<HTMLButtonElement>("#add-attachment")!.disabled).toBe(false);
-  window.document.querySelector<HTMLButtonElement>(".remove-attachment")!.click(); await waitFor(()=>!window.document.querySelector("#attachment-list")?.textContent?.includes("old.txt"));
-  window.document.querySelector<HTMLButtonElement>("#add-attachment")!.click(); await waitFor(()=>window.document.querySelector("#attachment-list")?.textContent?.includes("new.txt")===true);
+  expect(window.document.querySelector<HTMLButtonElement>("#attach-photo")!.disabled).toBe(false);
+  window.document.querySelector<HTMLElement>("#media-tray-items .tray-item")!.dispatchEvent(new window.MouseEvent("contextmenu",{bubbles:true,cancelable:true}));
+  await waitFor(()=>!!window.document.querySelector(".tray-menu"));
+  Array.from(window.document.querySelectorAll<HTMLButtonElement>(".tray-menu button")).find(b=>b.textContent==="移除附件")!.click(); await waitFor(()=>!window.document.querySelector('#media-tray-items [aria-label="附件 old.txt"]'));
+  window.document.querySelector<HTMLButtonElement>("#attach-photo")!.click(); await waitFor(()=>!!window.document.querySelector('#media-tray-items [aria-label="附件 new.txt"]'));
   expect(window.document.querySelector<HTMLTextAreaElement>("#content")!.value).toContain("[new.txt](new.txt)");
 });
 
@@ -1116,11 +1137,14 @@ test("saved article preview shows and removes a local image", async () => {
  case "Library.Sites":return [site];case "Library.Subscriptions":return [];case "Library.Articles":return [post];case "Library.Preview":return '<img src="photo.png">';
  case "Library.PreviewArticle":return post.attachments.length ? '<img src="data:image/png;base64,aW1hZ2U=">' : '<img src="">';
  case "Library.RemoveAttachment":post={...post,attachments:[]};return post;
+ case "Library.StopEditorMedia":return;case "Library.EditorAttachmentThumbnail":return "data:image/png;base64,THUMB";
  default:throw new Error(`Unexpected ${method} ${args}`);
  }}};
  window.confirm=()=>true;await import("../src/main.ts?local-image-preview"); enterFirstSite(window);await waitFor(()=>!!window.document.querySelector(".article-item"));window.document.querySelector<HTMLButtonElement>(".article-item")!.click();window.document.querySelector<HTMLButtonElement>("#edit-article")!.click();
  const frame=window.document.querySelector<HTMLIFrameElement>("#preview")!;await waitFor(()=>frame.srcdoc.includes("data:image/png;base64,aW1hZ2U="));expect(frame.srcdoc).toContain("img-src data:");
- window.document.querySelector<HTMLButtonElement>(".remove-attachment")!.click();await waitFor(()=>!frame.srcdoc.includes("base64,aW1hZ2U="));
+ window.document.querySelector<HTMLElement>("#media-tray-items .tray-item")!.dispatchEvent(new window.MouseEvent("contextmenu",{bubbles:true,cancelable:true}));
+ await waitFor(()=>!!window.document.querySelector(".tray-menu"));
+ Array.from(window.document.querySelectorAll<HTMLButtonElement>(".tray-menu button")).find(b=>b.textContent==="移除附件")!.click();await waitFor(()=>!frame.srcdoc.includes("base64,aW1hZ2U="));
 });
 
 test("global audio player remains visible after switching sites", async () => {
@@ -1207,6 +1231,63 @@ test("article tags stay local until save and trigger the normal publish", async 
   window.document.querySelector<HTMLButtonElement>('[aria-label="删除标签 Go"]')!.click();
   window.document.querySelector<HTMLButtonElement>("#save")!.click();await waitFor(()=>publishes===1);
   expect(savedTags).toEqual({"new-tag":"New tag"});
+});
+
+test("video attachment replaces the previous one and renames references", async () => {
+  const window = new Window({url:"http://localhost/"}); window.document.write(await Bun.file("index.html").text()); Object.assign(globalThis,{window,document:window.document});
+  const site={id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z"};
+  let draft:any={id:"d",siteId:"s",title:"Draft",content:"观看 clip-old.mp4 视频",attachments:["clip-old.mp4"],created:site.created,modified:site.created};
+  const mediaURLs:string[]=[];
+  (globalThis as any).mygo={call:async(method:string,...args:any[])=>{switch(method){
+    case "Library.Sites":return [site];case "Library.Subscriptions":case "Library.Articles":return [];
+    case "Library.Drafts":return [draft];case "Library.Preview":case "Library.PreviewDraft":return "";
+    case "Library.AttachDraftFiles":draft={...draft,attachments:["clip-new.mp4"]};return draft;
+    case "Library.EditorAttachmentMediaURL":mediaURLs.push(args[3]!);return "http://127.0.0.1:0/media";
+    case "Library.StopEditorMedia":return;
+    default:throw new Error(`${method} ${args}`);
+  }}};
+  window.confirm=(message?:string)=>{lastConfirm=message??"";return true;};
+  let lastConfirm="";
+  await import("../src/main.ts?video-replace"); enterFirstSite(window);await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#show-drafts")!.disabled);
+  window.document.querySelector<HTMLButtonElement>("#show-drafts")!.click();await waitFor(()=>window.document.querySelector("#articles")?.textContent?.includes("Draft")===true);
+  window.document.querySelector<HTMLButtonElement>("#articles button")!.click();
+  await waitFor(()=>!window.document.querySelector<HTMLElement>("#editor-video-player")!.hidden);
+  await waitFor(()=>mediaURLs.includes("clip-old.mp4"));
+  expect(window.document.querySelector("#media-tray")?.hidden).toBe(true);
+  window.document.querySelector<HTMLButtonElement>("#attach-video")!.click();
+  await waitFor(()=>window.document.querySelector<HTMLTextAreaElement>("#content")!.value.includes("clip-new.mp4"));
+  expect(lastConfirm).toContain("clip-old.mp4");
+  expect(window.document.querySelector<HTMLTextAreaElement>("#content")!.value).not.toContain("clip-old.mp4");
+  await waitFor(()=>mediaURLs.includes("clip-new.mp4"));
+  expect(mediaURLs.at(-1)).toBe("clip-new.mp4");
+});
+
+test("previously used tags add to the article from the tags popover", async () => {
+  const window = new Window({url:"http://localhost/"}); window.document.write(await Bun.file("index.html").text()); Object.assign(globalThis,{window,document:window.document});
+  const site={id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z"};
+  const posts=[
+    {id:"a",siteId:"s",title:"One",content:"",tags:{},created:site.created,modified:site.created},
+    {id:"b",siteId:"s",title:"Two",content:"",tags:{go:"Go",swift:"Swift"},created:site.created,modified:site.created},
+  ];
+  (globalThis as any).mygo={call:async(method:string,...args:any[])=>{switch(method){
+    case "Library.Sites":return [site];case "Library.Subscriptions":return [];
+    case "Library.Articles":return posts;case "Library.Drafts":return [];
+    case "Library.Preview":case "Library.PreviewArticle":return "";
+    case "Library.SiteAvailableTags":return [{label:"Go",count:2},{label:"Swift",count:1}];
+    case "Library.SaveArticleWithTags":return posts[0];
+    case "Library.StopEditorMedia":return;
+    default:throw new Error(`${method} ${args}`);
+  }}};
+  await import("../src/main.ts?tag-usage"); enterFirstSite(window);await waitFor(()=>!!window.document.querySelector(".article-item"));
+  window.document.querySelector<HTMLButtonElement>(".article-item")!.click();window.document.querySelector<HTMLButtonElement>("#edit-article")!.click();
+  const toggle=window.document.querySelector<HTMLButtonElement>("#toggle-metadata")!;
+  toggle.click();
+  await waitFor(()=>!window.document.querySelector<HTMLElement>("#tag-usage")!.hidden);
+  expect(window.document.querySelector("#tag-usage-list")?.textContent).toContain("Go");
+  const chip=Array.from(window.document.querySelectorAll<HTMLButtonElement>(".tag-usage-item")).find(b=>b.textContent?.startsWith("Go"))!;
+  chip.click();
+  await waitFor(()=>window.document.querySelector("#tag-list")?.textContent?.includes("Go")===true);
+  expect(window.document.querySelector("#metadata-count")?.textContent).toBe("1");
 });
 
 test("unadded tag input blocks saving and prompts before navigation", async () => {
