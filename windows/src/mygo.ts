@@ -473,7 +473,8 @@ export const Library = {
   drafts: bind<[string], Draft[]>("Library.Drafts", (siteID: string) => [siteID]),
   /**
    * EditorAttachmentMediaURL streams an article or draft attachment (audio or
-   * video) for the editor players over the private loopback server.
+   * video) for the editor players over the private loopback server. One server
+   * serves both players; StopEditorMedia revokes it when the editor moves on.
    */
   editorAttachmentMediaURL: bind<[string, string, string, string], string>("Library.EditorAttachmentMediaURL", (siteID: string, articleID: string, draftID: string, name: string) => [siteID, articleID, draftID, name]),
   /** EditorAttachmentThumbnail returns a small inline preview for the media tray. */

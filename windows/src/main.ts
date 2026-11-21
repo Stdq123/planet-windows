@@ -260,7 +260,7 @@ try { publicGateway.value = selectedGateway(window.localStorage.getItem(gatewayK
 catch { publicGateway.value = "eth.sucks"; }
 syncChoices(publicGateway.parentElement!);
 const attachPhoto = $<HTMLButtonElement>("#attach-photo"), attachVideo = $<HTMLButtonElement>("#attach-video"), attachAudio = $<HTMLButtonElement>("#attach-audio");
-const tagInput=$<HTMLInputElement>("#tag-input"), addTag=$<HTMLButtonElement>("#add-tag"), tagList=$("#tag-list"), tagUsageSection=$("#tag-usage"), tagUsageList=$("#tag-usage-list");
+const tagInput=$<HTMLInputElement>("#tag-input"), addTag=$<HTMLButtonElement>("#add-tag"), tagInlineList=$("#tag-inline-list"), tagInlineInput=$<HTMLInputElement>("#tag-inline-input"), tagUsageSection=$("#tag-usage"), tagUsageList=$("#tag-usage-list");
 const importedWarning = $("#imported-warning");
 const audioPlayer = $("#audio-player"), audioTitle = $("#audio-title"), globalAudio = $<HTMLAudioElement>("#global-audio"), globalVideo = $<HTMLVideoElement>("#global-video");
 const editorMedia = $("#editor-media"), editorVideoPlayer = $("#editor-video-player"), editorVideo = $<HTMLVideoElement>("#editor-video");
@@ -302,23 +302,28 @@ const xSync = initXSync({
 
 function tagSignature(): string { return JSON.stringify([...editorTags.entries()].sort(([a],[b])=>a.localeCompare(b))); }
 function tagJSON(): string { return JSON.stringify(Object.fromEntries(editorTags)); }
-function setEditorTags(tags?: Record<string,string>) { editorTags=new Map(Object.entries(tags ?? {}));savedTagSignature=tagSignature();tagInput.value=""; }
+function setEditorTags(tags?: Record<string,string>) { editorTags=new Map(Object.entries(tags ?? {}));savedTagSignature=tagSignature();tagInput.value="";tagInlineInput.value=""; }
 function normalizedTag(value:string):string {
   return value.toLowerCase().normalize("NFD").replace(/\p{M}/gu,"").replace(/[^\p{L}\p{N}-]+/gu,"-").replace(/-+/g,"-").replace(/^-|-$/g,"");
 }
-function addEditorTag() {
+function addEditorTag(field: HTMLInputElement) {
   if (!editing || saving || site?.tagsUnsupported) return;
-  const value=tagInput.value.trim(), key=normalizedTag(value);
+  const value=field.value.trim(), key=normalizedTag(value);
   if (!key || /^(?:index|tags|archive|archives|page[0-9]+|con|prn|aux|nul|(?:com|lpt)[1-9¹²³])$/i.test(key)) {showError("标签名称不能生成安全路径，请换一个名称。");return;}
   if ([...editorTags.keys()].some(old=>old.toLowerCase()===key.toLowerCase())) {showError("标签已存在。");return;}
-  editorTags.set(key,value);tagInput.value="";dirty=true;navigationRevision++;clearError();updateView();
+  editorTags.set(key,value);field.value="";dirty=true;navigationRevision++;clearError();updateView();
 }
-addTag.addEventListener("click",addEditorTag);
-tagInput.addEventListener("keydown",event=>{if(event.key==="Enter" && !event.isComposing && event.keyCode!==229){event.preventDefault();addEditorTag();}});
+addTag.addEventListener("click",()=>addEditorTag(tagInput));
+tagInput.addEventListener("keydown",event=>{if(event.key==="Enter" && !event.isComposing && event.keyCode!==229){event.preventDefault();addEditorTag(tagInput);}});
 tagInput.addEventListener("input",()=>{dirty=true;navigationRevision++;updateView();});
+tagInlineInput.addEventListener("keydown",event=>{if(event.key==="Enter" && !event.isComposing && event.keyCode!==229){event.preventDefault();addEditorTag(tagInlineInput);}});
+tagInlineInput.addEventListener("input",()=>{dirty=true;navigationRevision++;updateView();});
 function pendingTagBlocksSave(): boolean {
-  if (!tagInput.value.trim()) return false;
-  setMetadataOpen(true); showError("请先添加标签，或清空标签输入框后再保存。");tagInput.focus();return true;
+  for (const field of [tagInput, tagInlineInput]) {
+    if (!field.value.trim()) continue;
+    setMetadataOpen(true); showError("请先添加标签，或清空标签输入框后再保存。");field.focus();return true;
+  }
+  return false;
 }
 let navigationRevision = 0, favoritesView = false, readerRevision = 0;
 let smartView: "today" | "unread" | null = null;
@@ -642,12 +647,12 @@ function updateView() {
   readButton.textContent=item?.read ? "标为未读" : "标为已读";readButton.title=readButton.textContent;readButton.setAttribute("aria-label",readButton.textContent);readButton.setAttribute("aria-pressed", String(Boolean(item && !item.read)));readButton.disabled=!item || !subscription || pendingRead.has(readKey) || bulkReading.has(subscription.url);
   const markFeed=$<HTMLButtonElement>("#mark-feed-read");markFeed.hidden=!subscription;markFeed.disabled=!subscription || bulkReading.has(subscription.url) || [...pendingRead].some(key=>key.startsWith(`${subscription!.url}\u0000`)) || !subscription.feed.items.some(entry=>!entry.read);
   deleteArticle.hidden = (!article && !draft) || !!subscription; deleteArticle.textContent=draft ? "删除草稿" : "删除文章";
-	 tagInput.disabled = !editing || saving || !!site?.tagsUnsupported; addTag.disabled = tagInput.disabled;
-	 tagList.replaceChildren();
+	 tagInput.disabled = !editing || saving || !!site?.tagsUnsupported; addTag.disabled = tagInput.disabled; tagInlineInput.disabled = tagInput.disabled;
+	 tagInlineList.replaceChildren();
 	 for (const [key,value] of editorTags) {
 	   const item=label("span",value,"tag-item"), remove=document.createElement("button");
 	   remove.type="button";remove.className="remove-tag";remove.textContent="×";remove.setAttribute("aria-label",`删除标签 ${value}`);remove.disabled=tagInput.disabled;
-	   remove.addEventListener("click",()=>{if(saving || site?.tagsUnsupported)return;editorTags.delete(key);dirty=true;navigationRevision++;updateView();});item.append(remove);tagList.append(item);
+	   remove.addEventListener("click",()=>{if(saving || site?.tagsUnsupported)return;editorTags.delete(key);dirty=true;navigationRevision++;updateView();});item.append(remove);tagInlineList.append(item);
 	 }
   const ownAudio=$<HTMLButtonElement>("#play-own-audio");ownAudio.hidden=!article?.audioFilename || !site;ownAudio.disabled=saving;
   const articleSettings=$<HTMLButtonElement>("#article-settings");articleSettings.disabled=!article || !site || saving;articleSettings.title="文章路径、类型与导航设置";
@@ -656,7 +661,10 @@ function updateView() {
   let currentOwnShare="";
   if(site?.ipns && site.lastPublishedCID && article){try{currentOwnShare=sitePublicURL(selectedGateway(publicGateway.value),site.ipns,site.domain,`/${encodeURIComponent(article.slug || article.id)}/`);}catch{ /* The copy action reports unsupported gateway names. */ }}
   if(ownShareInput.value && ownShareInput.value!==currentOwnShare){ownShareInput.value="";ownShareInput.hidden=true;$("#own-share-status").textContent="";}
-  const editorAttachmentsReady = !!site && (!!article || !!draft) && !saving;
+  // Attachment entry points stay available while writing: the first attach
+  // lazily creates the local draft, matching the macOS writer which always
+  // operates on an existing draft.
+  const editorAttachmentsReady = !!site && editing && !saving;
   for (const button of [attachPhoto, attachVideo, attachAudio]) button.disabled = !editorAttachmentsReady;
   attachVideo.title = editorVideoAttachmentName() ? `替换现有视频附件（${editorVideoAttachmentName()}）` : "添加视频附件（每篇文章一个）";
   attachAudio.title = editorAudioAttachmentName() ? `替换现有音频附件（${editorAudioAttachmentName()}）` : "添加音频附件（每篇文章一个）";
@@ -2416,7 +2424,29 @@ function syncEditorAttachmentState(updated: Draft | Article, siteID: string, dra
   }
   dirty = true; navigationRevision++; void renderPreview();
 }
+// A brand-new article has no backend object until it is saved once; the first
+// attachment creates the local draft immediately so the editor behaves like the
+// macOS writer, which always works on an existing draft.
+async function ensureEditorDraft(): Promise<string> {
+  if (draft?.id) return draft.id;
+  if (article?.id || !site) return "";
+  navigationRevision++; saving = true; busyMessage = "正在创建本地草稿…"; updateView(); clearError();
+  const siteID = site.id;
+  try {
+    const created = await Library.saveDraft(siteID, "", "", title.value, content.value);
+    if (site?.id !== siteID || !created.id) return "";
+    draft = created; drafts = [...drafts, created];
+    return created.id;
+  } catch (e) { showError(e); return ""; }
+  finally { saving = false; busyMessage = ""; updateView(); }
+}
+
 async function runEditorAttach(kind: "image" | "video" | "audio") {
+  if (!site || !editing || saving) return;
+  if (!draft?.id && !article?.id) {
+    const createdID = await ensureEditorDraft();
+    if (!createdID) return;
+  }
   if (!site || (!article && !draft) || saving) return;
   if (kind === "video" || kind === "audio") {
     const existing = currentAttachmentNames().find(n => attachmentKindOf(n) === kind);
@@ -2457,7 +2487,12 @@ for (const [button, kind] of [[attachPhoto, "image"], [attachVideo, "video"], [a
   button.addEventListener("click", () => void runEditorAttach(kind));
 }
 async function addEditorAttachmentFiles(files: File[]) {
-  if (!site || (!article && !draft) || saving || !files.length) return;
+  if (!site || !editing || saving || !files.length) return;
+  if (!draft?.id && !article?.id) {
+    const createdID = await ensureEditorDraft();
+    if (!createdID) return;
+  }
+  if (!site || (!article && !draft)) return;
   const videos = files.filter(f => attachmentKindOf(f.name) === "video" || f.type.startsWith("video/"));
   const audios = files.filter(f => attachmentKindOf(f.name) === "audio" || f.type.startsWith("audio/"));
   if (videos.length > 1 || audios.length > 1) {

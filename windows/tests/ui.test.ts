@@ -1225,9 +1225,9 @@ test("article tags stay local until save and trigger the normal publish", async 
     default:throw new Error(method);
   }}};
   await import("../src/main.ts?edit-tags"); enterFirstSite(window);await waitFor(()=>!!window.document.querySelector(".article-item"));window.document.querySelector<HTMLButtonElement>(".article-item")!.click();window.document.querySelector<HTMLButtonElement>("#edit-article")!.click();
-  expect(window.document.querySelector("#tag-list")?.textContent).toContain("Go");
+  expect(window.document.querySelector("#tag-inline-list")?.textContent).toContain("Go");
   const input=window.document.querySelector<HTMLInputElement>("#tag-input")!;input.value="New tag";window.document.querySelector<HTMLButtonElement>("#add-tag")!.click();
-  expect(window.document.querySelector("#tag-list")?.textContent).toContain("New tag");expect(publishes).toBe(0);
+  expect(window.document.querySelector("#tag-inline-list")?.textContent).toContain("New tag");expect(publishes).toBe(0);
   window.document.querySelector<HTMLButtonElement>('[aria-label="删除标签 Go"]')!.click();
   window.document.querySelector<HTMLButtonElement>("#save")!.click();await waitFor(()=>publishes===1);
   expect(savedTags).toEqual({"new-tag":"New tag"});
@@ -1286,8 +1286,32 @@ test("previously used tags add to the article from the tags popover", async () =
   expect(window.document.querySelector("#tag-usage-list")?.textContent).toContain("Go");
   const chip=Array.from(window.document.querySelectorAll<HTMLButtonElement>(".tag-usage-item")).find(b=>b.textContent?.startsWith("Go"))!;
   chip.click();
-  await waitFor(()=>window.document.querySelector("#tag-list")?.textContent?.includes("Go")===true);
+  await waitFor(()=>window.document.querySelector("#tag-inline-list")?.textContent?.includes("Go")===true);
   expect(window.document.querySelector("#metadata-count")?.textContent).toBe("1");
+});
+
+test("attaching to a brand-new article lazily creates the local draft", async () => {
+  const window = new Window({url:"http://localhost/"}); window.document.write(await Bun.file("index.html").text()); Object.assign(globalThis,{window,document:window.document});
+  const site={id:"s",name:"Site",about:"",created:"2026-01-01T00:00:00Z"};
+  let draft:any=null, attachArgs:any[]=[];
+  (globalThis as any).mygo={call:async(method:string,...args:any[])=>{switch(method){
+    case "Library.Sites":return [site];case "Library.Subscriptions":case "Library.Articles":return [];
+    case "Library.Drafts":return draft?[draft]:[];
+    case "Library.SaveDraft":draft={id:"new-draft",siteId:"s",title:args[3],content:args[4],created:site.created,modified:site.created};return draft;
+    case "Library.AttachDraftFiles":attachArgs=args;draft={...draft,attachments:["first.png"]};return draft;
+    case "Library.Preview":case "Library.PreviewDraft":return "";
+    case "Library.StopEditorMedia":return;case "Library.EditorAttachmentThumbnail":return "data:image/png;base64,";
+    default:throw new Error(`${method} ${args}`);
+  }}};
+  await import("../src/main.ts?lazy-draft-attach"); enterFirstSite(window);
+  await waitFor(()=>!window.document.querySelector<HTMLButtonElement>("#new-article")!.disabled);
+  window.document.querySelector<HTMLButtonElement>("#new-article")!.click();
+  await waitFor(()=>!window.document.querySelector("#editor")!.hidden);
+  const photo=window.document.querySelector<HTMLButtonElement>("#attach-photo")!;
+  expect(photo.disabled).toBe(false);photo.click();
+  await waitFor(()=>!!window.document.querySelector('#media-tray-items [aria-label="附件 first.png"]'));
+  expect(attachArgs[0]).toBe("s");expect(attachArgs[1]).toBe("new-draft");expect(attachArgs[2]).toBe("image");
+  expect(window.document.querySelector<HTMLTextAreaElement>("#content")!.value).toContain("![first.png](first.png)");
 });
 
 test("unadded tag input blocks saving and prompts before navigation", async () => {

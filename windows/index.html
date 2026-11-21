@@ -152,12 +152,13 @@
         <div class="editor-controls">
           <div class="editor-options">
             <button id="toggle-metadata" type="button" class="secondary quiet" aria-controls="editor-metadata" aria-expanded="false">标签<span id="metadata-count"></span><span class="system-icon" aria-hidden="true">&#xE70D;</span></button>
+            <span id="tag-inline-list" class="tag-inline-list"></span><input id="tag-inline-input" class="tag-inline-input" maxlength="120" placeholder="+ 标签" aria-label="输入标签后回车添加" />
             <button id="attach-photo" type="button" class="secondary quiet" title="添加照片附件，可一次选择多张">附件照片</button>
             <button id="attach-video" type="button" class="secondary quiet" title="添加视频附件（每篇文章一个，替换现有视频）">附件视频</button>
             <button id="attach-audio" type="button" class="secondary quiet" title="添加音频附件（每篇文章一个，替换现有音频）">附件音频</button>
             <section id="editor-metadata" class="editor-metadata" aria-labelledby="metadata-heading" hidden>
               <div class="metadata-heading"><h2 id="metadata-heading">标签</h2><button id="close-metadata" type="button" class="icon-button" aria-label="关闭标签" title="关闭"><span class="system-icon" aria-hidden="true">&#xE711;</span></button></div>
-              <div class="tag-bar"><span id="tag-list"></span><div class="tag-input-row"><input id="tag-input" maxlength="120" placeholder="输入标签，回车或点击添加" /><button id="add-tag" type="button" class="secondary">添加</button></div><span class="tag-help">随文章或草稿保存</span></div>
+              <div class="tag-bar"><div class="tag-input-row"><input id="tag-input" maxlength="120" placeholder="输入标签，回车或点击添加" /><button id="add-tag" type="button" class="secondary">添加</button></div><span class="tag-help">随文章或草稿保存；曾用标签点击即可添加</span></div>
               <div class="tag-usage" id="tag-usage" hidden><div class="tag-usage-heading">曾用标签</div><div id="tag-usage-list" class="tag-usage-list"></div></div>
             </section>
           </div>

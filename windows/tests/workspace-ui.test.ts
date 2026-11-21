@@ -106,9 +106,9 @@ test("composition Enter does not consume a tag or falsely report a new article a
   expect($("#save-state").textContent).toBe("新文章");
   const tag=$<HTMLInputElement>("#tag-input");tag.value="ceshi";
   const event=new window.KeyboardEvent("keydown",{key:"Enter",isComposing:true,bubbles:true,cancelable:true});tag.dispatchEvent(event);
-  expect(event.defaultPrevented).toBe(false);expect(tag.value).toBe("ceshi");expect($("#tag-list").textContent).toBe("");
+  expect(event.defaultPrevented).toBe(false);expect(tag.value).toBe("ceshi");expect($("#tag-inline-list").textContent).toBe("");
   tag.value="测试";tag.dispatchEvent(new window.KeyboardEvent("keydown",{key:"Enter",bubbles:true,cancelable:true}));
-  expect($("#tag-list").textContent).toContain("测试");
+  expect($("#tag-inline-list").textContent).toContain("测试");
 });
 
 test("editor and preview switching keeps unsaved content and exposes only the chosen pane",async()=>{
